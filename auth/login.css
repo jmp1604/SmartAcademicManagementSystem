@@ -44,8 +44,8 @@ body {
     }
 
 .plp-logo {
-    height: 72px;
-    width: 72px;
+    height: 75px;
+    width: 75px;
     object-fit: contain;
     transition: transform .25s ease;
     }
@@ -53,17 +53,16 @@ body {
 .plp-logo:hover { transform: scale(1.06); }
     
 .ccs-logo {
-    height: 125px;
-    width: 125px;
+    height: 75px;
+    width: 75px;
     object-fit: contain;
     transition: transform .25s ease;
-    margin-top: 20px;
 }
 
 .ccs-logo:hover { transform: scale(1.06); }
 .logo-divider {
     width: 1px;
-    height: 60px;
+    height: 65px;
     background: #d4ddd6;
     align-self: center;
     }
