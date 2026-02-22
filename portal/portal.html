@@ -1,0 +1,141 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+    <title>Smart Academic Management System — Portal</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet"/>
+    <link href="https://fonts.googleapis.com/css2?family=Merriweather:wght@400;700&family=Source+Sans+3:wght@400;500;600&display=swap" rel="stylesheet"/>
+    <link rel="stylesheet" href="portal.css"/>
+</head>
+<body>
+
+<div class="bg-image"></div>
+
+<div class="page-wrap">
+
+    <header class="topbar">
+        <div class="topbar-logos">
+            <img src="assets/plplogo.png" alt="PLP Logo" class="topbar-logo"/>
+            <div class="topbar-divider"></div>
+            <img src="assets/ccslogo.png" alt="CCS Logo" class="topbar-logo"/>
+            <div class="topbar-title">
+                Smart Academic Management System
+                <span>Pamantasan ng Lungsod ng Pasig — CCS</span>
+            </div>
+        </div>
+
+        <div class="topbar-user">
+            <div class="user-info">
+                <div class="user-name">Juan Dela Cruz</div>
+                <div class="user-role">Faculty</div>
+            </div>
+            <div class="user-avatar">JD</div>
+            <button class="btn-logout">Log Out</button>
+        </div>
+    </header>
+
+    <main class="main-content">
+
+        <div class="portal-heading">
+            <h2>Select a System</h2>
+            <p>Choose a module below to get started</p>
+        </div>
+
+        <div class="systems-grid">
+
+            <!-- Card 1: Thesis & Capstone -->
+            <a href="thesis-capstone.html" class="system-card">
+                <span class="card-number">01</span>
+                <div class="card-icon-wrap">
+                    <svg viewBox="0 0 24 24">
+                        <path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/>
+                        <path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/>
+                        <line x1="8" y1="7" x2="16" y2="7"/>
+                        <line x1="8" y1="11" x2="16" y2="11"/>
+                        <line x1="8" y1="15" x2="12" y2="15"/>
+                    </svg>
+                </div>
+                <div class="card-body-content">
+                    <div class="card-label">Archive</div>
+                    <div class="card-title-text">Thesis & Capstone Archiving</div>
+                    <div class="card-desc">Browse, submit, and manage student thesis and capstone project records in a centralized repository.</div>
+                </div>
+                <div class="card-arrow">
+                    <svg viewBox="0 0 24 24"><path d="M5 12h14M12 5l7 7-7 7"/></svg>
+                </div>
+            </a>
+
+            <!-- Card 2: Faculty Requirement -->
+            <a href="faculty-requirements.html" class="system-card">
+                <span class="card-number">02</span>
+                <div class="card-icon-wrap">
+                    <svg viewBox="0 0 24 24">
+                        <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
+                        <polyline points="14 2 14 8 20 8"/>
+                        <polyline points="9 15 11 17 15 13"/>
+                    </svg>
+                </div>
+                <div class="card-body-content">
+                    <div class="card-label">Submission</div>
+                    <div class="card-title-text">Faculty Requirement Submission</div>
+                    <div class="card-desc">Upload and track required faculty documents, clearances, and academic deliverables for each semester.</div>
+                </div>
+                <div class="card-arrow">
+                    <svg viewBox="0 0 24 24"><path d="M5 12h14M12 5l7 7-7 7"/></svg>
+                </div>
+            </a>
+
+            <!-- Card 3: Student Violation -->
+            <a href="student-violations.html" class="system-card">
+                <span class="card-number">03</span>
+                <div class="card-icon-wrap">
+                    <svg viewBox="0 0 24 24">
+                        <circle cx="12" cy="12" r="10"/>
+                        <line x1="12" y1="8" x2="12" y2="12"/>
+                        <line x1="12" y1="16" x2="12.01" y2="16"/>
+                    </svg>
+                </div>
+                <div class="card-body-content">
+                    <div class="card-label">Discipline</div>
+                    <div class="card-title-text">Student Violation Management</div>
+                    <div class="card-desc">Record, monitor, and resolve student disciplinary cases and incident reports across departments.</div>
+                </div>
+                <div class="card-arrow">
+                    <svg viewBox="0 0 24 24"><path d="M5 12h14M12 5l7 7-7 7"/></svg>
+                </div>
+            </a>
+
+            <!-- Card 4: Time In/Out -->
+            <a href="timeinout.html" class="system-card">
+                <span class="card-number">04</span>
+                <div class="card-icon-wrap">
+                    <svg viewBox="0 0 24 24">
+                        <circle cx="12" cy="12" r="10"/>
+                        <polyline points="12 6 12 12 16 14"/>
+                    </svg>
+                </div>
+                <div class="card-body-content">
+                    <div class="card-label">Monitoring</div>
+                    <div class="card-title-text">Time In & Time Out Monitoring</div>
+                    <div class="card-desc">Track faculty and staff attendance logs, monitor work hours, and generate attendance reports.</div>
+                </div>
+                <div class="card-arrow">
+                    <svg viewBox="0 0 24 24"><path d="M5 12h14M12 5l7 7-7 7"/></svg>
+                </div>
+            </a>
+
+        </div>
+    </main>
+
+    <footer class="footer">
+        © 2025 Pamantasan ng Lungsod ng Pasig — College of Computer Studies
+    </footer>
+</div>
+
+<button class="help-btn" title="Help">?</button>
+
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
+<script src="portal.js"></script>
+</body>
+</html>
