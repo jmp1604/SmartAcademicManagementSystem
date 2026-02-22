@@ -1,0 +1,286 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8"/>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+    <title>Files Management — CCS Faculty Requirement System</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet"/>
+    <link href="https://fonts.googleapis.com/css2?family=Merriweather:wght@400;700&family=Source+Sans+3:wght@400;500;600&display=swap" rel="stylesheet"/>
+    <link rel="stylesheet" href="../resc/css/admin.css"/>
+</head>
+<body>
+
+<header class="topbar">
+    <div class="topbar-left">
+        <img src="../../auth/assets/plplogo.png" alt="PLP" class="topbar-logo"/>
+        <img src="../../auth/assets/ccslogo.png" alt="CCS" class="topbar-logo-ccs"/>
+        <div class="topbar-info">
+            <span class="topbar-title">CCS Faculty Requirement Submission System</span>
+            <span class="topbar-subtitle">System Administrator Portal</span>
+        </div>
+    </div>
+    <a href="../../auth/login.html" class="btn-logout">
+        <svg viewBox="0 0 24 24"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>
+        Logout
+    </a>
+</header>
+
+<div id="sidebar-container"></div>
+
+<main class="main-content">
+
+    <div class="page-header anim anim-1">
+        <h1>Files Management</h1>
+        <p>Manage all faculty submissions across the system</p>
+    </div>
+
+    <div class="stat-cards anim anim-2">
+        <div class="stat-card green">
+            <div class="stat-label">Total Files</div>
+            <div class="stat-value" style="color:var(--text-main);">8</div>
+        </div>
+        <div class="stat-card blue">
+            <div class="stat-label">Total Storage</div>
+            <div class="stat-value">17.6 MB</div>
+        </div>
+        <div class="stat-card purple" style="--purple:#059669;">
+            <div class="stat-label">Approved</div>
+            <div class="stat-value" style="color:#059669;">5</div>
+        </div>
+        <div class="stat-card orange">
+            <div class="stat-label">Pending</div>
+            <div class="stat-value">2</div>
+        </div>
+    </div>
+
+    <div class="panel anim anim-3">
+        <div class="toolbar">
+            <div class="toolbar-title">
+                <svg viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
+                All System Files
+            </div>
+            <div class="toolbar-right">
+                <div class="search-box">
+                    <svg viewBox="0 0 24 24"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+                    <input type="text" class="search-input" placeholder="Search files..."/>
+                </div>
+                <select class="filter-select dept-filter">
+                    <option>All Depts</option>
+                    <option value="cs">CS</option>
+                    <option value="it">IT</option>
+                    <option value="is">IS</option>
+                    <option value="act">ACT</option>
+                </select>
+                <select class="filter-select cat-filter">
+                    <option>All Categories</option>
+                    <option>Syllabus</option>
+                    <option>Grade Sheets</option>
+                    <option>Lecture Notes</option>
+                    <option>Attendance Records</option>
+                    <option>Assessment Tools</option>
+                    <option>Research Papers</option>
+                </select>
+                <select class="filter-select status-filter">
+                    <option>All Status</option>
+                    <option>Approved</option>
+                    <option>Pending</option>
+                </select>
+            </div>
+        </div>
+
+        <table class="data-table">
+            <thead>
+                <tr>
+                    <th>File Name</th>
+                    <th>Uploader</th>
+                    <th>Department</th>
+                    <th>Category</th>
+                    <th>Date</th>
+                    <th>Size</th>
+                    <th>Status</th>
+                    <th>Actions</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr class="searchable-row" data-dept="cs" data-cat="syllabus" data-status="approved">
+                    <td>
+                        <div class="d-flex align-items-center gap-2">
+                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#6b7f6e" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
+                            <strong>CS101_Syllabus_Q1_2025.pdf</strong>
+                        </div>
+                    </td>
+                    <td>Dr. Juan Dela Cruz</td>
+                    <td><span class="badge badge-dept-cs">CS</span></td>
+                    <td>Syllabus</td>
+                    <td>2026-02-20</td>
+                    <td>2.4 MB</td>
+                    <td><span class="badge badge-approved">Approved</span></td>
+                    <td>
+                        <div class="d-flex gap-1">
+                            <button class="btn-action" title="View"><svg viewBox="0 0 24 24"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg></button>
+                            <button class="btn-action" title="Download"><svg viewBox="0 0 24 24"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg></button>
+                            <button class="btn-action danger btn-delete" title="Delete"><svg viewBox="0 0 24 24"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/><path d="M10 11v6"/><path d="M14 11v6"/><path d="M9 6V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2"/></svg></button>
+                        </div>
+                    </td>
+                </tr>
+                <tr class="searchable-row" data-dept="it" data-cat="grade sheets" data-status="approved">
+                    <td>
+                        <div class="d-flex align-items-center gap-2">
+                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#6b7f6e" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
+                            <strong>IT201_Grades_Final_2025.xlsx</strong>
+                        </div>
+                    </td>
+                    <td>Prof. Maria Santos</td>
+                    <td><span class="badge badge-dept-it">IT</span></td>
+                    <td>Grade Sheets</td>
+                    <td>2026-02-18</td>
+                    <td>1.8 MB</td>
+                    <td><span class="badge badge-approved">Approved</span></td>
+                    <td>
+                        <div class="d-flex gap-1">
+                            <button class="btn-action" title="View"><svg viewBox="0 0 24 24"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg></button>
+                            <button class="btn-action" title="Download"><svg viewBox="0 0 24 24"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg></button>
+                            <button class="btn-action danger btn-delete" title="Delete"><svg viewBox="0 0 24 24"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/><path d="M10 11v6"/><path d="M14 11v6"/><path d="M9 6V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2"/></svg></button>
+                        </div>
+                    </td>
+                </tr>
+                <tr class="searchable-row" data-dept="is" data-cat="lecture notes" data-status="pending">
+                    <td>
+                        <div class="d-flex align-items-center gap-2">
+                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#6b7f6e" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
+                            <strong>IS301_LectureNotes_Week1.pdf</strong>
+                        </div>
+                    </td>
+                    <td>Dr. Ana Garcia</td>
+                    <td><span class="badge badge-dept-is">IS</span></td>
+                    <td>Lecture Notes</td>
+                    <td>2026-02-22</td>
+                    <td>3.2 MB</td>
+                    <td><span class="badge badge-pending">Pending</span></td>
+                    <td>
+                        <div class="d-flex gap-1">
+                            <button class="btn-action" title="View"><svg viewBox="0 0 24 24"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg></button>
+                            <button class="btn-action" title="Download"><svg viewBox="0 0 24 24"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg></button>
+                            <button class="btn-action danger btn-delete" title="Delete"><svg viewBox="0 0 24 24"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/><path d="M10 11v6"/><path d="M14 11v6"/><path d="M9 6V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2"/></svg></button>
+                        </div>
+                    </td>
+                </tr>
+                <tr class="searchable-row" data-dept="act" data-cat="attendance records" data-status="approved">
+                    <td>
+                        <div class="d-flex align-items-center gap-2">
+                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#6b7f6e" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
+                            <strong>ACT101_Attendance_January.xlsx</strong>
+                        </div>
+                    </td>
+                    <td>Prof. Jose Ramos</td>
+                    <td><span class="badge badge-dept-act">ACT</span></td>
+                    <td>Attendance Records</td>
+                    <td>2026-02-15</td>
+                    <td>890 KB</td>
+                    <td><span class="badge badge-approved">Approved</span></td>
+                    <td>
+                        <div class="d-flex gap-1">
+                            <button class="btn-action" title="View"><svg viewBox="0 0 24 24"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg></button>
+                            <button class="btn-action" title="Download"><svg viewBox="0 0 24 24"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg></button>
+                            <button class="btn-action danger btn-delete" title="Delete"><svg viewBox="0 0 24 24"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/><path d="M10 11v6"/><path d="M14 11v6"/><path d="M9 6V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2"/></svg></button>
+                        </div>
+                    </td>
+                </tr>
+                <tr class="searchable-row" data-dept="cs" data-cat="assessment tools" data-status="approved">
+                    <td>
+                        <div class="d-flex align-items-center gap-2">
+                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#6b7f6e" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
+                            <strong>CS201_Midterm_Exam.pdf</strong>
+                        </div>
+                    </td>
+                    <td>Dr. Juan Dela Cruz</td>
+                    <td><span class="badge badge-dept-cs">CS</span></td>
+                    <td>Assessment Tools</td>
+                    <td>2026-02-10</td>
+                    <td>1.2 MB</td>
+                    <td><span class="badge badge-approved">Approved</span></td>
+                    <td>
+                        <div class="d-flex gap-1">
+                            <button class="btn-action" title="View"><svg viewBox="0 0 24 24"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg></button>
+                            <button class="btn-action" title="Download"><svg viewBox="0 0 24 24"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg></button>
+                            <button class="btn-action danger btn-delete" title="Delete"><svg viewBox="0 0 24 24"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/><path d="M10 11v6"/><path d="M14 11v6"/><path d="M9 6V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2"/></svg></button>
+                        </div>
+                    </td>
+                </tr>
+                <tr class="searchable-row" data-dept="it" data-cat="research papers" data-status="pending">
+                    <td>
+                        <div class="d-flex align-items-center gap-2">
+                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#6b7f6e" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
+                            <strong>IT301_Research_Paper.pdf</strong>
+                        </div>
+                    </td>
+                    <td>Prof. Maria Santos</td>
+                    <td><span class="badge badge-dept-it">IT</span></td>
+                    <td>Research Papers</td>
+                    <td>2026-02-19</td>
+                    <td>4.5 MB</td>
+                    <td><span class="badge badge-pending">Pending</span></td>
+                    <td>
+                        <div class="d-flex gap-1">
+                            <button class="btn-action" title="View"><svg viewBox="0 0 24 24"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg></button>
+                            <button class="btn-action" title="Download"><svg viewBox="0 0 24 24"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg></button>
+                            <button class="btn-action danger btn-delete" title="Delete"><svg viewBox="0 0 24 24"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/><path d="M10 11v6"/><path d="M14 11v6"/><path d="M9 6V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2"/></svg></button>
+                        </div>
+                    </td>
+                </tr>
+                <tr class="searchable-row" data-dept="is" data-cat="grade sheets" data-status="approved">
+                    <td>
+                        <div class="d-flex align-items-center gap-2">
+                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#6b7f6e" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
+                            <strong>IS401_FinalGrades_S2.xlsx</strong>
+                        </div>
+                    </td>
+                    <td>Dr. Ana Garcia</td>
+                    <td><span class="badge badge-dept-is">IS</span></td>
+                    <td>Grade Sheets</td>
+                    <td>2026-02-08</td>
+                    <td>2.1 MB</td>
+                    <td><span class="badge badge-approved">Approved</span></td>
+                    <td>
+                        <div class="d-flex gap-1">
+                            <button class="btn-action" title="View"><svg viewBox="0 0 24 24"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg></button>
+                            <button class="btn-action" title="Download"><svg viewBox="0 0 24 24"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg></button>
+                            <button class="btn-action danger btn-delete" title="Delete"><svg viewBox="0 0 24 24"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/><path d="M10 11v6"/><path d="M14 11v6"/><path d="M9 6V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2"/></svg></button>
+                        </div>
+                    </td>
+                </tr>
+                <tr class="searchable-row" data-dept="act" data-cat="syllabus" data-status="approved">
+                    <td>
+                        <div class="d-flex align-items-center gap-2">
+                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#6b7f6e" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
+                            <strong>ACT201_Syllabus_Q2_2025.pdf</strong>
+                        </div>
+                    </td>
+                    <td>Prof. Jose Ramos</td>
+                    <td><span class="badge badge-dept-act">ACT</span></td>
+                    <td>Syllabus</td>
+                    <td>2026-02-05</td>
+                    <td>1.4 MB</td>
+                    <td><span class="badge badge-approved">Approved</span></td>
+                    <td>
+                        <div class="d-flex gap-1">
+                            <button class="btn-action" title="View"><svg viewBox="0 0 24 24"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg></button>
+                            <button class="btn-action" title="Download"><svg viewBox="0 0 24 24"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg></button>
+                            <button class="btn-action danger btn-delete" title="Delete"><svg viewBox="0 0 24 24"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/><path d="M10 11v6"/><path d="M14 11v6"/><path d="M9 6V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2"/></svg></button>
+                        </div>
+                    </td>
+                </tr>
+            </tbody>
+        </table>
+    </div>
+
+</main>
+
+<button class="help-btn">?</button>
+
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
+<script src="../resc/js/admin.js"></script>
+<script src="../includes/sidebar.js"></script>
+<script>loadSidebar('filesmanagement');</script>
+</body>
+</html>
