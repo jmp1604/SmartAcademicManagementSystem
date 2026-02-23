@@ -4,7 +4,7 @@ document.addEventListener('DOMContentLoaded', function () {
         logoutBtn.addEventListener('click', function (e) {
             e.preventDefault();
             if (confirm('Are you sure you want to log out?')) {
-                window.location.href = 'login.html';
+                window.location.href = '../../auth/login.html';
             }
         });
     }
