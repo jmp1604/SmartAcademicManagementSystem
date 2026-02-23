@@ -11,20 +11,7 @@
 </head>
 <body>
 
-<header class="topbar">
-    <div class="topbar-left">
-        <img src="../../auth/assets/plplogo.png" alt="PLP" class="topbar-logo"/>
-        <img src="../../auth/assets/ccslogo.png" alt="CCS" class="topbar-logo-ccs"/>
-        <div class="topbar-info">
-            <span class="topbar-title">CCS Faculty Requirement Submission System</span>
-            <span class="topbar-subtitle">System Administrator Portal</span>
-        </div>
-    </div>
-    <a href="../../auth/login.html" class="btn-logout">
-        <svg viewBox="0 0 24 24"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>
-        Logout
-    </a>
-</header>
+<div id="header-container"></div>
 
 <div id="sidebar-container"></div>
 
@@ -283,6 +270,9 @@
 <script src="../resc/js/common.js"></script>
 <script src="../resc/js/filesmanagement.js"></script>
 <script src="../includes/sidebar.js"></script>
-<script>loadSidebar('filesmanagement');</script>
+<script>
+    loadHeader();
+    loadSidebar('filesmanagement');
+</script>
 </body>
 </html>
