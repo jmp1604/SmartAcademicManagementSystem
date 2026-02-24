@@ -102,7 +102,6 @@ function updateNavigationButtons() {
     }
 }
 
-// Validate current step
 function validateStep(step) {
     const currentStepElement = document.querySelector(`.form-step[data-step="${step}"]`);
     const inputs = currentStepElement.querySelectorAll('input[required], select[required]');
@@ -114,7 +113,6 @@ function validateStep(step) {
         }
     });
 
-    // Additional validation for step 2 (password matching)
     if (step === 2) {
         const password = document.getElementById('password');
         const confirmPassword = document.getElementById('confirmPassword');
@@ -136,11 +134,8 @@ function validateStep(step) {
     return isValid;
 }
 
-// Validate individual field
 function validateField(field) {
     const value = field.value.trim();
-    
-    // Remove previous error messages
     clearError(field);
 
     if (field.hasAttribute('required') && !value) {
@@ -169,18 +164,15 @@ function validateField(field) {
     return true;
 }
 
-// Show error message
 function showError(field, message) {
     field.classList.add('is-invalid');
     field.classList.remove('is-valid');
     
-    // Remove existing error message if any
     const existingError = field.parentElement.querySelector('.invalid-feedback');
     if (existingError) {
         existingError.remove();
     }
 
-    // Add new error message
     const errorDiv = document.createElement('div');
     errorDiv.className = 'invalid-feedback';
     errorDiv.textContent = message;
@@ -192,17 +184,15 @@ function showError(field, message) {
     }
 }
 
-// Clear error message
 function clearError(field) {
     field.classList.remove('is-invalid', 'is-valid');
     const errorDiv = field.parentElement.querySelector('.invalid-feedback') || 
-                     field.parentElement.parentElement.querySelector('.invalid-feedback');
+                    field.parentElement.parentElement.querySelector('.invalid-feedback');
     if (errorDiv) {
         errorDiv.remove();
     }
 }
 
-// Setup real-time validation
 function setupFormValidation() {
     const inputs = form.querySelectorAll('input, select');
     
@@ -220,7 +210,6 @@ function setupFormValidation() {
         });
     });
 
-    // Real-time password match validation
     const confirmPassword = document.getElementById('confirmPassword');
     confirmPassword.addEventListener('input', function() {
         const password = document.getElementById('password');
@@ -233,9 +222,7 @@ function setupFormValidation() {
     });
 }
 
-// Submit registration
 function submitRegistration() {
-    // Collect form data
     const formData = {
         employee_id: document.getElementById('employeeId').value.trim(),
         first_name: document.getElementById('firstName').value.trim(),
@@ -243,22 +230,18 @@ function submitRegistration() {
         last_name: document.getElementById('lastName').value.trim(),
         department: document.getElementById('department').value,
         role: document.getElementById('role').value,
+        user_type: document.getElementById('userType').value,
         email: document.getElementById('email').value.trim(),
         password: document.getElementById('password').value,
-        status: 'pending', // Pending admin approval
+        status: 'pending', 
         created_at: new Date().toISOString(),
         updated_at: new Date().toISOString()
     };
 
-    // Store in localStorage (in production, this would be sent to a server)
     let registrations = JSON.parse(localStorage.getItem('pendingRegistrations') || '[]');
     registrations.push(formData);
     localStorage.setItem('pendingRegistrations', JSON.stringify(registrations));
-
-    // Show success message
     alert('Registration successful! Your account is pending admin approval. You will be notified once your account is activated.');
-
-    // Redirect to login page
     setTimeout(() => {
         window.location.href = 'login.html';
     }, 1000);
