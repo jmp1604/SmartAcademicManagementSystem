@@ -15,8 +15,6 @@ document.addEventListener('DOMContentLoaded', function() {
             alert('Please enter both email and password');
             return;
         }
-
-        // Disable submit button during login
         submitBtn.disabled = true;
         submitBtn.textContent = 'Signing in...';
 
@@ -32,7 +30,6 @@ document.addEventListener('DOMContentLoaded', function() {
 });
 
 async function loginUser(email, password) {
-    // Check if Supabase is configured
     if (!supabaseClient) {
         throw new Error('Database connection not available. Please check configuration.');
     }
@@ -41,7 +38,6 @@ async function loginUser(email, password) {
     let tableName = '';
     let userRole = '';
 
-    // First, check admins table
     const { data: adminData, error: adminError } = await supabaseClient
         .from('admins')
         .select('*')
@@ -49,7 +45,7 @@ async function loginUser(email, password) {
         .eq('password', password)
         .single();
 
-    if (adminError && adminError.code !== 'PGRST116') { // PGRST116 is "not found" error
+    if (adminError && adminError.code !== 'PGRST116') { 
         throw adminError;
     }
 
@@ -58,7 +54,6 @@ async function loginUser(email, password) {
         tableName = 'admins';
         userRole = 'admin';
     } else {
-        // If not found in admins, check professors table
         const { data: profData, error: profError } = await supabaseClient
             .from('professors')
             .select('*')
@@ -73,21 +68,18 @@ async function loginUser(email, password) {
         if (profData) {
             userData = profData;
             tableName = 'professors';
-            userRole = profData.role || 'faculty'; // Use role from database (dean or faculty)
+            userRole = profData.role || 'faculty'; 
         }
     }
 
-    // Validate login
     if (!userData) {
         throw new Error('Invalid email or password');
     }
 
-    // Check account status
     if (userData.status !== 'active') {
         throw new Error('Your account is not active. Please contact the administrator.');
     }
 
-    // Store user session
     sessionStorage.setItem('user', JSON.stringify({
         id: userData.professor_id || userData.admin_id,
         employeeId: userData.employee_id,
@@ -101,7 +93,6 @@ async function loginUser(email, password) {
         loginTime: new Date().toISOString()
     }));
 
-    // Redirect to portal for all users to choose their system
     window.location.href = '../portal/portal.html';
 }
 

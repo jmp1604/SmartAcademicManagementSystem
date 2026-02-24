@@ -269,8 +269,6 @@ async function submitRegistration() {
         if (!supabaseClient) {
             throw new Error('Database connection not available. Please check configuration.');
         }
-
-        // Check existing emails first
         const { data: existingProfessor } = await supabaseClient
             .from('professors')
             .select('email')
@@ -290,8 +288,6 @@ async function submitRegistration() {
             return;
         }
 
-        // Step 1: Create Supabase Auth user first
-        // This generates the UUID that will be used as professor_id or admin_id
         const { data: authData, error: authError } = await supabaseClient.auth.signUp({
             email: email,
             password: password
@@ -300,7 +296,6 @@ async function submitRegistration() {
         if (authError) throw authError;
         if (!authData.user) throw new Error('Failed to create auth user.');
 
-        // Step 2: Use the UUID from Supabase Auth
         const authUserId = authData.user.id;
 
         let result;
@@ -343,7 +338,6 @@ async function submitRegistration() {
         }
 
         if (result.error) {
-            // If profile insert fails, clean up the auth user to avoid orphaned auth accounts
             await supabaseClient.auth.admin.deleteUser(authUserId);
             throw result.error;
         }

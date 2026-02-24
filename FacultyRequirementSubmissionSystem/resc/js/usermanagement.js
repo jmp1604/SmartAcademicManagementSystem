@@ -1,12 +1,4 @@
-// User Management page functionality
-// 
-// Supabase Client is available globally via supabaseClient
-// Example: const { data, error } = await supabaseClient.from('users').select('*');
-//
-
 document.addEventListener('DOMContentLoaded', function () {
-
-    // Search functionality
     const searchInput = document.querySelector('.search-input');
     if (searchInput) {
         searchInput.addEventListener('input', function () {
@@ -17,7 +9,6 @@ document.addEventListener('DOMContentLoaded', function () {
         });
     }
 
-    // Role filter
     const roleFilter = document.querySelector('.role-filter');
     if (roleFilter) {
         roleFilter.addEventListener('change', function () {
@@ -29,7 +20,6 @@ document.addEventListener('DOMContentLoaded', function () {
         });
     }
 
-    // Delete button functionality
     document.querySelectorAll('.btn-delete').forEach(function (btn) {
         btn.addEventListener('click', function () {
             const row = this.closest('tr');
@@ -41,7 +31,6 @@ document.addEventListener('DOMContentLoaded', function () {
         });
     });
 
-    // Add user button
     const addUserBtn = document.querySelector('.btn-add-user');
     if (addUserBtn) {
         addUserBtn.addEventListener('click', function () {

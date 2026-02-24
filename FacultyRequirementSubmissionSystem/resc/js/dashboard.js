@@ -1,15 +1,3 @@
-// Dashboard-specific functionality
-// 
-// Supabase Usage Examples:
-// -----------------------
-// Query data: const { data, error } = await supabaseClient.from('table_name').select('*');
-// Insert data: await supabaseClient.from('table_name').insert({ column: 'value' });
-// Update data: await supabaseClient.from('table_name').update({ column: 'new_value' }).eq('id', 1);
-// Delete data: await supabaseClient.from('table_name').delete().eq('id', 1);
-// 
-// The supabaseClient is globally available after config.js loads
-//
-
 document.addEventListener('DOMContentLoaded', function () {
     if (typeof Chart !== 'undefined') {
         initDashboardCharts();
