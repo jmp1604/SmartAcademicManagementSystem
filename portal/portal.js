@@ -54,8 +54,9 @@ function displayUserInfo() {
             
             // Update user name display
             const userNameEl = document.querySelector('.user-name');
-            if (userNameEl && user.username) {
-                userNameEl.textContent = user.username;
+            if (userNameEl) {
+                const fullName = `${user.firstName || ''} ${user.lastName || ''}`.trim() || user.email;
+                userNameEl.textContent = fullName;
             }
             
             // Update user role display
@@ -66,8 +67,9 @@ function displayUserInfo() {
             
             // Update user avatar with initials
             const userAvatarEl = document.querySelector('.user-avatar');
-            if (userAvatarEl && user.username) {
-                const initials = getInitials(user.username);
+            if (userAvatarEl) {
+                const fullName = `${user.firstName || ''} ${user.lastName || ''}`.trim() || user.email;
+                const initials = getInitials(fullName);
                 userAvatarEl.textContent = initials;
             }
         } catch (e) {
