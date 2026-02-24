@@ -17,7 +17,7 @@ index.html → auth/login.html → portal/portal.html → [4 Modules]
 ```
 
 ### 1. Faculty Requirement Submission System
-**Status:** ✅ Active  
+**Status:** Active  
 **Path:** `/FacultyRequirementSubmissionSystem/pages/dashboard.html`  
 **Features:**
 - Dashboard with system statistics
@@ -26,17 +26,17 @@ index.html → auth/login.html → portal/portal.html → [4 Modules]
 - Supabase integration with connection indicator
 
 ### 2. Thesis & Capstone Archiving
-**Status:** 🚧 In Development  
+**Status:** In Development  
 **Path:** `/ThesisAndCapstoneArchiving/placeholder.html`  
 **Purpose:** Browse, submit, and manage student thesis and capstone project records
 
 ### 3. Student Violation Management System
-**Status:** 🚧 In Development  
+**Status:** In Development  
 **Path:** `/StudentViolationManagementSystem/placeholder.html`  
 **Purpose:** Record, monitor, and resolve student disciplinary cases
 
 ### 4. Time In & Time Out Monitoring
-**Status:** 🚧 In Development  
+**Status:** In Development  
 **Path:** `/TimeInAndTimeOutMonitoring/placeholder.html`  
 **Purpose:** Track faculty and staff attendance logs and work hours
 

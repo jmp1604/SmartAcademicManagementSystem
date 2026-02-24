@@ -24,14 +24,14 @@
     <form action="#" method="POST" novalidate>
 
     <div class="mb-field">
-        <label class="form-label" for="username">Username</label>
+        <label class="form-label" for="username">Email</label>
         <div class="input-wrapper">
             <input
-            type="text"
+            type="email"
             id="username"
             name="username"
             class="form-control"
-            placeholder="Enter your username"
+            placeholder="Enter your email"
             autocomplete="username"
             required
         />
@@ -79,43 +79,10 @@
 
 <button class="help-btn" title="Help">?</button>
 
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="../config/.env.js"></script>
+<script src="../config/config.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
-<script>
-    function togglePassword() {
-        const pwd = document.getElementById('password');
-        const icon = document.getElementById('toggle-icon');
-            if (pwd.type === 'password') {
-                pwd.type = 'text';
-                icon.innerHTML = `<path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94"/><path d="M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19"/><line x1="1" y1="1" x2="23" y2="23"/>`;
-            } else {
-                pwd.type = 'password';
-                icon.innerHTML = `<path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/>`;
-    }
-    }
-
-    document.addEventListener('DOMContentLoaded', function() {
-        const form = document.querySelector('form');
-        form.addEventListener('submit', function(e) {
-            e.preventDefault();
-            
-            const username = document.getElementById('username').value;
-            const password = document.getElementById('password').value;
-            const role = document.getElementById('role').value;
-            
-            if (!username || !password) {
-                alert('Please enter both username and password');
-                return;
-            }
-            
-            sessionStorage.setItem('user', JSON.stringify({
-                username: username,
-                role: role,
-                loginTime: new Date().toISOString()
-            }));
-
-            window.location.href = '../portal/portal.html';
-        });
-    });
-</script>
+<script src="login.js"></script>
 </body>
 </html>
