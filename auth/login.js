@@ -3,7 +3,6 @@ document.addEventListener('DOMContentLoaded', function() {
     const form = document.querySelector('form');
     const usernameInput = document.getElementById('username');
     const passwordInput = document.getElementById('password');
-    const roleSelect = document.getElementById('role');
     const submitBtn = document.querySelector('.btn-signin');
 
     form.addEventListener('submit', async function(e) {
@@ -11,7 +10,6 @@ document.addEventListener('DOMContentLoaded', function() {
         
         const username = usernameInput.value.trim();
         const password = passwordInput.value;
-        const role = roleSelect.value;
         
         if (!username || !password) {
             alert('Please enter both email and password');
@@ -23,7 +21,7 @@ document.addEventListener('DOMContentLoaded', function() {
         submitBtn.textContent = 'Signing in...';
 
         try {
-            await loginUser(username, password, role);
+            await loginUser(username, password);
         } catch (error) {
             console.error('Login error:', error);
             alert('Login failed: ' + (error.message || 'Unknown error occurred'));
@@ -33,7 +31,7 @@ document.addEventListener('DOMContentLoaded', function() {
     });
 });
 
-async function loginUser(email, password, roleType) {
+async function loginUser(email, password) {
     // Check if Supabase is configured
     if (!supabaseClient) {
         throw new Error('Database connection not available. Please check configuration.');
@@ -41,41 +39,41 @@ async function loginUser(email, password, roleType) {
 
     let userData = null;
     let tableName = '';
+    let userRole = '';
 
-    // Search in appropriate table based on role
-    if (roleType === 'admin') {
-        // Check admins table
-        const { data, error } = await supabaseClient
-            .from('admins')
-            .select('*')
-            .eq('email', email)
-            .eq('password', password)
-            .single();
+    // First, check admins table
+    const { data: adminData, error: adminError } = await supabaseClient
+        .from('admins')
+        .select('*')
+        .eq('email', email)
+        .eq('password', password)
+        .single();
 
-        if (error && error.code !== 'PGRST116') { // PGRST116 is "not found" error
-            throw error;
-        }
+    if (adminError && adminError.code !== 'PGRST116') { // PGRST116 is "not found" error
+        throw adminError;
+    }
 
-        if (data) {
-            userData = data;
-            tableName = 'admins';
-        }
-    } else if (roleType === 'faculty' || roleType === 'dean') {
-        // Check professors table
-        const { data, error } = await supabaseClient
+    if (adminData) {
+        userData = adminData;
+        tableName = 'admins';
+        userRole = 'admin';
+    } else {
+        // If not found in admins, check professors table
+        const { data: profData, error: profError } = await supabaseClient
             .from('professors')
             .select('*')
             .eq('email', email)
             .eq('password', password)
             .single();
 
-        if (error && error.code !== 'PGRST116') {
-            throw error;
+        if (profError && profError.code !== 'PGRST116') {
+            throw profError;
         }
 
-        if (data) {
-            userData = data;
+        if (profData) {
+            userData = profData;
             tableName = 'professors';
+            userRole = profData.role || 'faculty'; // Use role from database (dean or faculty)
         }
     }
 
@@ -89,11 +87,6 @@ async function loginUser(email, password, roleType) {
         throw new Error('Your account is not active. Please contact the administrator.');
     }
 
-    // Check if role matches (for professors)
-    if (tableName === 'professors' && roleType === 'dean' && userData.role !== 'dean') {
-        throw new Error('You do not have dean privileges');
-    }
-
     // Store user session
     sessionStorage.setItem('user', JSON.stringify({
         id: userData.professor_id || userData.admin_id,
@@ -102,20 +95,14 @@ async function loginUser(email, password, roleType) {
         middleName: userData.middle_name,
         lastName: userData.last_name,
         email: userData.email,
-        role: roleType,
+        role: userRole,
         userType: tableName === 'admins' ? 'admin' : 'professor',
         department: userData.department || null,
         loginTime: new Date().toISOString()
     }));
 
-    // Redirect based on role
-    if (roleType === 'admin') {
-        window.location.href = '../FacultyRequirementSubmissionSystem/pages/dashboard.html';
-    } else if (roleType === 'dean') {
-        window.location.href = '../portal/portal.html'; // Update this to dean dashboard when available
-    } else {
-        window.location.href = '../portal/portal.html';
-    }
+    // Redirect to portal for all users to choose their system
+    window.location.href = '../portal/portal.html';
 }
 
 function togglePassword() {
