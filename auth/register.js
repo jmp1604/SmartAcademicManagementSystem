@@ -223,6 +223,7 @@ function setupUserTypeToggle() {
     const middleNameField = document.getElementById('middleNameField');
     const lastNameField = document.getElementById('lastNameField');
     const lastNameInput = document.getElementById('lastName');
+    const adminLevelField = document.getElementById('adminLevelField');
     
     function toggleRoleField() {
         if (userTypeSelect.value === 'admin') {
@@ -230,6 +231,7 @@ function setupUserTypeToggle() {
             employeeIdField.style.display = 'none';
             middleNameField.style.display = 'none';
             lastNameField.style.display = 'none';
+            adminLevelField.style.display = 'block'; 
             if (firstNameLabel) firstNameLabel.textContent = 'Admin Name';
             firstNameInput.placeholder = 'Enter admin name';
             lastNameInput.removeAttribute('required');
@@ -240,6 +242,7 @@ function setupUserTypeToggle() {
             employeeIdField.style.display = 'block';
             middleNameField.style.display = 'block';
             lastNameField.style.display = 'block';
+            adminLevelField.style.display = 'none';
             if (firstNameLabel) firstNameLabel.textContent = 'First Name';
             firstNameInput.placeholder = 'First name';
             lastNameInput.setAttribute('required', 'required');
@@ -262,8 +265,12 @@ async function submitRegistration() {
     const middleName = document.getElementById('middleName').value.trim();
     const lastName = document.getElementById('lastName').value.trim();
     const role = document.getElementById('role').value;
+    const adminLevelElement = document.getElementById('adminLevel');
+    const adminLevel = adminLevelElement ? adminLevelElement.value : 'admin'; 
     const email = document.getElementById('email').value.trim();
     const password = document.getElementById('password').value;
+
+    console.log('Registration data:', { userType, adminLevel, email }); 
 
     try {
         if (!supabaseClient) {
@@ -309,13 +316,16 @@ async function submitRegistration() {
                     admin_name: firstName,
                     email: email,
                     password: password,
+                    admin_level: adminLevel || 'admin', // Ensure fallback to 'admin'
                     profile_picture: null,
                     status: 'active',
                     created_at: new Date().toISOString(),
                     updated_at: new Date().toISOString()
                 }]);
 
-            successMessage = 'Admin registration successful! You can now log in.';
+            console.log('Admin insert result:', result); // Debug log
+
+            successMessage = `${adminLevel === 'super_admin' ? 'Super Admin' : 'Admin'} registration successful! You can now log in.`;
 
         } else {
             result = await supabaseClient
@@ -338,6 +348,7 @@ async function submitRegistration() {
         }
 
         if (result.error) {
+            console.error('Database insert error:', result.error); // Debug log
             await supabaseClient.auth.admin.deleteUser(authUserId);
             throw result.error;
         }
@@ -349,6 +360,7 @@ async function submitRegistration() {
 
     } catch (error) {
         console.error('Registration error:', error);
+        console.error('Error details:', error.message, error.details, error.hint); // More detailed error logging
         alert('Registration failed: ' + (error.message || 'Unknown error occurred'));
         submitBtn.disabled = false;
         submitBtn.textContent = 'Complete Registration';

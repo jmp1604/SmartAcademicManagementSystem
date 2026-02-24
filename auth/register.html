@@ -104,6 +104,15 @@
                 <small class="field-hint" style="color: #ff6b6b;">⚠️ Temporary field for development - Select Admin to create admin accounts</small>
             </div>
 
+            <div class="mb-field" id="adminLevelField" style="display: none;">
+                <label class="form-label" for="adminLevel">Admin Level <span class="required">*</span></label>
+                <select id="adminLevel" name="adminLevel" class="form-select">
+                    <option value="admin" selected>Regular Admin</option>
+                    <option value="super_admin">Super Admin</option>
+                </select>
+                <small class="field-hint">Super Admin can manage users and grant access</small>
+            </div>
+
         </div>
 
         <!-- Step 2: Account Details -->
