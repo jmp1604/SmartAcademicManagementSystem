@@ -4,8 +4,6 @@ function checkSupabaseConnection() {
     
     if (typeof supabaseClient !== 'undefined' && supabaseClient !== null) {
         console.log('✓ Supabase client is connected to:', SUPABASE_CONFIG.projectUrl);
-        
-        // Update indicator to show connected status (green light)
         if (indicator) {
             indicator.classList.add('connected');
             indicator.classList.remove('disconnected');
@@ -15,8 +13,6 @@ function checkSupabaseConnection() {
         return true;
     } else {
         console.error('✗ Supabase client is not initialized');
-        
-        // Update indicator to show disconnected status (red light)
         if (indicator) {
             indicator.classList.add('disconnected');
             indicator.classList.remove('connected');
@@ -27,11 +23,9 @@ function checkSupabaseConnection() {
     }
 }
 
-// Check if user is logged in
 function checkUserSession() {
     const user = sessionStorage.getItem('user');
     if (!user) {
-        // Redirect to login if no session found
         window.location.href = '../../auth/login.html';
         return false;
     }
@@ -39,10 +33,7 @@ function checkUserSession() {
 }
 
 document.addEventListener('DOMContentLoaded', function () {
-    // Check user session first
     checkUserSession();
-    
-    // Verify Supabase connection on page load
     checkSupabaseConnection();
     
     const logoutBtn = document.querySelector('.btn-logout');

@@ -28,32 +28,32 @@
                 Total Users
                 <svg viewBox="0 0 24 24"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
             </div>
-            <div class="stat-value">60</div>
-            <div class="stat-sub">+5 new this month</div>
+            <div class="stat-value" id="totalUsers">0</div>
+            <div class="stat-sub" id="newUsersText">Loading...</div>
         </div>
         <div class="stat-card blue anim anim-2">
             <div class="stat-label">
                 Total Submissions
                 <svg viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/><polyline points="10 9 9 9 8 9"/></svg>
             </div>
-            <div class="stat-value">1,250</div>
-            <div class="stat-sub">+320 this semester</div>
+            <div class="stat-value" id="totalSubmissions">0</div>
+            <div class="stat-sub" id="submissionsText">Loading...</div>
         </div>
         <div class="stat-card purple anim anim-3">
             <div class="stat-label">
                 Departments
                 <svg viewBox="0 0 24 24"><rect x="2" y="7" width="20" height="14" rx="2" ry="2"/><path d="M16 21V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v16"/></svg>
             </div>
-            <div class="stat-value">4</div>
-            <div class="stat-sub">Active departments</div>
+            <div class="stat-value" id="totalDepartments">0</div>
+            <div class="stat-sub" id="departmentsText">Loading...</div>
         </div>
         <div class="stat-card orange anim anim-4">
             <div class="stat-label">
                 System Uptime
                 <svg viewBox="0 0 24 24"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>
             </div>
-            <div class="stat-value">99.9%</div>
-            <div class="stat-sub">Excellent performance</div>
+            <div class="stat-value" id="systemUptime">--%</div>
+            <div class="stat-sub" id="uptimeText">Loading...</div>
         </div>
     </div>
 
@@ -87,55 +87,8 @@
                     <th>Status</th>
                 </tr>
             </thead>
-            <tbody>
-                <tr>
-                    <td><strong>Computer Science</strong></td>
-                    <td>25 members</td>
-                    <td>145 documents</td>
-                    <td>
-                        <div class="progress-wrap">
-                            <div class="progress-bar-bg"><div class="progress-bar-fill" style="width:92%"></div></div>
-                            <span class="progress-pct">92%</span>
-                        </div>
-                    </td>
-                    <td><span class="badge badge-excellent">Excellent</span></td>
-                </tr>
-                <tr>
-                    <td><strong>Information Technology</strong></td>
-                    <td>18 members</td>
-                    <td>98 documents</td>
-                    <td>
-                        <div class="progress-wrap">
-                            <div class="progress-bar-bg"><div class="progress-bar-fill" style="width:78%"></div></div>
-                            <span class="progress-pct">78%</span>
-                        </div>
-                    </td>
-                    <td><span class="badge badge-attention">Needs Attention</span></td>
-                </tr>
-                <tr>
-                    <td><strong>Information Systems</strong></td>
-                    <td>12 members</td>
-                    <td>76 documents</td>
-                    <td>
-                        <div class="progress-wrap">
-                            <div class="progress-bar-bg"><div class="progress-bar-fill" style="width:85%"></div></div>
-                            <span class="progress-pct">85%</span>
-                        </div>
-                    </td>
-                    <td><span class="badge badge-good">Good</span></td>
-                </tr>
-                <tr>
-                    <td><strong>Accounting Technology</strong></td>
-                    <td>15 members</td>
-                    <td>110 documents</td>
-                    <td>
-                        <div class="progress-wrap">
-                            <div class="progress-bar-bg"><div class="progress-bar-fill" style="width:95%"></div></div>
-                            <span class="progress-pct">95%</span>
-                        </div>
-                    </td>
-                    <td><span class="badge badge-excellent">Excellent</span></td>
-                </tr>
+            <tbody id="departmentStatsTable">
+                <!-- Department statistics will be loaded dynamically -->
             </tbody>
         </table>
     </div>
@@ -146,45 +99,13 @@
             Recent System Activities
         </div>
 
-        <div class="activity-item">
-            <div class="activity-dot dot-green"></div>
-            <div class="activity-body">
-                <div class="activity-name">Dr. Juan Dela Cruz</div>
-                <div class="activity-action">Submitted 3 documents</div>
+        <div id="activityList">
+            <!-- Recent activities will be loaded dynamically -->
+            <div class="activity-item">
+                <div class="activity-body" style="text-align: center; color: #8faaa7; padding: 2rem 0;">
+                    No recent activities
+                </div>
             </div>
-            <div class="activity-time">5 minutes ago</div>
-        </div>
-        <div class="activity-item">
-            <div class="activity-dot dot-blue"></div>
-            <div class="activity-body">
-                <div class="activity-name">Dean Maria Santos</div>
-                <div class="activity-action">Approved department report</div>
-            </div>
-            <div class="activity-time">15 minutes ago</div>
-        </div>
-        <div class="activity-item">
-            <div class="activity-dot dot-purple"></div>
-            <div class="activity-body">
-                <div class="activity-name">Admin Pedro Reyes</div>
-                <div class="activity-action">Created new user account</div>
-            </div>
-            <div class="activity-time">1 hour ago</div>
-        </div>
-        <div class="activity-item">
-            <div class="activity-dot dot-gray"></div>
-            <div class="activity-body">
-                <div class="activity-name">Prof. Ana Garcia</div>
-                <div class="activity-action">Updated profile settings</div>
-            </div>
-            <div class="activity-time">2 hours ago</div>
-        </div>
-        <div class="activity-item">
-            <div class="activity-dot dot-green"></div>
-            <div class="activity-body">
-                <div class="activity-name">Dr. Jose Ramos</div>
-                <div class="activity-action">Submitted final requirements</div>
-            </div>
-            <div class="activity-time">3 hours ago</div>
         </div>
     </div>
 

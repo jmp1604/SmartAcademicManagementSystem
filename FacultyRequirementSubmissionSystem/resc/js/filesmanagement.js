@@ -1,12 +1,4 @@
-// Files Management page functionality
-// 
-// Supabase Client is available globally via supabaseClient
-// Example: const { data, error } = await supabaseClient.from('files').select('*');
-//
-
 document.addEventListener('DOMContentLoaded', function () {
-
-    // Search functionality
     const searchInput = document.querySelector('.search-input');
     if (searchInput) {
         searchInput.addEventListener('input', function () {
@@ -14,7 +6,6 @@ document.addEventListener('DOMContentLoaded', function () {
         });
     }
 
-    // Department filter
     const deptFilter = document.querySelector('.dept-filter');
     if (deptFilter) {
         deptFilter.addEventListener('change', function () {
@@ -22,7 +13,6 @@ document.addEventListener('DOMContentLoaded', function () {
         });
     }
 
-    // Category filter
     const catFilter = document.querySelector('.cat-filter');
     if (catFilter) {
         catFilter.addEventListener('change', function () {
@@ -30,7 +20,6 @@ document.addEventListener('DOMContentLoaded', function () {
         });
     }
 
-    // Status filter
     const statusFilter = document.querySelector('.status-filter');
     if (statusFilter) {
         statusFilter.addEventListener('change', function () {
@@ -38,7 +27,6 @@ document.addEventListener('DOMContentLoaded', function () {
         });
     }
 
-    // Apply all filters together
     function applyFileFilters() {
         const dept   = (document.querySelector('.dept-filter')?.value   || '').toLowerCase();
         const cat    = (document.querySelector('.cat-filter')?.value    || '').toLowerCase();
@@ -54,7 +42,6 @@ document.addEventListener('DOMContentLoaded', function () {
         });
     }
 
-    // Delete button functionality
     document.querySelectorAll('.btn-delete').forEach(function (btn) {
         btn.addEventListener('click', function () {
             const row = this.closest('tr');

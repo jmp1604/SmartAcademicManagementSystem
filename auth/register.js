@@ -1,22 +1,19 @@
-// Multi-step form variables
 let currentStep = 1;
 const totalSteps = 2;
 
-// DOM Elements
 const form = document.getElementById('registrationForm');
 const backBtn = document.getElementById('backBtn');
 const nextBtn = document.getElementById('nextBtn');
 const prevBtn = document.getElementById('prevBtn');
 const submitBtn = document.getElementById('submitBtn');
 
-// Initialize
 document.addEventListener('DOMContentLoaded', function() {
     setupPasswordToggles();
     setupFormNavigation();
     setupFormValidation();
+    setupUserTypeToggle();
 });
 
-// Password Toggle Functionality
 function setupPasswordToggles() {
     const toggleButtons = document.querySelectorAll('.toggle-password');
     
@@ -43,7 +40,6 @@ function setupPasswordToggles() {
     });
 }
 
-// Form Navigation Setup
 function setupFormNavigation() {
     backBtn.addEventListener('click', function() {
         window.location.href = 'login.html';
@@ -68,26 +64,17 @@ function setupFormNavigation() {
     });
 }
 
-// Navigate to specific step
 function goToStep(stepNumber) {
     if (stepNumber < 1 || stepNumber > totalSteps) return;
 
-    // Hide current step
     document.querySelector(`.form-step[data-step="${currentStep}"]`).classList.remove('active');
     document.querySelector(`.step[data-step="${currentStep}"]`).classList.remove('active');
-
-    // Update current step
     currentStep = stepNumber;
-
-    // Show new step
     document.querySelector(`.form-step[data-step="${currentStep}"]`).classList.add('active');
     document.querySelector(`.step[data-step="${currentStep}"]`).classList.add('active');
-
-    // Update navigation buttons
     updateNavigationButtons();
 }
 
-// Update navigation button visibility
 function updateNavigationButtons() {
     if (currentStep === 1) {
         backBtn.style.display = 'flex';
@@ -102,19 +89,23 @@ function updateNavigationButtons() {
     }
 }
 
-// Validate current step
 function validateStep(step) {
     const currentStepElement = document.querySelector(`.form-step[data-step="${step}"]`);
     const inputs = currentStepElement.querySelectorAll('input[required], select[required]');
     let isValid = true;
 
     inputs.forEach(input => {
+        // Skip validation for hidden fields
+        if (input.offsetParent === null || input.parentElement.offsetParent === null || 
+            (input.parentElement.parentElement && input.parentElement.parentElement.style.display === 'none')) {
+            return;
+        }
+        
         if (!validateField(input)) {
             isValid = false;
         }
     });
 
-    // Additional validation for step 2 (password matching)
     if (step === 2) {
         const password = document.getElementById('password');
         const confirmPassword = document.getElementById('confirmPassword');
@@ -124,7 +115,6 @@ function validateStep(step) {
             isValid = false;
         }
 
-        // Email validation
         const email = document.getElementById('email');
         const emailPattern = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
         if (!emailPattern.test(email.value)) {
@@ -136,11 +126,8 @@ function validateStep(step) {
     return isValid;
 }
 
-// Validate individual field
 function validateField(field) {
     const value = field.value.trim();
-    
-    // Remove previous error messages
     clearError(field);
 
     if (field.hasAttribute('required') && !value) {
@@ -169,18 +156,15 @@ function validateField(field) {
     return true;
 }
 
-// Show error message
 function showError(field, message) {
     field.classList.add('is-invalid');
     field.classList.remove('is-valid');
     
-    // Remove existing error message if any
     const existingError = field.parentElement.querySelector('.invalid-feedback');
     if (existingError) {
         existingError.remove();
     }
 
-    // Add new error message
     const errorDiv = document.createElement('div');
     errorDiv.className = 'invalid-feedback';
     errorDiv.textContent = message;
@@ -192,17 +176,15 @@ function showError(field, message) {
     }
 }
 
-// Clear error message
 function clearError(field) {
     field.classList.remove('is-invalid', 'is-valid');
     const errorDiv = field.parentElement.querySelector('.invalid-feedback') || 
-                     field.parentElement.parentElement.querySelector('.invalid-feedback');
+                    field.parentElement.parentElement.querySelector('.invalid-feedback');
     if (errorDiv) {
         errorDiv.remove();
     }
 }
 
-// Setup real-time validation
 function setupFormValidation() {
     const inputs = form.querySelectorAll('input, select');
     
@@ -220,7 +202,6 @@ function setupFormValidation() {
         });
     });
 
-    // Real-time password match validation
     const confirmPassword = document.getElementById('confirmPassword');
     confirmPassword.addEventListener('input', function() {
         const password = document.getElementById('password');
@@ -232,34 +213,144 @@ function setupFormValidation() {
         }
     });
 }
+function setupUserTypeToggle() {
+    const userTypeSelect = document.getElementById('userType');
+    const roleField = document.getElementById('roleField');
+    const employeeIdField = document.getElementById('employeeIdField');
+    const nameFields = document.getElementById('nameFields');
+    const firstNameLabel = document.getElementById('firstNameLabel');
+    const firstNameInput = document.getElementById('firstName');
+    const middleNameField = document.getElementById('middleNameField');
+    const lastNameField = document.getElementById('lastNameField');
+    const lastNameInput = document.getElementById('lastName');
+    
+    function toggleRoleField() {
+        if (userTypeSelect.value === 'admin') {
+            roleField.style.display = 'none';
+            employeeIdField.style.display = 'none';
+            middleNameField.style.display = 'none';
+            lastNameField.style.display = 'none';
+            if (firstNameLabel) firstNameLabel.textContent = 'Admin Name';
+            firstNameInput.placeholder = 'Enter admin name';
+            lastNameInput.removeAttribute('required');
+            nameFields.classList.remove('row');
+            firstNameInput.parentElement.classList.remove('col-md-4');
+        } else {
+            roleField.style.display = 'block';
+            employeeIdField.style.display = 'block';
+            middleNameField.style.display = 'block';
+            lastNameField.style.display = 'block';
+            if (firstNameLabel) firstNameLabel.textContent = 'First Name';
+            firstNameInput.placeholder = 'First name';
+            lastNameInput.setAttribute('required', 'required');
+            nameFields.classList.add('row');
+            firstNameInput.parentElement.classList.add('col-md-4');
+        }
+    }
+    toggleRoleField();
+    
+    userTypeSelect.addEventListener('change', toggleRoleField);
+}
 
-// Submit registration
-function submitRegistration() {
-    // Collect form data
-    const formData = {
-        employee_id: document.getElementById('employeeId').value.trim(),
-        first_name: document.getElementById('firstName').value.trim(),
-        middle_name: document.getElementById('middleName').value.trim(),
-        last_name: document.getElementById('lastName').value.trim(),
-        department: document.getElementById('department').value,
-        role: document.getElementById('role').value,
-        email: document.getElementById('email').value.trim(),
-        password: document.getElementById('password').value,
-        status: 'pending', // Pending admin approval
-        created_at: new Date().toISOString(),
-        updated_at: new Date().toISOString()
-    };
+async function submitRegistration() {
+    submitBtn.disabled = true;
+    submitBtn.textContent = 'Registering...';
 
-    // Store in localStorage (in production, this would be sent to a server)
-    let registrations = JSON.parse(localStorage.getItem('pendingRegistrations') || '[]');
-    registrations.push(formData);
-    localStorage.setItem('pendingRegistrations', JSON.stringify(registrations));
+    const userType = document.getElementById('userType').value;
+    const employeeId = document.getElementById('employeeId').value.trim();
+    const firstName = document.getElementById('firstName').value.trim();
+    const middleName = document.getElementById('middleName').value.trim();
+    const lastName = document.getElementById('lastName').value.trim();
+    const role = document.getElementById('role').value;
+    const email = document.getElementById('email').value.trim();
+    const password = document.getElementById('password').value;
 
-    // Show success message
-    alert('Registration successful! Your account is pending admin approval. You will be notified once your account is activated.');
+    try {
+        if (!supabaseClient) {
+            throw new Error('Database connection not available. Please check configuration.');
+        }
+        const { data: existingProfessor } = await supabaseClient
+            .from('professors')
+            .select('email')
+            .eq('email', email)
+            .maybeSingle();
 
-    // Redirect to login page
-    setTimeout(() => {
-        window.location.href = 'login.html';
-    }, 1000);
+        const { data: existingAdmin } = await supabaseClient
+            .from('admins')
+            .select('email')
+            .eq('email', email)
+            .maybeSingle();
+
+        if (existingProfessor || existingAdmin) {
+            alert('An account with this email already exists.');
+            submitBtn.disabled = false;
+            submitBtn.textContent = 'Complete Registration';
+            return;
+        }
+
+        const { data: authData, error: authError } = await supabaseClient.auth.signUp({
+            email: email,
+            password: password
+        });
+
+        if (authError) throw authError;
+        if (!authData.user) throw new Error('Failed to create auth user.');
+
+        const authUserId = authData.user.id;
+
+        let result;
+        let successMessage;
+
+        if (userType === 'admin') {
+            result = await supabaseClient
+                .from('admins')
+                .insert([{
+                    admin_id: authUserId,
+                    admin_name: firstName,
+                    email: email,
+                    password: password,
+                    profile_picture: null,
+                    status: 'active',
+                    created_at: new Date().toISOString(),
+                    updated_at: new Date().toISOString()
+                }]);
+
+            successMessage = 'Admin registration successful! You can now log in.';
+
+        } else {
+            result = await supabaseClient
+                .from('professors')
+                .insert([{
+                    professor_id: authUserId,
+                    employee_id: employeeId,
+                    first_name: firstName,
+                    middle_name: middleName || null,
+                    last_name: lastName || null,
+                    email: email,
+                    password: password,
+                    role: role,
+                    status: 'inactive',
+                    created_at: new Date().toISOString(),
+                    updated_at: new Date().toISOString()
+                }]);
+
+            successMessage = 'Registration successful! Your account is pending admin approval.';
+        }
+
+        if (result.error) {
+            await supabaseClient.auth.admin.deleteUser(authUserId);
+            throw result.error;
+        }
+
+        alert(successMessage);
+        setTimeout(() => {
+            window.location.href = 'login.html';
+        }, 1000);
+
+    } catch (error) {
+        console.error('Registration error:', error);
+        alert('Registration failed: ' + (error.message || 'Unknown error occurred'));
+        submitBtn.disabled = false;
+        submitBtn.textContent = 'Complete Registration';
+    }
 }
