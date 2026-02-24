@@ -52,7 +52,7 @@ async function loginUser(email, password) {
     if (adminData) {
         userData = adminData;
         tableName = 'admins';
-        userRole = 'admin';
+        userRole = adminData.admin_level || 'admin'; // Get admin_level from database
     } else {
         const { data: profData, error: profError } = await supabaseClient
             .from('professors')
@@ -89,11 +89,16 @@ async function loginUser(email, password) {
         email: userData.email,
         role: userRole,
         userType: tableName === 'admins' ? 'admin' : 'professor',
+        adminLevel: tableName === 'admins' ? (userData.admin_level || 'admin') : null, 
         department: userData.department || null,
         loginTime: new Date().toISOString()
     }));
 
-    window.location.href = '../portal/portal.html';
+    if (tableName === 'admins' && userData.admin_level === 'super_admin') {
+        window.location.href = '../FacultyRequirementSubmissionSystem/pages/dashboard.html';
+    } else {
+        window.location.href = '../portal/portal.html';
+    }
 }
 
 function togglePassword() {
