@@ -64,6 +64,7 @@
                     <option>Faculty</option>
                     <option>Dean</option>
                     <option>Admin</option>
+                    <option>Super Admin</option>
                 </select>
             </div>
         </div>
@@ -97,6 +98,9 @@
 <script src="../resc/js/usermanagement.js"></script>
 <script src="../includes/sidebar.js"></script>
 <script>
+    // Protect page - only super admins can access
+    requireSuperAdmin();
+    
     loadHeader();
     loadSidebar('usermanagement');
 </script>

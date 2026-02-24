@@ -5,9 +5,12 @@ function loadHeader() {
             <img src="../../auth/assets/plplogo.png" alt="PLP" class="topbar-logo"/>
             <img src="../../auth/assets/ccslogo.png" alt="CCS" class="topbar-logo-ccs"/>
             <div class="topbar-info">
-                <span class="topbar-title">CCS Faculty Requirement Submission System</span>
-                <span class="topbar-subtitle">System Administrator Portal</span>
+                <span class="topbar-title">Faculty Requirement Submission System</span>
+                <span class="topbar-subtitle" id="topbarSubtitle">System Administrator Portal</span>
             </div>
+        </div>
+        <div class="supabase-indicator" id="supabaseIndicator" title="Supabase Connection Status">
+            <span class="status-light"></span>
         </div>
         <a href="../../auth/login.html" class="btn-logout">
             <svg viewBox="0 0 24 24"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>
@@ -16,19 +19,38 @@ function loadHeader() {
     </header>`;
     
     document.getElementById('header-container').innerHTML = headerHTML;
+    
+    if (typeof updateHeaderSubtitle === 'function') {
+        updateHeaderSubtitle();
+    }
 }
 
 function loadSidebar(activePage) {
+    let userStr = sessionStorage.getItem('user');
+    let isSuperAdmin = false;
+    
+    if (userStr) {
+        try {
+            const user = JSON.parse(userStr);
+            isSuperAdmin = user.userType === 'admin' && user.adminLevel === 'super_admin';
+        } catch (e) {
+            console.error('Error parsing user session:', e);
+        }
+    }
+    
+    const userManagementLink = isSuperAdmin ? `
+        <a href="usermanagement.html" class="nav-item ${activePage === 'usermanagement' ? 'active' : ''}">
+            <svg viewBox="0 0 24 24"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
+            User Management
+        </a>` : '';
+    
     const sidebarHTML = `
     <nav class="sidebar">
         <a href="dashboard.html" class="nav-item ${activePage === 'dashboard' ? 'active' : ''}">
             <svg viewBox="0 0 24 24"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/></svg>
             System Dashboard
         </a>
-        <a href="usermanagement.html" class="nav-item ${activePage === 'usermanagement' ? 'active' : ''}">
-            <svg viewBox="0 0 24 24"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
-            User Management
-        </a>
+        ${userManagementLink}
         <a href="filesmanagement.html" class="nav-item ${activePage === 'filesmanagement' ? 'active' : ''}">
             <svg viewBox="0 0 24 24"><ellipse cx="12" cy="5" rx="9" ry="3"/><path d="M21 12c0 1.66-4 3-9 3s-9-1.34-9-3"/><path d="M3 5v14c0 1.66 4 3 9 3s9-1.34 9-3V5"/></svg>
             Files Management
