@@ -154,6 +154,25 @@ body {
     box-shadow: 0 2px 8px rgba(20,90,46,.3);
     }
 
+.register-link {
+    text-align: center;
+    font-size: .875rem;
+    color: #6b7f6e;
+    margin-top: 1.5rem;
+}
+
+.register-link a {
+    color: var(--green-mid);
+    text-decoration: none;
+    font-weight: 600;
+    transition: color .2s;
+}
+
+.register-link a:hover {
+    color: var(--green-btn);
+    text-decoration: underline;
+}
+
 .help-btn {
     position: fixed;
     bottom: 1.4rem;
