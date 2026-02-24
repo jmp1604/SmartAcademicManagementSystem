@@ -112,6 +112,63 @@ body {
     stroke-width: 2; stroke-linecap: round; stroke-linejoin: round;
 }
 
+/* ── Supabase Connection Indicator ── */
+.supabase-indicator {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    margin-right: 1.5rem;
+    cursor: help;
+}
+
+.supabase-indicator .status-light {
+    width: 12px;
+    height: 12px;
+    border-radius: 50%;
+    background: #6b7280;
+    border: 2px solid rgba(255,255,255,0.3);
+    transition: all .3s ease;
+    animation: checking 1.5s ease-in-out infinite;
+}
+
+/* Connected State - Green Light */
+.supabase-indicator.connected .status-light {
+    background: #10b981;
+    border-color: #34d399;
+    box-shadow: 0 0 12px rgba(16, 185, 129, 0.8), 
+                0 0 20px rgba(16, 185, 129, 0.4),
+                inset 0 0 8px rgba(52, 211, 153, 0.6);
+    animation: none;
+}
+
+/* Disconnected State - Red Light */
+.supabase-indicator.disconnected .status-light {
+    background: #ef4444;
+    border-color: #f87171;
+    box-shadow: 0 0 12px rgba(239, 68, 68, 0.8), 
+                0 0 20px rgba(239, 68, 68, 0.4),
+                inset 0 0 8px rgba(248, 113, 113, 0.6);
+    animation: blink 1s ease-in-out infinite;
+}
+
+@keyframes checking {
+    0%, 100% {
+        opacity: 0.4;
+    }
+    50% {
+        opacity: 1;
+    }
+}
+
+@keyframes blink {
+    0%, 100% {
+        opacity: 1;
+    }
+    50% {
+        opacity: 0.3;
+    }
+}
+
 /* ── Sidebar ── */
 .sidebar {
     position: fixed;

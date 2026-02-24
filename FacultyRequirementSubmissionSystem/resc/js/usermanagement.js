@@ -1,4 +1,9 @@
 // User Management page functionality
+// 
+// Supabase Client is available globally via supabaseClient
+// Example: const { data, error } = await supabaseClient.from('users').select('*');
+//
+
 document.addEventListener('DOMContentLoaded', function () {
 
     // Search functionality

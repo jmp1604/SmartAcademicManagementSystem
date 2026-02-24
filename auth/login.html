@@ -90,6 +90,30 @@
                 icon.innerHTML = `<path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/>`;
     }
     }
+
+    document.addEventListener('DOMContentLoaded', function() {
+        const form = document.querySelector('form');
+        form.addEventListener('submit', function(e) {
+            e.preventDefault();
+            
+            const username = document.getElementById('username').value;
+            const password = document.getElementById('password').value;
+            const role = document.getElementById('role').value;
+            
+            if (!username || !password) {
+                alert('Please enter both username and password');
+                return;
+            }
+            
+            sessionStorage.setItem('user', JSON.stringify({
+                username: username,
+                role: role,
+                loginTime: new Date().toISOString()
+            }));
+
+            window.location.href = '../portal/portal.html';
+        });
+    });
 </script>
 </body>
 </html>

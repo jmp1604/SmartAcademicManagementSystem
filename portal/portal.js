@@ -1,9 +1,13 @@
 document.addEventListener('DOMContentLoaded', function () {
+    checkUserSession();
+    displayUserInfo();
 
     const logoutBtn = document.querySelector('.btn-logout');
     if (logoutBtn) {
         logoutBtn.addEventListener('click', function () {
             if (confirm('Are you sure you want to log out?')) {
+                // Clear session
+                sessionStorage.removeItem('user');
                 window.location.href = '../auth/login.html';
             }
         });
@@ -32,3 +36,56 @@ document.addEventListener('DOMContentLoaded', function () {
     });
 
 });
+
+// Check if user is logged in, redirect to login if not
+function checkUserSession() {
+    const user = sessionStorage.getItem('user');
+    if (!user) {
+        window.location.href = '../auth/login.html';
+    }
+}
+
+// Display user information from session
+function displayUserInfo() {
+    const userStr = sessionStorage.getItem('user');
+    if (userStr) {
+        try {
+            const user = JSON.parse(userStr);
+            
+            // Update user name display
+            const userNameEl = document.querySelector('.user-name');
+            if (userNameEl && user.username) {
+                userNameEl.textContent = user.username;
+            }
+            
+            // Update user role display
+            const userRoleEl = document.querySelector('.user-role');
+            if (userRoleEl && user.role) {
+                userRoleEl.textContent = capitalizeFirst(user.role);
+            }
+            
+            // Update user avatar with initials
+            const userAvatarEl = document.querySelector('.user-avatar');
+            if (userAvatarEl && user.username) {
+                const initials = getInitials(user.username);
+                userAvatarEl.textContent = initials;
+            }
+        } catch (e) {
+            console.error('Error parsing user session:', e);
+        }
+    }
+}
+
+// Helper function to capitalize first letter
+function capitalizeFirst(str) {
+    return str.charAt(0).toUpperCase() + str.slice(1);
+}
+
+// Helper function to get initials from name
+function getInitials(name) {
+    const parts = name.trim().split(' ');
+    if (parts.length >= 2) {
+        return (parts[0][0] + parts[1][0]).toUpperCase();
+    }
+    return name.substring(0, 2).toUpperCase();
+}
