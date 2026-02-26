@@ -1,6 +1,7 @@
 document.addEventListener('DOMContentLoaded', function () {
     checkUserSession();
     displayUserInfo();
+    showAdminCardIfNeeded();
 
     const logoutBtn = document.querySelector('.btn-logout');
     if (logoutBtn) {
@@ -35,6 +36,12 @@ document.addEventListener('DOMContentLoaded', function () {
     });
 
 });
+
+function showAdminCardIfNeeded() {
+    // System Administration card removed - not needed
+    // Super admins go directly to user management
+    // Regular admins access module-specific features
+}
 
 function checkUserSession() {
     const user = sessionStorage.getItem('user');

@@ -1,4 +1,3 @@
-
 function checkSupabaseConnection() {
     const indicator = document.getElementById('supabaseIndicator');
     
@@ -9,7 +8,6 @@ function checkSupabaseConnection() {
             indicator.classList.remove('disconnected');
             indicator.title = 'Supabase Connected';
         }
-        
         return true;
     } else {
         console.error('✗ Supabase client is not initialized');
@@ -18,52 +16,7 @@ function checkSupabaseConnection() {
             indicator.classList.remove('connected');
             indicator.title = 'Supabase Disconnected';
         }
-        
         return false;
-    }
-}
-
-function checkUserSession() {
-    const user = sessionStorage.getItem('user');
-    if (!user) {
-        window.location.href = '../../auth/login.html';
-        return false;
-    }
-    return true;
-}
-
-function updateHeaderSubtitle() {
-    const userStr = sessionStorage.getItem('user');
-    const subtitleElement = document.getElementById('topbarSubtitle');
-    
-    if (!userStr || !subtitleElement) return;
-    
-    try {
-        const user = JSON.parse(userStr);
-        let subtitle = 'Portal'; 
-        
-        if (user.userType === 'admin') {
-            if (user.adminLevel === 'super_admin') {
-                subtitle = 'Super Administrator Portal';
-            } else {
-                subtitle = 'Administrator Portal';
-            }
-        } else if (user.userType === 'professor') {
-            const role = (user.role || '').toLowerCase();
-            if (role === 'dean') {
-                subtitle = 'Dean Portal';
-            } else if (role === 'professor' || role === 'faculty') {
-                subtitle = 'Professor Portal';
-            } else {
-                subtitle = 'Faculty Portal';
-            }
-        } else if (user.userType === 'student') {
-            subtitle = 'Student Portal';
-        }
-        
-        subtitleElement.textContent = subtitle;
-    } catch (e) {
-        console.error('Error updating header subtitle:', e);
     }
 }
 
@@ -93,30 +46,68 @@ function isAdmin() {
     }
 }
 
-function requireSuperAdmin() {
-    if (!isSuperAdmin()) {
-        alert('Access denied. This page is restricted to Super Admins only.');
-        window.location.href = 'dashboard.html';
+function isProfessor() {
+    const userStr = sessionStorage.getItem('user');
+    if (!userStr) return false;
+    
+    try {
+        const user = JSON.parse(userStr);
+        return user.userType === 'professor';
+    } catch (e) {
+        console.error('Error parsing user session:', e);
         return false;
     }
-    return true;
+}
+
+function isDean() {
+    const userStr = sessionStorage.getItem('user');
+    if (!userStr) return false;
+    
+    try {
+        const user = JSON.parse(userStr);
+        return user.userType === 'professor' && user.role === 'dean';
+    } catch (e) {
+        console.error('Error parsing user session:', e);
+        return false;
+    }
+}
+
+function getCurrentUser() {
+    const userStr = sessionStorage.getItem('user');
+    if (!userStr) return null;
+    
+    try {
+        return JSON.parse(userStr);
+    } catch (e) {
+        console.error('Error parsing user session:', e);
+        return null;
+    }
 }
 
 document.addEventListener('DOMContentLoaded', function () {
-    checkUserSession();
     checkSupabaseConnection();
     
-    const logoutBtn = document.querySelector('.btn-logout');
-    if (logoutBtn) {
-        logoutBtn.addEventListener('click', function (e) {
+    // Use event delegation to handle logout buttons (including dynamically created ones)
+    document.addEventListener('click', function(e) {
+        const logoutBtn = e.target.closest('.btn-logout');
+        if (logoutBtn) {
             e.preventDefault();
             if (confirm('Are you sure you want to log out?')) {
-                // Clear session
                 sessionStorage.removeItem('user');
-                window.location.href = '../../auth/login.html';
+                
+                // Determine correct path to login.html based on current location
+                const path = window.location.pathname;
+                let authPath = '../auth/login.html';
+                
+                // Check if we're in a nested folder (like FacultyRequirementSubmissionSystem/pages/)
+                if (path.includes('/pages/') || path.includes('/includes/')) {
+                    authPath = '../../auth/login.html';
+                }
+                
+                window.location.href = authPath;
             }
-        });
-    }
+        }
+    });
 
     const helpBtn = document.querySelector('.help-btn');
     if (helpBtn) {
@@ -124,5 +115,4 @@ document.addEventListener('DOMContentLoaded', function () {
             alert('For assistance, please contact the CCS System Administrator.');
         });
     }
-
 });

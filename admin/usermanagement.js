@@ -1,6 +1,20 @@
 let allUsers = [];
+let currentUser = null;
+let isUserSuperAdmin = false;
 
-// Load all users from database
+function initializeUserSession() {
+    const userStr = sessionStorage.getItem('user');
+    if (userStr) {
+        try {
+            currentUser = JSON.parse(userStr);
+            isUserSuperAdmin = currentUser.userType === 'admin' && currentUser.adminLevel === 'super_admin';
+            console.log('Current user role:', isUserSuperAdmin ? 'Super Admin' : 'Admin');
+        } catch (e) {
+            console.error('Error parsing user session:', e);
+        }
+    }
+}
+
 async function loadUsers() {
     try {
         if (!supabaseClient) {
@@ -8,7 +22,6 @@ async function loadUsers() {
             return;
         }
 
-        // Fetch professors
         const { data: professors, error: profError } = await supabaseClient
             .from('professors')
             .select('*')
@@ -16,7 +29,6 @@ async function loadUsers() {
 
         if (profError) throw profError;
 
-        // Fetch admins
         const { data: admins, error: adminError } = await supabaseClient
             .from('admins')
             .select('*')
@@ -24,10 +36,8 @@ async function loadUsers() {
 
         if (adminError) throw adminError;
 
-        // Combine and format users
         allUsers = [];
 
-        // Add professors
         if (professors) {
             professors.forEach(prof => {
                 allUsers.push({
@@ -44,15 +54,20 @@ async function loadUsers() {
             });
         }
 
-        // Add admins
         if (admins) {
             admins.forEach(admin => {
+                const adminRole = admin.admin_level === 'super_admin' ? 'super admin' : 'admin';
+                
+                if (!isUserSuperAdmin && admin.admin_level) {
+                    return; 
+                }
+                
                 allUsers.push({
                     id: admin.admin_id,
                     type: 'admin',
                     name: admin.admin_name || 'N/A',
                     email: admin.email,
-                    role: admin.admin_level === 'super_admin' ? 'super admin' : 'admin',
+                    role: adminRole,
                     department: 'Administration',
                     status: admin.status || 'active',
                     created_at: admin.created_at,
@@ -63,6 +78,7 @@ async function loadUsers() {
 
         displayUsers(allUsers);
         updateStatistics();
+        applyRoleBasedRestrictions();
 
     } catch (error) {
         console.error('Error loading users:', error);
@@ -70,7 +86,31 @@ async function loadUsers() {
     }
 }
 
-// Display users in the table
+function applyRoleBasedRestrictions() {
+    if (!isUserSuperAdmin) {
+        const roleFilter = document.querySelector('.role-filter');
+        if (roleFilter) {
+            const superAdminOption = Array.from(roleFilter.options).find(opt => 
+                opt.textContent.toLowerCase() === 'super admin'
+            );
+            if (superAdminOption) {
+                superAdminOption.style.display = 'none';
+            }
+        }
+        
+        const addUserBtn = document.querySelector('.btn-add-user');
+        if (addUserBtn) {
+            const btnText = addUserBtn.textContent.trim();
+            if (btnText === 'Add New User') {
+                addUserBtn.innerHTML = `
+                    <svg viewBox="0 0 24 24"><path d="M16 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="8.5" cy="7" r="4"/><line x1="20" y1="8" x2="20" y2="14"/><line x1="23" y1="11" x2="17" y2="11"/></svg>
+                    Add Faculty/Dean
+                `;
+            }
+        }
+    }
+}
+
 function displayUsers(users) {
     const tbody = document.getElementById('usersTableBody');
     if (!tbody) return;
@@ -94,19 +134,15 @@ function displayUsers(users) {
         row.dataset.role = user.role;
         row.dataset.userId = user.id;
         row.dataset.userType = user.type;
-
-        // Format role badge
         let roleBadgeClass = 'badge-faculty';
         if (user.role === 'dean') roleBadgeClass = 'badge-dean';
         else if (user.role === 'admin' || user.role === 'super admin') roleBadgeClass = 'badge-admin';
-
-        // Format status badge
         const statusBadgeClass = user.status === 'active' ? 'badge-active' : 'badge-inactive';
         const statusText = user.status === 'active' ? 'Active' : 'Pending';
-
-        // Actions based on status
         let actionButtons = '';
-        if (user.status === 'inactive' && user.type === 'professor') {
+        const canModify = checkModifyPermission(user);
+        
+        if (user.status === 'inactive' && user.type === 'professor' && canModify) {
             actionButtons = `
                 <button class="btn-action btn-approve" title="Approve User" onclick="approveUser('${user.id}', '${user.type}')">
                     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
@@ -122,7 +158,7 @@ function displayUsers(users) {
                     Reject
                 </button>
             `;
-        } else if (user.role !== 'super admin') {
+        } else if (canModify && user.role !== 'super admin') {
             actionButtons = `
                 <button class="btn-action btn-delete" title="Delete User" onclick="deleteUser('${user.id}', '${user.type}', '${user.name}')">
                     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
@@ -131,6 +167,10 @@ function displayUsers(users) {
                     </svg>
                     Delete
                 </button>
+            `;
+        } else if (!canModify) {
+            actionButtons = `
+                <span style="color:var(--text-muted);font-size:.8rem;font-style:italic;">No permissions</span>
             `;
         }
 
@@ -147,7 +187,18 @@ function displayUsers(users) {
     });
 }
 
-// Approve user (activate their account)
+function checkModifyPermission(targetUser) {
+    if (isUserSuperAdmin) {
+        return true;
+    }
+    
+    if (targetUser.type === 'admin') {
+        return false;
+    }
+    
+    return true;
+}
+
 async function approveUser(userId, userType) {
     if (!confirm('Are you sure you want to approve this user?')) {
         return;
@@ -169,7 +220,7 @@ async function approveUser(userId, userType) {
         if (error) throw error;
 
         alert('User approved successfully!');
-        await loadUsers(); // Reload the list
+        await loadUsers(); 
 
     } catch (error) {
         console.error('Error approving user:', error);
@@ -177,8 +228,12 @@ async function approveUser(userId, userType) {
     }
 }
 
-// Delete user
 async function deleteUser(userId, userType, userName) {
+    if (userType === 'admin' && !isUserSuperAdmin) {
+        alert('Only Super Admins can delete admin users.');
+        return;
+    }
+    
     if (!confirm(`Are you sure you want to delete "${userName}"? This action cannot be undone.`)) {
         return;
     }
@@ -199,7 +254,7 @@ async function deleteUser(userId, userType, userName) {
         if (error) throw error;
 
         alert('User deleted successfully!');
-        await loadUsers(); // Reload the list
+        await loadUsers();
 
     } catch (error) {
         console.error('Error deleting user:', error);
@@ -207,7 +262,6 @@ async function deleteUser(userId, userType, userName) {
     }
 }
 
-// Update statistics
 function updateStatistics() {
     const totalUsers = allUsers.length;
     const facultyCount = allUsers.filter(u => u.type === 'professor' && u.role !== 'dean').length;
@@ -220,12 +274,10 @@ function updateStatistics() {
     document.getElementById('adminsCount').textContent = adminsCount;
 }
 
-// Capitalize words helper
 function capitalizeWords(str) {
     return str.replace(/\b\w/g, char => char.toUpperCase());
 }
 
-// Search functionality
 function setupSearch() {
     const searchInput = document.querySelector('.search-input');
     if (searchInput) {
@@ -241,7 +293,6 @@ function setupSearch() {
     }
 }
 
-// Role filter functionality
 function setupRoleFilter() {
     const roleFilter = document.querySelector('.role-filter');
     if (roleFilter) {
@@ -261,18 +312,21 @@ function setupRoleFilter() {
     }
 }
 
-// Add new user button
 function setupAddUserButton() {
     const addUserBtn = document.querySelector('.btn-add-user');
     if (addUserBtn) {
         addUserBtn.addEventListener('click', function () {
-            alert('This feature will allow adding new users manually. Coming soon!');
+            if (isUserSuperAdmin) {
+                alert('Add User feature: Super Admins can add Faculty, Deans, and Admins. Coming soon!');
+            } else {
+                alert('Add User feature: You can add Faculty and Deans. Coming soon!');
+            }
         });
     }
 }
 
-// Initialize
 document.addEventListener('DOMContentLoaded', function () {
+    initializeUserSession();
     loadUsers();
     setupSearch();
     setupRoleFilter();

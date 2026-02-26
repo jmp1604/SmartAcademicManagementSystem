@@ -13,7 +13,7 @@ The Smart Academic Management System is a comprehensive platform that integrates
 
 ### Navigation Flow
 ```
-index.html → auth/login.html → portal/portal.html → [4 Modules]
+index.html → auth/login.html → portal/portal.html → [5 Modules]
 ```
 
 ### 1. Faculty Requirement Submission System
@@ -22,20 +22,30 @@ index.html → auth/login.html → portal/portal.html → [4 Modules]
 **Features:**
 - Dashboard with system statistics
 - Files management and submission tracking
-- User management (Faculty, Deans, Admins)
 - Supabase integration with connection indicator
 
-### 2. Thesis & Capstone Archiving
+### 2. System Administration
+**Status:** Active  
+**Path:** `/admin/usermanagement.html`  
+**Access:** Admin and Super Admin only
+**Features:**
+- User management with role-based permissions
+- Super Admin: Manage all users (Faculty, Deans, Admins)
+- Admin: Manage Faculty and Deans only
+- User approval and deletion controls
+- Real-time user statistics
+
+### 3. Thesis & Capstone Archiving
 **Status:** In Development  
 **Path:** `/ThesisAndCapstoneArchiving/placeholder.html`  
 **Purpose:** Browse, submit, and manage student thesis and capstone project records
 
-### 3. Student Violation Management System
+### 4. Student Violation Management System
 **Status:** In Development  
 **Path:** `/StudentViolationManagementSystem/placeholder.html`  
 **Purpose:** Record, monitor, and resolve student disciplinary cases
 
-### 4. Time In & Time Out Monitoring
+### 5. Time In & Time Out Monitoring
 **Status:** In Development  
 **Path:** `/TimeInAndTimeOutMonitoring/placeholder.html`  
 **Purpose:** Track faculty and staff attendance logs and work hours
@@ -75,8 +85,9 @@ The system is connected to Supabase for backend services:
    - Click "Sign In"
 
 3. **Select Module:**
-   - Choose from 4 available modules in the portal
-   - Only Faculty Requirement System is fully functional
+   - Choose from 5 available modules in the portal
+   - Faculty Requirement System and System Administration are fully functional
+   - Admin panel only visible to Admin users
 
 ## Design System
 - **Primary Color:** PLP Green (#145a2e)
@@ -99,6 +110,12 @@ SmartAcademicManagementSystem/
 │   ├── portal.html
 │   ├── portal.css
 │   └── portal.js
+├── admin/                              # System administration (Admin only)
+│   ├── usermanagement.html             # User management interface
+│   ├── usermanagement.css
+│   ├── usermanagement.js               # Role-based access logic
+│   ├── common.css
+│   └── common.js
 ├── FacultyRequirementSubmissionSystem/ # Module 1
 │   ├── pages/                          # HTML pages
 │   ├── resc/                           # Resources (CSS/JS)
@@ -117,8 +134,19 @@ SmartAcademicManagementSystem/
 
 ## Browser Support
 - Chrome (Recommended)
-- Firefox
-- Edge
+- FiDean:** Department-level oversight and approvals
+- **Admin:** Can manage Faculty and Deans; access to user management
+- **Super Admin:** Full system access including managing all users and admins
+
+### Admin Access Levels:
+| Feature | Super Admin | Admin | Faculty/Dean |
+|---------|-------------|-------|--------------|
+| View Faculty/Deans | ✅ | ✅ | ❌ |
+| Add/Delete Faculty/Deans | ✅ | ✅ | ❌ |
+| View Admins | ✅ | ❌ | ❌ |
+| Add/Delete Admins | ✅ | ❌ | ❌ |
+| Change Admin Roles | ✅ | ❌ | ❌ |
+| System Settings | ✅ | Limited | ❌ |
 - Safari
 
 ## User Roles

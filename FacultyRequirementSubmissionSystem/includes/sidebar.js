@@ -28,10 +28,11 @@ function loadHeader() {
 function loadSidebar(activePage) {
     let userStr = sessionStorage.getItem('user');
     let isSuperAdmin = false;
+    let user = null;
     
     if (userStr) {
         try {
-            const user = JSON.parse(userStr);
+            user = JSON.parse(userStr);
             isSuperAdmin = user.userType === 'admin' && user.adminLevel === 'super_admin';
         } catch (e) {
             console.error('Error parsing user session:', e);
@@ -39,7 +40,7 @@ function loadSidebar(activePage) {
     }
     
     const userManagementLink = isSuperAdmin ? `
-        <a href="usermanagement.html" class="nav-item ${activePage === 'usermanagement' ? 'active' : ''}">
+        <a href="../../admin/usermanagement.html" class="nav-item ${activePage === 'usermanagement' ? 'active' : ''}">
             <svg viewBox="0 0 24 24"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
             User Management
         </a>` : '';

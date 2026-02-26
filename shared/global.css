@@ -1,5 +1,5 @@
 /* ═══════════════════════════════════════════
-   common.css — Shared styles for all pages
+   global.css — Shared styles for all modules
    ═══════════════════════════════════════════ */
 
 :root {
@@ -131,7 +131,6 @@ body {
     animation: checking 1.5s ease-in-out infinite;
 }
 
-/* Connected State - Green Light */
 .supabase-indicator.connected .status-light {
     background: #10b981;
     border-color: #34d399;
@@ -141,7 +140,6 @@ body {
     animation: none;
 }
 
-/* Disconnected State - Red Light */
 .supabase-indicator.disconnected .status-light {
     background: #ef4444;
     border-color: #f87171;
@@ -152,21 +150,13 @@ body {
 }
 
 @keyframes checking {
-    0%, 100% {
-        opacity: 0.4;
-    }
-    50% {
-        opacity: 1;
-    }
+    0%, 100% { opacity: 0.4; }
+    50% { opacity: 1; }
 }
 
 @keyframes blink {
-    0%, 100% {
-        opacity: 1;
-    }
-    50% {
-        opacity: 0.3;
-    }
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.3; }
 }
 
 /* ── Sidebar ── */
