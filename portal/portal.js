@@ -23,9 +23,6 @@ document.addEventListener('DOMContentLoaded', function () {
     const cards = document.querySelectorAll('.system-card');
     cards.forEach(function (card) {
         card.addEventListener('click', function (e) {
-            // Href is already set on the <a> tag; this handler can be used
-            // for analytics or transition effects in the future.
-            // Example: add a ripple / loading state before navigating
             card.style.opacity = '0.8';
             card.style.transform = 'scale(0.98)';
             setTimeout(function () {
@@ -38,9 +35,6 @@ document.addEventListener('DOMContentLoaded', function () {
 });
 
 function showAdminCardIfNeeded() {
-    // System Administration card removed - not needed
-    // Super admins go directly to user management
-    // Regular admins access module-specific features
 }
 
 function checkUserSession() {

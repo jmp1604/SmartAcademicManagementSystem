@@ -1,4 +1,3 @@
-// Login functionality
 document.addEventListener('DOMContentLoaded', function() {
     const form = document.querySelector('form');
     const usernameInput = document.getElementById('username');

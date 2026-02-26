@@ -86,20 +86,14 @@ function getCurrentUser() {
 
 document.addEventListener('DOMContentLoaded', function () {
     checkSupabaseConnection();
-    
-    // Use event delegation to handle logout buttons (including dynamically created ones)
     document.addEventListener('click', function(e) {
         const logoutBtn = e.target.closest('.btn-logout');
         if (logoutBtn) {
             e.preventDefault();
             if (confirm('Are you sure you want to log out?')) {
                 sessionStorage.removeItem('user');
-                
-                // Determine correct path to login.html based on current location
                 const path = window.location.pathname;
                 let authPath = '../auth/login.html';
-                
-                // Check if we're in a nested folder (like FacultyRequirementSubmissionSystem/pages/)
                 if (path.includes('/pages/') || path.includes('/includes/')) {
                     authPath = '../../auth/login.html';
                 }
