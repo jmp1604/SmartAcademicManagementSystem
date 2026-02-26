@@ -1,0 +1,170 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8"/>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+    <title>Upload Files — CCS Faculty Portal</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet"/>
+    <link href="https://fonts.googleapis.com/css2?family=Merriweather:wght@400;700&family=Source+Sans+3:wght@400;500;600&display=swap" rel="stylesheet"/>
+    <link rel="stylesheet" href="../resc/css/faculty-specific.css"/>
+</head>
+<body>
+
+<div id="header-container"></div>
+
+<div id="sidebar-container"></div>
+
+<main class="main-content">
+
+    <div class="page-header anim anim-1">
+        <h1>Upload Files</h1>
+        <p>Submit your faculty requirements to the College of Computer Studies</p>
+    </div>
+
+    <div class="stat-cards anim anim-2">
+        <div class="stat-card green">
+            <div class="stat-label">My Uploads This Semester</div>
+            <div class="stat-value">8</div>
+        </div>
+        <div class="stat-card teal">
+            <div class="stat-label">Approved</div>
+            <div class="stat-value">5</div>
+        </div>
+        <div class="stat-card orange">
+            <div class="stat-label">Pending Review</div>
+            <div class="stat-value">2</div>
+        </div>
+    </div>
+
+    <div id="upload-step-1" class="upload-step active anim anim-3">
+        <div class="panel">
+            <div class="panel-header">
+                <svg viewBox="0 0 24 24"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/></svg>
+                Step 1: Select Requirement Category
+            </div>
+            <div class="panel-body">
+                <div class="category-grid">
+
+                    <div class="category-card" data-cat="Syllabus">
+                        <div class="cat-icon" style="background:#fef3c7;">📚</div>
+                        <div class="cat-name">Syllabus</div>
+                        <div class="cat-desc">Course syllabi and curriculum outlines</div>
+                    </div>
+
+                    <div class="category-card" data-cat="Grade Sheets">
+                        <div class="cat-icon" style="background:#dbeafe;">📊</div>
+                        <div class="cat-name">Grade Sheets</div>
+                        <div class="cat-desc">Student grades and academic records</div>
+                    </div>
+
+                    <div class="category-card" data-cat="Lecture Notes">
+                        <div class="cat-icon" style="background:#ede9fe;">📝</div>
+                        <div class="cat-name">Lecture Notes</div>
+                        <div class="cat-desc">Teaching materials and lecture notes</div>
+                    </div>
+
+                    <div class="category-card" data-cat="Attendance Records">
+                        <div class="cat-icon" style="background:#d1fae5;">✅</div>
+                        <div class="cat-name">Attendance Records</div>
+                        <div class="cat-desc">Student attendance tracking sheets</div>
+                    </div>
+
+                    <div class="category-card" data-cat="Assessment Tools">
+                        <div class="cat-icon" style="background:#ffedd5;">📋</div>
+                        <div class="cat-name">Assessment Tools</div>
+                        <div class="cat-desc">Quizzes, exams, and evaluation materials</div>
+                    </div>
+
+                    <div class="category-card" data-cat="Research Papers">
+                        <div class="cat-icon" style="background:#f0fdf4;">🔬</div>
+                        <div class="cat-name">Research Papers</div>
+                        <div class="cat-desc">Faculty research and publications</div>
+                    </div>
+
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div id="upload-step-2" class="upload-step anim anim-3">
+        <div class="panel">
+            <div class="panel-header">
+                <svg viewBox="0 0 24 24"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+                Step 2: Upload File — <span id="selected-category-name" style="font-style:italic;font-weight:400;opacity:.85;"></span>
+            </div>
+            <div class="panel-body">
+                <form id="upload-form" novalidate>
+
+                    <div class="dropzone" id="dropzone">
+                        <div class="dropzone-icon">
+                            <svg viewBox="0 0 24 24"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+                        </div>
+                        <div class="dropzone-title">Drag &amp; drop your file here</div>
+                        <div class="dropzone-sub">Supports PDF, DOCX, XLSX, PPT — Max 25MB</div>
+                        <button type="button" class="btn-browse" id="browse-btn">Browse File</button>
+                        <input type="file" id="file-input" style="display:none;"
+                            accept=".pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx"/>
+                    </div>
+
+                    <div class="file-preview" id="file-preview">
+                        <svg viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
+                        <span class="file-preview-name" id="preview-name"></span>
+                        <span class="file-preview-size" id="preview-size"></span>
+                        <button type="button" class="file-preview-remove" id="remove-file">
+                            <svg viewBox="0 0 24 24"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+                        </button>
+                    </div>
+
+                    <div class="upload-meta">
+                        <div>
+                            <label class="form-label" for="file-category">Category</label>
+                            <select id="file-category" class="form-select">
+                                <option>Syllabus</option>
+                                <option>Grade Sheets</option>
+                                <option>Lecture Notes</option>
+                                <option>Attendance Records</option>
+                                <option>Assessment Tools</option>
+                                <option>Research Papers</option>
+                            </select>
+                        </div>
+                        <div>
+                            <label class="form-label" for="file-description">Description <span style="font-weight:400;text-transform:none;letter-spacing:0;color:#8faa93;">(optional)</span></label>
+                            <input type="text" id="file-description" class="form-control"
+                                placeholder="Brief description of the file…"/>
+                        </div>
+                        <div>
+                            <label class="form-label" for="academic-period">Academic Period</label>
+                            <select id="academic-period" class="form-select">
+                                <option>1st Semester 2025-2026</option>
+                                <option>2nd Semester 2025-2026</option>
+                                <option>Summer 2026</option>
+                            </select>
+                        </div>
+                    </div>
+
+                    <div class="step-actions">
+                        <button type="button" class="btn-outline" id="btn-back-step">← Back to Categories</button>
+                        <button type="submit" class="btn-primary">
+                            <svg viewBox="0 0 24 24"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+                            Submit File
+                        </button>
+                    </div>
+
+                </form>
+            </div>
+        </div>
+    </div>
+
+</main>
+
+<button class="help-btn">?</button>
+
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
+<script src="../includes/sidebar.js"></script>
+<script src="../resc/js/faculty-specific.js"></script>
+<script>
+loadHeader();
+loadSidebar('faculty-upload');
+</script>
+</body>
+</html>

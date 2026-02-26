@@ -1,4 +1,3 @@
-// Login functionality
 document.addEventListener('DOMContentLoaded', function() {
     const form = document.querySelector('form');
     const usernameInput = document.getElementById('username');
@@ -95,7 +94,7 @@ async function loginUser(email, password) {
     }));
 
     if (tableName === 'admins' && userData.admin_level === 'super_admin') {
-        window.location.href = '../FacultyRequirementSubmissionSystem/pages/dashboard.html';
+        window.location.href = '../admin/usermanagement.html';
     } else {
         window.location.href = '../portal/portal.html';
     }
