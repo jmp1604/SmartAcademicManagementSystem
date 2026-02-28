@@ -1,0 +1,153 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8"/>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+    <title>Audit Trailing — CCS Faculty Requirement System</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet"/>
+    <link href="https://fonts.googleapis.com/css2?family=Merriweather:wght@400;700&family=Source+Sans+3:wght@400;500;600&display=swap" rel="stylesheet"/>
+    <link rel="stylesheet" href="../../shared/global.css"/>
+    <link rel="stylesheet" href="../resc/css/faculty-specific.css"/>
+    <link rel="stylesheet" href="../resc/css/dean-audit.css"/>
+</head>
+<body>
+
+<div id="header-container"></div>
+
+<div id="sidebar-container"></div>
+
+<main class="main-content">
+
+    <div class="page-header anim anim-1">
+        <h1>Audit Trailing</h1>
+        <p>Track all faculty and dean activities within the system</p>
+    </div>
+
+    <div class="stat-cards">
+        <div class="stat-card blue anim anim-1">
+            <div class="stat-label">Document Uploads</div>
+            <div class="stat-value" id="uploadsCount">45</div>
+            <div class="stat-sub">This semester</div>
+        </div>
+        <div class="stat-card green anim anim-2">
+            <div class="stat-label">Approvals</div>
+            <div class="stat-value" id="approvalsCount">32</div>
+            <div class="stat-sub">This semester</div>
+        </div>
+        <div class="stat-card orange anim anim-3">
+            <div class="stat-label">Rejections</div>
+            <div class="stat-value" id="rejectionsCount">5</div>
+            <div class="stat-sub">This semester</div>
+        </div>
+        <div class="stat-card purple anim anim-4">
+            <div class="stat-label">Updates</div>
+            <div class="stat-value" id="updatesCount">18</div>
+            <div class="stat-sub">This semester</div>
+        </div>
+    </div>
+
+    <div class="panel anim anim-2">
+        <div class="panel-title">
+            <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+            Activity Log
+        </div>
+
+        <div class="toolbar" style="margin-bottom: 1.2rem;">
+            <div class="toolbar-right" style="width: 100%; justify-content: flex-end;">
+                <div class="search-box">
+                    <svg viewBox="0 0 24 24"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/></svg>
+                    <input type="text" id="activitySearchInput" placeholder="Search activities...">
+                </div>
+                <select class="filter-select" id="actionFilter">
+                    <option value="">All Actions</option>
+                    <option value="upload">Uploads</option>
+                    <option value="approve">Approvals</option>
+                    <option value="reject">Rejections</option>
+                    <option value="update">Updates</option>
+                    <option value="delete">Deletions</option>
+                </select>
+                <select class="filter-select" id="dateRangeFilter">
+                    <option value="today">Today</option>
+                    <option value="week">This Week</option>
+                    <option value="month" selected>This Month</option>
+                    <option value="semester">This Semester</option>
+                    <option value="all">All Time</option>
+                </select>
+            </div>
+        </div>
+
+        <div class="activity-log" id="activityLog">
+            <!-- Activities will be loaded dynamically -->
+        </div>
+
+        <div class="pagination-controls" id="paginationControls" style="display: none;">
+            <button class="btn-page" id="prevPageBtn">
+                <svg viewBox="0 0 24 24"><polyline points="15 18 9 12 15 6"/></svg>
+            </button>
+            <span class="page-info" id="pageInfo">Page 1 of 1</span>
+            <button class="btn-page" id="nextPageBtn">
+                <svg viewBox="0 0 24 24"><polyline points="9 18 15 12 9 6"/></svg>
+            </button>
+        </div>
+    </div>
+
+</main>
+
+<div class="modal fade" id="activityDetailsModal" tabindex="-1">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Activity Details</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <div class="activity-detail-section">
+                    <div class="detail-row">
+                        <span class="detail-label">Action:</span>
+                        <span class="detail-value" id="detailAction"></span>
+                    </div>
+                    <div class="detail-row">
+                        <span class="detail-label">User:</span>
+                        <span class="detail-value" id="detailUser"></span>
+                    </div>
+                    <div class="detail-row">
+                        <span class="detail-label">File:</span>
+                        <span class="detail-value" id="detailFile"></span>
+                    </div>
+                    <div class="detail-row">
+                        <span class="detail-label">Category:</span>
+                        <span class="detail-value" id="detailCategory"></span>
+                    </div>
+                    <div class="detail-row">
+                        <span class="detail-label">Date & Time:</span>
+                        <span class="detail-value" id="detailDateTime"></span>
+                    </div>
+                    <div class="detail-row" id="detailCommentRow" style="display: none;">
+                        <span class="detail-label">Comments:</span>
+                        <span class="detail-value" id="detailComments"></span>
+                    </div>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<button class="help-btn" title="Help & Documentation">?</button>
+
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="../../config/.env.js"></script>
+<script src="../../config/config.js"></script>
+<script src="../../shared/global.js"></script>
+<script src="includes/sidebar.js"></script>
+<script src="../resc/js/faculty-specific.js"></script>
+<script src="../resc/js/dean-audit.js"></script>
+<script>
+loadHeader();
+loadSidebar('dean-audit');
+</script>
+</body>
+</html>

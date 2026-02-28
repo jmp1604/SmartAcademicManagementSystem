@@ -1,0 +1,327 @@
+.activity-log {
+    display: flex;
+    flex-direction: column;
+    gap: .8rem;
+}
+
+.activity-item {
+    background: var(--card-bg);
+    border: 1px solid var(--border);
+    border-radius: .7rem;
+    padding: 1.1rem 1.3rem;
+    display: flex;
+    align-items: center;
+    gap: 1.1rem;
+    transition: all .2s;
+    cursor: pointer;
+}
+
+.activity-item:hover {
+    border-color: var(--green-mid);
+    box-shadow: 0 2px 8px rgba(20, 90, 46, 0.1);
+    transform: translateX(3px);
+}
+
+.activity-icon {
+    width: 42px;
+    height: 42px;
+    border-radius: .6rem;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+}
+
+.activity-icon svg {
+    width: 20px;
+    height: 20px;
+    stroke: white;
+    fill: none;
+    stroke-width: 2;
+    stroke-linecap: round;
+    stroke-linejoin: round;
+}
+
+.activity-icon.upload {
+    background: linear-gradient(135deg, #2563eb 0%, #3b82f6 100%);
+}
+
+.activity-icon.approve {
+    background: linear-gradient(135deg, #059669 0%, #10b981 100%);
+}
+
+.activity-icon.reject {
+    background: linear-gradient(135deg, #dc2626 0%, #ef4444 100%);
+}
+
+.activity-icon.update {
+    background: linear-gradient(135deg, #7c3aed 0%, #9333ea 100%);
+}
+
+.activity-icon.delete {
+    background: linear-gradient(135deg, #ea580c 0%, #f97316 100%);
+}
+
+.activity-content {
+    flex: 1;
+    min-width: 0;
+}
+
+.activity-header {
+    display: flex;
+    align-items: center;
+    gap: .6rem;
+    margin-bottom: .4rem;
+}
+
+.activity-user {
+    font-weight: 600;
+    color: var(--text-main);
+    font-size: .92rem;
+}
+
+.activity-action {
+    font-size: .88rem;
+    color: var(--text-muted);
+}
+
+.activity-file {
+    font-size: .85rem;
+    color: var(--text-main);
+    font-weight: 500;
+    display: block;
+    margin-bottom: .25rem;
+}
+
+.activity-meta {
+    font-size: .78rem;
+    color: var(--text-muted);
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+}
+
+.activity-badge {
+    padding: .25rem .6rem;
+    border-radius: .35rem;
+    font-size: .72rem;
+    font-weight: 600;
+    text-transform: capitalize;
+    flex-shrink: 0;
+}
+
+.activity-badge.syllabus {
+    background: #ede9fe;
+    color: #7c3aed;
+}
+
+.activity-badge.grades {
+    background: #dcfce7;
+    color: #059669;
+}
+
+.activity-badge.notes {
+    background: #dbeafe;
+    color: #2563eb;
+}
+
+.activity-badge.attendance {
+    background: #fef3c7;
+    color: #d97706;
+}
+
+.activity-badge.assessment {
+    background: #fce7f3;
+    color: #db2777;
+}
+
+.activity-badge.research {
+    background: #e0f2fe;
+    color: #0891b2;
+}
+
+.activity-status {
+    margin-left: auto;
+    flex-shrink: 0;
+}
+
+.status-badge {
+    padding: .35rem .8rem;
+    border-radius: .4rem;
+    font-size: .75rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: .05em;
+}
+
+.status-badge.success {
+    background: #d1fae5;
+    color: #065f46;
+}
+
+.status-badge.error {
+    background: #fee2e2;
+    color: #991b1b;
+}
+
+.status-badge.info {
+    background: #dbeafe;
+    color: #1e40af;
+}
+
+.status-badge.warning {
+    background: #fef3c7;
+    color: #92400e;
+}
+
+/* Pagination Controls */
+.pagination-controls {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 1rem;
+    margin-top: 1.5rem;
+    padding-top: 1.5rem;
+    border-top: 1px solid var(--border);
+}
+
+.btn-page {
+    width: 36px;
+    height: 36px;
+    border-radius: .5rem;
+    border: 1.5px solid var(--border);
+    background: var(--card-bg);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    transition: all .2s;
+}
+
+.btn-page:hover:not(:disabled) {
+    border-color: var(--green-mid);
+    background: #f7faf8;
+}
+
+.btn-page:disabled {
+    opacity: 0.4;
+    cursor: not-allowed;
+}
+
+.btn-page svg {
+    width: 18px;
+    height: 18px;
+    stroke: var(--text-main);
+    fill: none;
+    stroke-width: 2;
+    stroke-linecap: round;
+    stroke-linejoin: round;
+}
+
+.page-info {
+    font-size: .88rem;
+    color: var(--text-muted);
+    font-weight: 500;
+}
+
+/* Activity Details Modal */
+.activity-detail-section {
+    display: flex;
+    flex-direction: column;
+    gap: .8rem;
+}
+
+.activity-detail-section .detail-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    padding: .8rem;
+    background: #f7faf8;
+    border-radius: .5rem;
+    border: none;
+}
+
+.activity-detail-section .detail-label {
+    font-weight: 600;
+    color: var(--text-muted);
+    font-size: .85rem;
+}
+
+.activity-detail-section .detail-value {
+    color: var(--text-main);
+    font-size: .88rem;
+    text-align: right;
+    font-weight: 500;
+    max-width: 60%;
+}
+
+/* Empty State */
+.empty-state {
+    text-align: center;
+    padding: 3rem 1rem;
+    color: var(--text-muted);
+}
+
+.empty-state svg {
+    width: 60px;
+    height: 60px;
+    stroke: var(--text-muted);
+    fill: none;
+    stroke-width: 1.5;
+    margin-bottom: 1rem;
+    opacity: 0.5;
+}
+
+.empty-state p {
+    font-size: 1rem;
+    margin: 0;
+}
+
+/* Loading State */
+.loading-state {
+    text-align: center;
+    padding: 2rem;
+    color: var(--text-muted);
+}
+
+.loading-spinner {
+    width: 40px;
+    height: 40px;
+    border: 3px solid var(--border);
+    border-top-color: var(--green-btn);
+    border-radius: 50%;
+    animation: spin 1s linear infinite;
+    margin: 0 auto 1rem;
+}
+
+@keyframes spin {
+    to { transform: rotate(360deg); }
+}
+
+/* Responsive Design */
+@media (max-width: 768px) {
+    .activity-item {
+        flex-direction: column;
+        align-items: flex-start;
+        gap: .8rem;
+    }
+    
+    .activity-header {
+        flex-direction: column;
+        align-items: flex-start;
+        gap: .3rem;
+    }
+    
+    .activity-status {
+        margin-left: 0;
+        align-self: flex-end;
+    }
+    
+    .activity-meta {
+        flex-wrap: wrap;
+    }
+    
+    .pagination-controls {
+        flex-wrap: wrap;
+    }
+}

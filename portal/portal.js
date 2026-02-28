@@ -2,6 +2,7 @@ document.addEventListener('DOMContentLoaded', function () {
     checkUserSession();
     displayUserInfo();
     showAdminCardIfNeeded();
+    setFacultyRequirementLink();
 
     const logoutBtn = document.querySelector('.btn-logout');
     if (logoutBtn) {
@@ -82,4 +83,26 @@ function getInitials(name) {
         return (parts[0][0] + parts[1][0]).toUpperCase();
     }
     return name.substring(0, 2).toUpperCase();
+}
+
+function setFacultyRequirementLink() {
+    const userStr = sessionStorage.getItem('user');
+    if (userStr) {
+        try {
+            const user = JSON.parse(userStr);
+            const facultyCard = document.querySelector('a[href*="FacultyRequirementSubmissionSystem"]');
+            
+            if (facultyCard) {
+                // If user is a professor/faculty, navigate to faculty-upload.html
+                // If user is an admin, navigate to dashboard.html
+                if (user.userType === 'professor') {
+                    facultyCard.href = '../FacultyRequirementSubmissionSystem/pages/faculty-upload.html';
+                } else {
+                    facultyCard.href = '../FacultyRequirementSubmissionSystem/pages/dashboard.html';
+                }
+            }
+        } catch (e) {
+            console.error('Error setting faculty requirement link:', e);
+        }
+    }
 }

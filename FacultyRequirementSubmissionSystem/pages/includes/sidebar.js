@@ -66,6 +66,7 @@ function loadSidebar(activePage) {
     let userStr = sessionStorage.getItem('user');
     let isSuperAdmin = false;
     let isProfessor = false;
+    let isDean = false;
     let user = null;
     
     if (userStr) {
@@ -73,9 +74,35 @@ function loadSidebar(activePage) {
             user = JSON.parse(userStr);
             isSuperAdmin = user.userType === 'admin' && user.adminLevel === 'super_admin';
             isProfessor = user.userType === 'professor';
+            isDean = user.userType === 'professor' && user.role === 'dean';
         } catch (e) {
             console.error('Error parsing user session:', e);
         }
+    }
+    
+    if (isDean) {
+        const sidebarHTML = `
+        <nav class="sidebar">
+            <a href="dashboard.html" class="nav-item ${activePage === 'dashboard' ? 'active' : ''}">
+                <svg viewBox="0 0 24 24"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/></svg>
+                Dashboard
+            </a>
+            <a href="dean-submissions.html" class="nav-item ${activePage === 'dean-submissions' ? 'active' : ''}">
+                <svg viewBox="0 0 24 24"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/></svg>
+                Submission Files
+            </a>
+            <a href="dean-audit.html" class="nav-item ${activePage === 'dean-audit' ? 'active' : ''}">
+                <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+                Audit Trailing
+            </a>
+            <a href="faculty-reports.html" class="nav-item ${activePage === 'faculty-reports' ? 'active' : ''}">
+                <svg viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg>
+                Report Generation
+            </a>
+        </nav>`;
+        
+        document.getElementById('sidebar-container').innerHTML = sidebarHTML;
+        return;
     }
     
     if (isProfessor) {
@@ -112,6 +139,10 @@ function loadSidebar(activePage) {
             System Dashboard
         </a>
         ${userManagementLink}
+        <a href="admin-category-management.html" class="nav-item ${activePage === 'admin-category-management' ? 'active' : ''}">
+            <svg viewBox="0 0 24 24"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/></svg>
+            Category Management
+        </a>
         <a href="filesmanagement.html" class="nav-item ${activePage === 'filesmanagement' ? 'active' : ''}">
             <svg viewBox="0 0 24 24"><ellipse cx="12" cy="5" rx="9" ry="3"/><path d="M21 12c0 1.66-4 3-9 3s-9-1.34-9-3"/><path d="M3 5v14c0 1.66 4 3 9 3s9-1.34 9-3V5"/></svg>
             Files Management

@@ -5,6 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
     <title>Upload Files — CCS Faculty Portal</title>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet"/>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css"/>
     <link href="https://fonts.googleapis.com/css2?family=Merriweather:wght@400;700&family=Source+Sans+3:wght@400;500;600&display=swap" rel="stylesheet"/>
     <link rel="stylesheet" href="../resc/css/faculty-specific.css"/>
 </head>
@@ -24,15 +25,15 @@
     <div class="stat-cards anim anim-2">
         <div class="stat-card green">
             <div class="stat-label">My Uploads This Semester</div>
-            <div class="stat-value">8</div>
+            <div class="stat-value" id="upload-total">0</div>
         </div>
         <div class="stat-card teal">
             <div class="stat-label">Approved</div>
-            <div class="stat-value">5</div>
+            <div class="stat-value" id="upload-approved">0</div>
         </div>
         <div class="stat-card orange">
             <div class="stat-label">Pending Review</div>
-            <div class="stat-value">2</div>
+            <div class="stat-value" id="upload-pending">0</div>
         </div>
     </div>
 
@@ -43,44 +44,20 @@
                 Step 1: Select Requirement Category
             </div>
             <div class="panel-body">
-                <div class="category-grid">
-
-                    <div class="category-card" data-cat="Syllabus">
-                        <div class="cat-icon" style="background:#fef3c7;">📚</div>
-                        <div class="cat-name">Syllabus</div>
-                        <div class="cat-desc">Course syllabi and curriculum outlines</div>
+                <div class="category-grid" id="categoriesGridUpload">
+                    <!-- Categories will be loaded dynamically from database -->
+                    <div class="loading-spinner" style="text-align: center; padding: 3rem; grid-column: 1/-1;">
+                        <p style="color: var(--text-muted);">Loading categories...</p>
                     </div>
-
-                    <div class="category-card" data-cat="Grade Sheets">
-                        <div class="cat-icon" style="background:#dbeafe;">📊</div>
-                        <div class="cat-name">Grade Sheets</div>
-                        <div class="cat-desc">Student grades and academic records</div>
-                    </div>
-
-                    <div class="category-card" data-cat="Lecture Notes">
-                        <div class="cat-icon" style="background:#ede9fe;">📝</div>
-                        <div class="cat-name">Lecture Notes</div>
-                        <div class="cat-desc">Teaching materials and lecture notes</div>
-                    </div>
-
-                    <div class="category-card" data-cat="Attendance Records">
-                        <div class="cat-icon" style="background:#d1fae5;">✅</div>
-                        <div class="cat-name">Attendance Records</div>
-                        <div class="cat-desc">Student attendance tracking sheets</div>
-                    </div>
-
-                    <div class="category-card" data-cat="Assessment Tools">
-                        <div class="cat-icon" style="background:#ffedd5;">📋</div>
-                        <div class="cat-name">Assessment Tools</div>
-                        <div class="cat-desc">Quizzes, exams, and evaluation materials</div>
-                    </div>
-
-                    <div class="category-card" data-cat="Research Papers">
-                        <div class="cat-icon" style="background:#f0fdf4;">🔬</div>
-                        <div class="cat-name">Research Papers</div>
-                        <div class="cat-desc">Faculty research and publications</div>
-                    </div>
-
+                </div>
+                
+                <!-- Empty state when no categories -->
+                <div id="noCategoriesMessage" style="display:none; text-align: center; padding: 3rem; grid-column: 1/-1;">
+                    <svg viewBox="0 0 24 24" style="width: 48px; height: 48px; stroke: var(--text-muted); fill: none; margin: 0 auto 1rem;">
+                        <path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/>
+                    </svg>
+                    <h3 style="color: var(--text-main); margin-bottom: .5rem;">No Categories Available</h3>
+                    <p style="color: var(--text-muted);">Please contact the system administrator to create requirement categories.</p>
                 </div>
             </div>
         </div>
@@ -160,8 +137,13 @@
 <button class="help-btn">?</button>
 
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
-<script src="../includes/sidebar.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="../../config/.env.js"></script>
+<script src="../../config/config.js"></script>
+<script src="../../shared/global.js"></script>
+<script src="includes/sidebar.js"></script>
 <script src="../resc/js/faculty-specific.js"></script>
+<script src="../resc/js/faculty-upload.js"></script>
 <script>
 loadHeader();
 loadSidebar('faculty-upload');
