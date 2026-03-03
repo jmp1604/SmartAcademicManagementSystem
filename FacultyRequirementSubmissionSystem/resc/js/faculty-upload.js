@@ -1,12 +1,13 @@
 
-let selectedCategoryId = null;
+let selectedRequirementId = null;
+let selectedRequirementData = null;
 
 document.addEventListener('DOMContentLoaded', async function () {
     const step1          = document.getElementById('upload-step-1');
     const step2          = document.getElementById('upload-step-2');
     const selectedCatEl  = document.getElementById('selected-category-name');
     const btnBackStep    = document.getElementById('btn-back-step');
-    await loadCategories();
+    await loadRequirements();
 
     function attachCategoryListeners() {
         const categoryCards = document.querySelectorAll('.category-card');
@@ -15,13 +16,18 @@ document.addEventListener('DOMContentLoaded', async function () {
                 card.addEventListener('click', function () {
                     categoryCards.forEach(c => c.classList.remove('selected'));
                     card.classList.add('selected');
-                    const catName = card.dataset.cat;
-                    selectedCategoryId = card.dataset.catId;
-                    if (selectedCatEl) selectedCatEl.textContent = catName;
+                    const reqName = card.dataset.cat;
+                    selectedRequirementId = card.dataset.catId;
+                    selectedRequirementData = {
+                        id: card.dataset.catId,
+                        name: reqName,
+                        category: card.dataset.category
+                    };
+                    if (selectedCatEl) selectedCatEl.textContent = reqName;
                     if (step1) step1.classList.remove('active');
                     if (step2) step2.classList.add('active');
                     const catSelect = document.getElementById('file-category');
-                    if (catSelect) catSelect.value = catName;
+                    if (catSelect) catSelect.value = reqName;
                 });
             });
         }
@@ -77,7 +83,7 @@ document.addEventListener('DOMContentLoaded', async function () {
 
 const uploadForm = document.getElementById('upload-form');
     if (uploadForm) {
-        uploadForm.addEventListener('submit', function (e) {
+        uploadForm.addEventListener('submit', async function (e) {
             e.preventDefault();
 
             const fileInput2 = document.getElementById('file-input');
@@ -87,12 +93,18 @@ const uploadForm = document.getElementById('upload-form');
                 alert('Please select a file to upload');
                 return;
             }
-            showUploadSuccess();
+
+            if (!selectedRequirementId) {
+                alert('Please select a requirement first');
+                return;
+            }
+
+            await handleFileUpload(fileInput2.files[0], fileDesc.value);
         });
     }
 });
 
-async function loadCategories() {
+async function loadRequirements() {
     try {
         if (!supabaseClient) {
             console.error('Supabase client not initialized');
@@ -100,11 +112,18 @@ async function loadCategories() {
             return;
         }
 
+        // Load requirements with their category information
         const { data, error } = await supabaseClient
-            .from('categories')
-            .select('*')
+            .from('requirements')
+            .select(`
+                *,
+                categories:category_id(
+                    name,
+                    icon
+                )
+            `)
             .eq('status', 'active')
-            .order('name', { ascending: true });
+            .order('title', { ascending: true });
 
         if (error) throw error;
 
@@ -119,28 +138,34 @@ async function loadCategories() {
 
         const colors = ['#fef3c7', '#dbeafe', '#fce7f3', '#e0e7ff', '#d1fae5', '#ffedd5'];
 
-        categoriesGrid.innerHTML = data.map((category, index) => {
+        categoriesGrid.innerHTML = data.map((requirement, index) => {
             const bgColor = colors[index % colors.length];
+            const categoryName = requirement.categories?.name || 'General';
             let iconHtml = '📁';
-            if (category.icon) {
-                if (category.icon.includes('fa-')) {
-                    iconHtml = `<i class="${category.icon}"></i>`;
+            if (requirement.categories?.icon) {
+                if (requirement.categories.icon.includes('fa-')) {
+                    iconHtml = `<i class="${requirement.categories.icon}"></i>`;
                 } else {
-                    iconHtml = category.icon;
+                    iconHtml = requirement.categories.icon;
                 }
             }
+            
+            // Format deadline
+            const deadline = requirement.deadline ? new Date(requirement.deadline).toLocaleDateString() : 'No deadline';
+            const isMandatory = requirement.is_mandatory ? '<span style="color:#dc2626;font-weight:600;">*Required</span>' : '';
+            
             return `
-                <div class="category-card" data-cat="${escapeHtml(category.name)}" data-cat-id="${category.id}">
+                <div class="category-card" data-cat="${escapeHtml(requirement.name)}" data-cat-id="${requirement.id}" data-category="${escapeHtml(categoryName)}">
                     <div class="cat-icon" style="background:${bgColor};">${iconHtml}</div>
-                    <div class="cat-name">${escapeHtml(category.name)}</div>
-                    <div class="cat-desc">${escapeHtml(category.description || 'No description')}</div>
+                    <div class="cat-name">${escapeHtml(requirement.name)} ${isMandatory}</div>
+                    <div class="cat-desc">${escapeHtml(requirement.description || 'No description')}<br><small style="color:#666;">📅 ${deadline} | 📂 ${escapeHtml(categoryName)}</small></div>
                 </div>
             `;
         }).join('');
         attachCategoryListeners();
 
     } catch (error) {
-        console.error('Error loading categories:', error);
+        console.error('Error loading requirements:', error);
         showNoCategoriesMessage();
     }
 }
@@ -156,13 +181,18 @@ function attachCategoryListeners() {
             card.addEventListener('click', function () {
                 categoryCards.forEach(c => c.classList.remove('selected'));
                 card.classList.add('selected');
-                const catName = card.dataset.cat;
-                selectedCategoryId = card.dataset.catId;
-                if (selectedCatEl) selectedCatEl.textContent = catName;
+                const reqName = card.dataset.cat;
+                selectedRequirementId = card.dataset.catId;
+                selectedRequirementData = {
+                    id: card.dataset.catId,
+                    name: reqName,
+                    category: card.dataset.category
+                };
+                if (selectedCatEl) selectedCatEl.textContent = reqName;
                 if (step1) step1.classList.remove('active');
                 if (step2) step2.classList.add('active');
                 const catSelect = document.getElementById('file-category');
-                if (catSelect) catSelect.value = catName;
+                if (catSelect) catSelect.value = reqName;
             });
         });
     }
@@ -203,6 +233,74 @@ function formatBytes(bytes) {
     return (bytes / 1048576).toFixed(1) + ' MB';
 }
 
+async function handleFileUpload(file, description) {
+    const step2 = document.getElementById('upload-step-2');
+    if (!step2) return;
+
+    // Show uploading state
+    step2.innerHTML = `
+        <div class="panel-body" style="text-align:center; padding:3rem 2rem;">
+            <div style="width:64px;height:64px;border-radius:50%;background:#dbeafe;display:flex;align-items:center;justify-content:center;margin:0 auto 1.2rem;animation:spin 1s linear infinite;">
+                <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="#1e40af" stroke-width="2.5"><circle cx="12" cy="12" r="10" opacity="0.25"/><path d="M12 2a10 10 0 0 1 10 10" stroke-linecap="round"/></svg>
+            </div>
+            <h3 style="font-family:'Merriweather',serif;color:#1e40af;margin-bottom:.5rem;font-size:1.1rem;">Uploading...</h3>
+            <p style="color:#6b7280;font-size:.875rem;">Please wait while your file is being uploaded.</p>
+        </div>
+    `;
+
+    try {
+        const { data: { user }, error: userError } = await supabaseClient.auth.getUser();
+        if (userError || !user) throw new Error('User not authenticated');
+        const timestamp = Date.now();
+        const fileExt = file.name.split('.').pop();
+        const fileName = `${timestamp}-${file.name.replace(/[^a-zA-Z0-9.-]/g, '_')}`;
+        const filePath = `submissions/${user.id}/${fileName}`;
+        
+        const { data: uploadData, error: uploadError } = await supabaseClient.storage
+            .from('faculty-submissions')
+            .upload(filePath, file, {
+                cacheControl: '3600',
+                upsert: false
+            });
+
+        if (uploadError) throw uploadError;
+        const { data: urlData } = supabaseClient.storage
+            .from('faculty-submissions')
+            .getPublicUrl(filePath);
+        const { data: submissionData, error: submissionError } = await supabaseClient
+            .from('submissions')
+            .insert({
+                professor_id: user.id,
+                requirement_id: selectedRequirementId,
+                status: 'pending',
+                remarks: description || null
+            })
+            .select()
+            .single();
+
+        if (submissionError) throw submissionError;
+        const { data: fileData, error: fileError } = await supabaseClient
+            .from('submission_files')
+            .insert({
+                submission_id: submissionData.id,
+                file_name: file.name,
+                file_url: urlData.publicUrl,
+                file_size: file.size,
+                file_type: file.type || `application/${fileExt}`
+            })
+            .select()
+            .single();
+
+        if (fileError) throw fileError;
+
+        showUploadSuccess();
+
+    } catch (error) {
+        console.error('Upload error:', error);
+        showUploadError(error.message);
+    }
+}
+
 function showUploadSuccess() {
     const step2 = document.getElementById('upload-step-2');
     if (!step2) return;
@@ -222,4 +320,19 @@ function showUploadSuccess() {
                 <a href="faculty-myfiles.html" style="padding:.6rem 1.4rem;border:1.5px solid #d4ddd6;color:#1a2e1c;border-radius:.6rem;font-weight:600;font-size:.875rem;text-decoration:none;">View My Files</a>
             </div>
         </div>`;
+}
+
+function showUploadError(message) {
+    const step2 = document.getElementById('upload-step-2');
+    if (!step2) return;
+    step2.innerHTML = `
+        <div class="panel-body" style="text-align:center; padding:3rem 2rem;">
+            <div style="width:64px;height:64px;border-radius:50%;background:#fee2e2;display:flex;align-items:center;justify-content:center;margin:0 auto 1.2rem;">
+                <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="#dc2626" stroke-width="2.5"><circle cx="12" cy="12" r="10"/><line x1="15" y1="9" x2="9" y2="15"/><line x1="9" y1="9" x2="15" y2="15"/></svg>
+            </div>
+            <h3 style="font-family:'Merriweather',serif;color:#dc2626;margin-bottom:.5rem;font-size:1.1rem;">Upload Failed</h3>
+            <p style="color:#6b7280;font-size:.875rem;margin-bottom:1.75rem;">${escapeHtml(message)}</p>
+            <button onclick="location.reload()" style="padding:.6rem 1.4rem;background:#dc2626;color:#fff;border:none;border-radius:.6rem;font-weight:700;font-size:.875rem;cursor:pointer;">Try Again</button>
+        </div>
+    `;
 }
