@@ -1,4 +1,7 @@
+console.log('=== PORTAL.JS LOADED ===');
+
 document.addEventListener('DOMContentLoaded', function () {
+    console.log('=== DOMContentLoaded fired ===');
     checkUserSession();
     displayUserInfo();
     showAdminCardIfNeeded();
@@ -90,16 +93,24 @@ function setFacultyRequirementLink() {
     if (userStr) {
         try {
             const user = JSON.parse(userStr);
+            console.log('User data:', user);
+            console.log('User type:', user.userType);
+            console.log('User role:', user.role);
+            
             const facultyCard = document.querySelector('a[href*="FacultyRequirementSubmissionSystem"]');
             
             if (facultyCard) {
-                // If user is a professor/faculty, navigate to faculty-upload.html
-                // If user is an admin, navigate to dashboard.html
-                if (user.userType === 'professor') {
+                if (user.userType === 'professor' && user.role === 'dean') {
+                    console.log('Setting link for DEAN to dashboard.html');
+                    facultyCard.href = '../FacultyRequirementSubmissionSystem/pages/dashboard.html';
+                } else if (user.userType === 'professor') {
+                    console.log('Setting link for PROFESSOR to faculty-upload.html');
                     facultyCard.href = '../FacultyRequirementSubmissionSystem/pages/faculty-upload.html';
                 } else {
+                    console.log('Setting link for ADMIN to dashboard.html');
                     facultyCard.href = '../FacultyRequirementSubmissionSystem/pages/dashboard.html';
                 }
+                console.log('Final card href:', facultyCard.href);
             }
         } catch (e) {
             console.error('Error setting faculty requirement link:', e);
