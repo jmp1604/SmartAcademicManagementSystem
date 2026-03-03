@@ -45,116 +45,65 @@ async function loadActivities() {
 
         if (!supabaseClient) {
             console.error('Supabase client not initialized');
-            loadPlaceholderActivities();
+            allActivities = [];
+            filteredActivities = [];
+            renderActivities();
             updateStats();
             return;
         }
 
-        // TODO: Load actual activities from audit log table
-        loadPlaceholderActivities();
+        // Load audit logs for faculty in this dean's department
+        const { data: activities, error } = await supabaseClient
+            .from('audit_logs')
+            .select(`
+                *,
+                professors!audit_logs_user_id_fkey(
+                    first_name,
+                    middle_name,
+                    last_name,
+                    role,
+                    department
+                )
+            `)
+            .eq('professors.department', department)
+            .order('timestamp', { ascending: false })
+            .limit(100);
+
+        if (error) {
+            console.error('Error loading activities:', error);
+            allActivities = [];
+            filteredActivities = [];
+            renderActivities();
+            updateStats();
+            return;
+        }
+
+        // Transform activities to match expected format
+        allActivities = (activities || []).map(activity => ({
+            id: activity.id,
+            action: activity.action,
+            user: activity.professors 
+                ? `${activity.professors.first_name} ${activity.professors.last_name}` 
+                : 'Unknown User',
+            userType: activity.professors?.role === 'dean' ? 'Dean' : 'Professor',
+            file: activity.file_name || 'N/A',
+            category: activity.category || 'general',
+            timestamp: activity.timestamp,
+            status: 'success',
+            comments: activity.comments || null
+        }));
+
+        filteredActivities = [...allActivities];
+        renderActivities();
         updateStats();
         
     } catch (error) {
         console.error('Error loading activities:', error);
-        loadPlaceholderActivities();
+        allActivities = [];
+        filteredActivities = [];
+        renderActivities();
         updateStats();
     }
-}
-
-function loadPlaceholderActivities() {
-    allActivities = [
-        {
-            id: 1,
-            action: 'approve',
-            user: 'Dean Pedro Reyes',
-            userType: 'Dean',
-            file: 'CS101_Syllabus_Q1_2025.pdf',
-            category: 'syllabus',
-            timestamp: '2026-02-22 14:45:30',
-            status: 'success',
-            comments: 'Approved'
-        },
-        {
-            id: 2,
-            action: 'upload',
-            user: 'Dr. Juan Dela Cruz',
-            userType: 'Professor',
-            file: 'CS101_Grades_Final_2025.xlsx',
-            category: 'grades',
-            timestamp: '2026-02-22 14:00:15',
-            status: 'success',
-            comments: null
-        },
-        {
-            id: 3,
-            action: 'update',
-            user: 'Prof. Maria Santos',
-            userType: 'Professor',
-            file: 'IT201_Syllabus_Q1_2025.pdf',
-            category: 'syllabus',
-            timestamp: '2026-02-22 14:35:50',
-            status: 'success',
-            comments: 'Updated version with corrections'
-        },
-        {
-            id: 4,
-            action: 'delete',
-            user: 'Dr. Ana Garcia',
-            userType: 'Professor',
-            file: 'IS301_Draft.pdf',
-            category: 'syllabus',
-            timestamp: '2026-02-22 13:20:45',
-            status: 'success',
-            comments: 'Removed draft version'
-        },
-        {
-            id: 5,
-            action: 'reject',
-            user: 'Dean Pedro Reyes',
-            userType: 'Dean',
-            file: 'CS201_Incomplete.pdf',
-            category: 'syllabus',
-            timestamp: '2026-02-22 12:15:30',
-            status: 'success',
-            comments: 'Missing required sections'
-        },
-        {
-            id: 6,
-            action: 'upload',
-            user: 'Dr. Roberto Santos',
-            userType: 'Professor',
-            file: 'IT301_LectureNotes_Week1.pdf',
-            category: 'notes',
-            timestamp: '2026-02-22 11:45:20',
-            status: 'success',
-            comments: null
-        },
-        {
-            id: 7,
-            action: 'approve',
-            user: 'Dean Pedro Reyes',
-            userType: 'Dean',
-            file: 'CS102_Attendance_Feb.xlsx',
-            category: 'attendance',
-            timestamp: '2026-02-22 10:30:15',
-            status: 'success',
-            comments: 'Approved'
-        },
-        {
-            id: 8,
-            action: 'upload',
-            user: 'Prof. Linda Cruz',
-            userType: 'Professor',
-            file: 'IS101_Quiz1_2025.pdf',
-            category: 'assessment',
-            timestamp: '2026-02-22 09:20:00',
-            status: 'success',
-            comments: null
-        }
-    ];
-
-    filteredActivities = [...allActivities];
-    renderActivities();
 }
 
 function updateStats() {

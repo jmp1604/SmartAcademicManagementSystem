@@ -108,11 +108,12 @@
 
 </main>
 
-<div class="modal fade" id="fileReviewModal" tabindex="-1">
+<!-- File Details Modal (View Only) -->
+<div class="modal fade" id="fileDetailsModal" tabindex="-1">
     <div class="modal-dialog modal-lg modal-dialog-centered">
         <div class="modal-content">
             <div class="modal-header">
-                <h5 class="modal-title">Review Submission</h5>
+                <h5 class="modal-title">Submission Details</h5>
                 <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
             </div>
             <div class="modal-body">
@@ -141,22 +142,62 @@
                         <span class="detail-label">Size:</span>
                         <span class="detail-value" id="modalSize"></span>
                     </div>
+                    <div class="detail-row">
+                        <span class="detail-label">Status:</span>
+                        <span class="detail-value" id="modalStatus"></span>
+                    </div>
                 </div>
 
-                <div class="review-comments-section">
-                    <label for="reviewComments" class="form-label">Comments (Optional)</label>
-                    <textarea class="form-control" id="reviewComments" rows="3" placeholder="Add comments or feedback..."></textarea>
+                <div class="alert alert-info" style="margin-top: 1rem;">
+                    <strong>Note:</strong> Only admins can approve or reject submissions. You can flag submissions for admin attention if there are issues.
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Flag Submission Modal -->
+<div class="modal fade" id="flagModal" tabindex="-1">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Flag Submission for Admin Review</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <p style="margin-bottom: 1rem;">You are flagging: <strong id="flagFileName"></strong></p>
+                
+                <div class="mb-3">
+                    <label for="flagReason" class="form-label">Reason for Flagging <span style="color: red;">*</span></label>
+                    <select class="form-select" id="flagReason" required>
+                        <option value="">Select a reason...</option>
+                        <option value="Incomplete Document">Incomplete Document</option>
+                        <option value="Wrong File Format">Wrong File Format</option>
+                        <option value="Missing Required Information">Missing Required Information</option>
+                        <option value="Policy Violation">Policy Violation</option>
+                        <option value="Unclear Content">Unclear Content</option>
+                        <option value="Requires Admin Verification">Requires Admin Verification</option>
+                        <option value="Other">Other</option>
+                    </select>
+                </div>
+
+                <div class="mb-3">
+                    <label for="flagNotes" class="form-label">Additional Notes (Optional)</label>
+                    <textarea class="form-control" id="flagNotes" rows="3" placeholder="Provide additional details about why this submission needs admin attention..."></textarea>
+                </div>
+
+                <div class="alert alert-warning">
+                    <strong>⚠️ Important:</strong> Flagging this submission will notify the admin for review. The faculty member will be informed if action is taken.
                 </div>
             </div>
             <div class="modal-footer">
                 <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
-                <button type="button" class="btn btn-danger" id="rejectFileBtn">
-                    <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><line x1="15" y1="9" x2="9" y2="15"/><line x1="9" y1="9" x2="15" y2="15"/></svg>
-                    Reject
-                </button>
-                <button type="button" class="btn btn-success" id="approveFileBtn">
-                    <svg viewBox="0 0 24 24"><polyline points="20 6 9 17 4 12"/></svg>
-                    Approve
+                <button type="button" class="btn btn-warning" id="flagSubmissionBtn">
+                    <svg viewBox="0 0 24 24" style="width: 16px; height: 16px; margin-right: 4px;"><path d="M4 15s1-1 4-1 5 2 8 2 4-1 4-1V3s-1 1-4 1-5-2-8-2-4 1-4 1z"/><line x1="4" y1="22" x2="4" y2="15"/></svg>
+                    Flag for Admin
                 </button>
             </div>
         </div>

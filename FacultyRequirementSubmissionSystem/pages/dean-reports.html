@@ -1,0 +1,219 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8"/>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+    <title>Department Reports — CCS Dean Portal</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet"/>
+    <link href="https://fonts.googleapis.com/css2?family=Merriweather:wght@400;700&family=Source+Sans+3:wght@400;500;600&display=swap" rel="stylesheet"/>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.min.css"/>
+    <link rel="stylesheet" href="../../shared/global.css"/>
+    <link rel="stylesheet" href="../resc/css/faculty-specific.css"/>
+    <link rel="stylesheet" href="../resc/css/dean-reports.css"/>
+</head>
+<body>
+
+<div id="header-container"></div>
+
+<div id="sidebar-container"></div>
+
+<main class="main-content">
+
+    <div class="page-header anim anim-1">
+        <h1>Department Reports</h1>
+        <p>Generate comprehensive reports for department-wide submissions and faculty activities</p>
+    </div>
+
+    <div class="filter-panel anim anim-2">
+        <div class="filter-panel-title">
+            <svg viewBox="0 0 24 24"><polygon points="22 3 2 3 10 12.46 10 19 14 21 14 12.46 22 3"/></svg>
+            Report Filters
+        </div>
+        <div class="filter-panel-sub">Select criteria for your department reports</div>
+        <div class="filter-grid">
+            <div class="filter-group">
+                <label>Academic Year</label>
+                <div class="filter-select-wrap">
+                    <select id="filter-year">
+                        <option>2023-2024</option>
+                        <option>2024-2025</option>
+                        <option selected>2025-2026</option>
+                    </select>
+                    <svg viewBox="0 0 24 24"><polyline points="6 9 12 15 18 9"/></svg>
+                </div>
+            </div>
+            <div class="filter-group">
+                <label>Semester</label>
+                <div class="filter-select-wrap">
+                    <select id="filter-semester">
+                        <option>All Semesters</option>
+                        <option>1st Semester</option>
+                        <option selected>2nd Semester</option>
+                        <option>Summer</option>
+                    </select>
+                    <svg viewBox="0 0 24 24"><polyline points="6 9 12 15 18 9"/></svg>
+                </div>
+            </div>
+            <div class="filter-group">
+                <label>Department</label>
+                <div class="filter-select-wrap">
+                    <select id="filter-department">
+                        <option selected>My Department</option>
+                        <option>Computer Science</option>
+                        <option>Information Technology</option>
+                        <option>Information Systems</option>
+                    </select>
+                    <svg viewBox="0 0 24 24"><polyline points="6 9 12 15 18 9"/></svg>
+                </div>
+            </div>
+            <div class="filter-group">
+                <label>Category</label>
+                <div class="filter-select-wrap">
+                    <select id="filter-category">
+                        <option selected>All Categories</option>
+                        <option>Syllabus</option>
+                        <option>Grade Sheets</option>
+                        <option>Lecture Notes</option>
+                        <option>Attendance Records</option>
+                        <option>Assessment Tools</option>
+                        <option>Research Papers</option>
+                    </select>
+                    <svg viewBox="0 0 24 24"><polyline points="6 9 12 15 18 9"/></svg>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="summary-cards anim anim-3">
+        <div class="summary-card white">
+            <div class="summary-label">Total Submissions</div>
+            <div class="summary-value" id="stat-total">212</div>
+        </div>
+        <div class="summary-card green">
+            <div class="summary-label">Approved</div>
+            <div class="summary-value" id="stat-approved">189</div>
+        </div>
+        <div class="summary-card yellow">
+            <div class="summary-label">Pending Review</div>
+            <div class="summary-value" id="stat-pending">23</div>
+        </div>
+        <div class="summary-card red">
+            <div class="summary-label">Flagged</div>
+            <div class="summary-value" id="stat-flagged">0</div>
+        </div>
+    </div>
+
+    <div class="charts-grid anim anim-4">
+        <div class="chart-card">
+            <div class="chart-card-header">
+                <h3>Submission Status Distribution</h3>
+                <p>Overview of all submissions by approval status</p>
+            </div>
+            <div class="chart-wrap">
+                <canvas id="statusDonut"></canvas>
+            </div>
+        </div>
+
+        <div class="chart-card">
+            <div class="chart-card-header">
+                <h3>Monthly Submission Trends</h3>
+                <p>Department submission activity over time</p>
+            </div>
+            <div class="chart-wrap">
+                <canvas id="monthBar"></canvas>
+            </div>
+        </div>
+    </div>
+
+    <div class="report-actions-grid anim anim-5">
+
+        <div class="report-action-card">
+            <div class="rac-header">
+                <svg viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg>
+                <span class="rac-title">Department Summary Report</span>
+            </div>
+            <div class="rac-desc">Generate a comprehensive summary of all department submissions including faculty compliance and status breakdown</div>
+            <button class="btn-generate" onclick="generateReport('department-summary', event)">
+                <svg viewBox="0 0 24 24"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+                Generate Department Report
+            </button>
+        </div>
+
+        <div class="report-action-card">
+            <div class="rac-header">
+                <svg viewBox="0 0 24 24"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
+                <span class="rac-title">Faculty Compliance Report</span>
+            </div>
+            <div class="rac-desc">View submission compliance rates for all faculty members in your department with detailed breakdowns</div>
+            <button class="btn-generate" onclick="generateReport('faculty-compliance', event)">
+                <svg viewBox="0 0 24 24"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+                Generate Compliance Report
+            </button>
+        </div>
+
+        <div class="report-action-card">
+            <div class="rac-header">
+                <svg viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
+                <span class="rac-title">Semester Timeline Report</span>
+            </div>
+            <div class="rac-desc">Chronological view of all department activities and submission patterns for the selected semester</div>
+            <button class="btn-generate" onclick="generateReport('semester-timeline', event)">
+                <svg viewBox="0 0 24 24"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+                Generate Timeline Report
+            </button>
+        </div>
+
+        <div class="report-action-card">
+            <div class="rac-header">
+                <svg viewBox="0 0 24 24"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/></svg>
+                <span class="rac-title">Category Analysis Report</span>
+            </div>
+            <div class="rac-desc">Detailed breakdown of submissions by category with completion rates and trends across all categories</div>
+            <button class="btn-generate" onclick="generateReport('category-analysis', event)">
+                <svg viewBox="0 0 24 24"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+                Generate Category Report
+            </button>
+        </div>
+
+    </div>
+
+    <div class="submissions-panel anim anim-6">
+        <div class="submissions-panel-title">Faculty Submission Overview (<span id="faculty-count">0</span> Faculty Members)</div>
+        <div class="submissions-panel-sub">Summary of submission status per faculty member</div>
+
+        <table class="sub-table">
+            <thead>
+                <tr>
+                    <th>Faculty Name</th>
+                    <th>Department</th>
+                    <th>Total Submissions</th>
+                    <th>Approved</th>
+                    <th>Pending</th>
+                    <th>Compliance Rate</th>
+                </tr>
+            </thead>
+            <tbody id="faculty-tbody">
+                <!-- Faculty data will be loaded dynamically -->
+            </tbody>
+        </table>
+    </div>
+
+</main>
+
+<button class="help-btn">?</button>
+
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="../../config/.env.js"></script>
+<script src="../../config/config.js"></script>
+<script src="../../shared/global.js"></script>
+<script src="includes/sidebar.js"></script>
+<script src="../resc/js/faculty-specific.js"></script>
+<script src="../resc/js/dean-reports.js"></script>
+<script>
+loadHeader();
+loadSidebar('dean-reports');
+</script>
+</body>
+</html>
