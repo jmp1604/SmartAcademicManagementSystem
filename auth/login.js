@@ -51,7 +51,7 @@ async function loginUser(email, password) {
     if (adminData) {
         userData = adminData;
         tableName = 'admins';
-        userRole = adminData.admin_level || 'admin'; // Get admin_level from database
+        userRole = adminData.admin_level || 'admin';
     } else {
         const { data: profData, error: profError } = await supabaseClient
             .from('professors')
@@ -92,6 +92,11 @@ async function loginUser(email, password) {
         department: userData.department || null,
         loginTime: new Date().toISOString()
     }));
+
+    console.log('Login successful - User data saved to session:');
+    console.log('- userType:', tableName === 'admins' ? 'admin' : 'professor');
+    console.log('- role:', userRole);
+    console.log('- email:', userData.email);
 
     if (tableName === 'admins' && userData.admin_level === 'super_admin') {
         window.location.href = '../admin/usermanagement.html';

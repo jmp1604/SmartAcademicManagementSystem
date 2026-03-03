@@ -30,14 +30,11 @@ function setupEventListeners() {
     if (deptFilter) {
         deptFilter.addEventListener('change', filterFiles);
     }
-    const approveBtn = document.getElementById('approveFileBtn');
-    const rejectBtn = document.getElementById('rejectFileBtn');
     
-    if (approveBtn) {
-        approveBtn.addEventListener('click', handleApproveFile);
-    }
-    if (rejectBtn) {
-        rejectBtn.addEventListener('click', handleRejectFile);
+    // Flag submission button
+    const flagBtn = document.getElementById('flagSubmissionBtn');
+    if (flagBtn) {
+        flagBtn.addEventListener('click', handleFlagSubmission);
     }
 }
 
@@ -45,79 +42,68 @@ async function loadCategories() {
     try {
         if (!supabaseClient) {
             console.error('Supabase client not initialized');
-            showPlaceholderCategories();
+            allCategories = [];
+            renderCategories(allCategories);
+            updateOverallStats();
             return;
         }
 
-        // TODO: Load categories from database
-        showPlaceholderCategories();
+        // Load categories from database
+        const { data: categories, error: categoriesError } = await supabaseClient
+            .from('requirements')
+            .select('*')
+            .order('name');
+
+        if (categoriesError) {
+            console.error('Error loading categories:', categoriesError);
+            allCategories = [];
+            renderCategories(allCategories);
+            updateOverallStats();
+            return;
+        }
+
+        const user = getCurrentUser();
+        const department = user.department || 'Computer Science';
+
+        // Get all submissions from faculty in this dean's department
+        const { data: submissions, error: submissionsError } = await supabaseClient
+            .from('submissions')
+            .select(`
+                *,
+                professors!inner(department)
+            `)
+            .eq('professors.department', department);
+
+        if (submissionsError) {
+            console.error('Error loading submissions:', submissionsError);
+        }
+
+        // Map categories with submission counts
+        allCategories = (categories || []).map(category => {
+            const categorySubmissions = submissions?.filter(s => s.requirement_id === category.id) || [];
+            const iconColors = ['purple', 'green', 'blue', 'orange', 'teal', 'pink'];
+            const iconIndex = allCategories.length % iconColors.length;
+
+            return {
+                id: category.id,
+                name: category.name,
+                description: category.description || 'No description available',
+                icon: iconColors[iconIndex],
+                totalFiles: categorySubmissions.length,
+                approved: categorySubmissions.filter(s => s.status === 'approved').length,
+                pending: categorySubmissions.filter(s => s.status === 'pending').length
+            };
+        });
+
+        renderCategories(allCategories);
+        updateOverallStats();
         
     } catch (error) {
         console.error('Error loading categories:', error);
-        showPlaceholderCategories();
+        allCategories = [];
+        renderCategories(allCategories);
+        updateOverallStats();
     }
-}
-
-function showPlaceholderCategories() {
-    allCategories = [
-        {
-            id: 'syllabus',
-            name: 'Syllabus',
-            description: 'Course syllabi and curriculum outlines',
-            icon: 'purple',
-            totalFiles: 45,
-            approved: 40,
-            pending: 5
-        },
-        {
-            id: 'grades',
-            name: 'Grade Sheets',
-            description: 'Student grades and academic records',
-            icon: 'green',
-            totalFiles: 38,
-            approved: 35,
-            pending: 3
-        },
-        {
-            id: 'notes',
-            name: 'Lecture Notes',
-            description: 'Teaching materials and lecture notes',
-            icon: 'blue',
-            totalFiles: 52,
-            approved: 44,
-            pending: 8
-        },
-        {
-            id: 'attendance',
-            name: 'Attendance Records',
-            description: 'Student attendance tracking sheets',
-            icon: 'orange',
-            totalFiles: 28,
-            approved: 26,
-            pending: 2
-        },
-        {
-            id: 'assessment',
-            name: 'Assessment Tools',
-            description: 'Quizzes, exams, and evaluation materials',
-            icon: 'teal',
-            totalFiles: 34,
-            approved: 30,
-            pending: 4
-        },
-        {
-            id: 'research',
-            name: 'Research Papers',
-            description: 'Faculty research and publications',
-            icon: 'pink',
-            totalFiles: 15,
-            approved: 14,
-            pending: 1
-        }
-    ];
-
-    renderCategories(allCategories);
-    updateOverallStats();
 }
 
 function updateOverallStats() {
@@ -225,55 +211,61 @@ function showCategoriesView() {
 async function loadFiles(categoryId) {
     try {
         if (!supabaseClient) {
-            showPlaceholderFiles(categoryId);
+            allFiles = [];
+            renderFiles(allFiles);
             return;
         }
 
-        // TODO: Load actual files from database
-        showPlaceholderFiles(categoryId);
+        const user = getCurrentUser();
+        const department = user.department || 'Computer Science';
+
+        // Load files from faculty in this dean's department for this category
+        const { data: files, error } = await supabaseClient
+            .from('submissions')
+            .select(`
+                *,
+                professors!inner(first_name, middle_name, last_name, department)
+            `)
+            .eq('requirement_id', categoryId)
+            .eq('professors.department', department)
+            .order('created_at', { ascending: false });
+
+        if (error) {
+            console.error('Error loading files:', error);
+            allFiles = [];
+            renderFiles(allFiles);
+            return;
+        }
+
+        // Transform files to match expected format
+        allFiles = (files || []).map(file => ({
+            id: file.id,
+            filename: file.file_name,
+            category: categoryId,
+            uploadedBy: file.professors 
+                ? `${file.professors.first_name} ${file.professors.middle_name ? file.professors.middle_name + ' ' : ''}${file.professors.last_name}` 
+                : 'Unknown',
+            department: file.professors?.department || 'N/A',
+            date: file.created_at,
+            size: formatFileSize(file.file_size),
+            status: file.status,
+            fileUrl: file.file_url
+        }));
+
+        renderFiles(allFiles);
         
     } catch (error) {
         console.error('Error loading files:', error);
-        showPlaceholderFiles(categoryId);
+        allFiles = [];
+        renderFiles(allFiles);
     }
 }
 
-function showPlaceholderFiles(categoryId) {
-    // Sample files based on Figma design
-    allFiles = [
-        {
-            id: 1,
-            filename: 'CS101_Syllabus_Q1_2025.pdf',
-            category: categoryId,
-            uploadedBy: 'Dr. Juan Dela Cruz',
-            department: 'Computer Science',
-            date: '2026-02-20',
-            size: '2.4 MB',
-            status: 'approved'
-        },
-        {
-            id: 2,
-            filename: 'IT201_Syllabus_Q1_2025.pdf',
-            category: categoryId,
-            uploadedBy: 'Prof. Maria Santos',
-            department: 'Information Technology',
-            date: '2026-02-21',
-            size: '2.1 MB',
-            status: 'pending'
-        },
-        {
-            id: 3,
-            filename: 'IS301_Syllabus_Q1_2025.pdf',
-            category: categoryId,
-            uploadedBy: 'Dr. Ana Garcia',
-            department: 'Information Systems',
-            date: '2026-02-19',
-            size: '2.8 MB',
-            status: 'approved'
-        }
-    ];
-
-    renderFiles(allFiles);
+function formatFileSize(bytes) {
+    if (!bytes) return 'N/A';
+    if (bytes < 1024) return bytes + ' B';
+    if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(1) + ' KB';
+    return (bytes / (1024 * 1024)).toFixed(1) + ' MB';
 }
 
 function renderFiles(files) {
@@ -311,18 +303,19 @@ function renderFiles(files) {
                     <svg viewBox="0 0 24 24"><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/></svg>
                     Size: ${file.size}
                 </div>
-                ${file.status === 'pending' ? `
-                    <div class="file-card-actions">
-                        <button class="btn-approve" onclick="showReviewModal(${file.id}, 'approve')">
-                            <svg viewBox="0 0 24 24"><polyline points="20 6 9 17 4 12"/></svg>
-                            Approve
+                <div class="file-card-actions">
+                    <button class="btn-view" onclick="viewFileDetails(${file.id})" style="background: #2563eb; color: white;">
+                        <svg viewBox="0 0 24 24"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
+                        View Details
+                    </button>
+                    ${file.status === 'pending' && !file.flagged_by_dean ? `
+                        <button class="btn-flag" onclick="showFlagModal(${file.id})" style="background: #f59e0b; color: white;">
+                            <svg viewBox="0 0 24 24"><path d="M4 15s1-1 4-1 5 2 8 2 4-1 4-1V3s-1 1-4 1-5-2-8-2-4 1-4 1z"/><line x1="4" y1="22" x2="4" y2="15"/></svg>
+                            Flag for Admin
                         </button>
-                        <button class="btn-reject" onclick="showReviewModal(${file.id}, 'reject')">
-                            <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><line x1="15" y1="9" x2="9" y2="15"/><line x1="9" y1="9" x2="15" y2="15"/></svg>
-                            Reject
-                        </button>
-                    </div>
-                ` : ''}
+                    ` : ''}
+                    ${file.flagged_by_dean ? '<span style="color: #f59e0b; font-size: 0.85rem;">⚠️ Flagged</span>' : ''}
+                </div>
             </div>
         `;
         grid.appendChild(card);
@@ -346,7 +339,7 @@ function filterFiles() {
     renderFiles(filtered);
 }
 
-function showReviewModal(fileId, action) {
+function viewFileDetails(fileId) {
     const file = allFiles.find(f => f.id === fileId);
     if (!file) return;
 
@@ -357,64 +350,75 @@ function showReviewModal(fileId, action) {
     document.getElementById('modalDepartment').textContent = file.department;
     document.getElementById('modalDate').textContent = formatFileDate(file.date);
     document.getElementById('modalSize').textContent = file.size;
-    
-    // Store file ID for later
-    document.getElementById('fileReviewModal').dataset.fileId = fileId;
-    document.getElementById('fileReviewModal').dataset.action = action;
+    document.getElementById('modalStatus').textContent = file.status.toUpperCase();
     
     // Show modal
-    const modal = new bootstrap.Modal(document.getElementById('fileReviewModal'));
+    const modal = new bootstrap.Modal(document.getElementById('fileDetailsModal'));
     modal.show();
 }
 
-async function handleApproveFile() {
-    const modal = document.getElementById('fileReviewModal');
-    const fileId = parseInt(modal.dataset.fileId);
-    const comments = document.getElementById('reviewComments').value;
+function showFlagModal(fileId) {
+    const file = allFiles.find(f => f.id === fileId);
+    if (!file) return;
+
+    // Store file ID for later
+    document.getElementById('flagModal').dataset.fileId = fileId;
+    document.getElementById('flagFileName').textContent = file.filename;
+    document.getElementById('flagReason').value = '';
+    document.getElementById('flagNotes').value = '';
     
-    try {
-        // TODO: Update file status in database
-        console.log(`Approving file ${fileId} with comments:`, comments);
-        
-        // Update local state
-        const file = allFiles.find(f => f.id === fileId);
-        if (file) {
-            file.status = 'approved';
-        }
-        
-        // Refresh display
-        filterFiles();
-        
-        // Close modal
-        bootstrap.Modal.getInstance(modal).hide();
-        
-        // Show success message
-        alert('File approved successfully!');
-        
-    } catch (error) {
-        console.error('Error approving file:', error);
-        alert('Failed to approve file. Please try again.');
-    }
+    // Show modal
+    const modal = new bootstrap.Modal(document.getElementById('flagModal'));
+    modal.show();
 }
 
-async function handleRejectFile() {
-    const modal = document.getElementById('fileReviewModal');
-    const fileId = parseInt(modal.dataset.fileId);
-    const comments = document.getElementById('reviewComments').value;
+async function handleFlagSubmission() {
+    const modal = document.getElementById('flagModal');
+    const fileId = modal.dataset.fileId;
+    const reason = document.getElementById('flagReason').value;
+    const notes = document.getElementById('flagNotes').value;
     
-    if (!comments.trim()) {
-        alert('Please provide a reason for rejection');
+    if (!reason.trim()) {
+        alert('Please provide a reason for flagging this submission');
         return;
     }
     
     try {
-        // TODO: Update file status in database
-        console.log(`Rejecting file ${fileId} with comments:`, comments);
+        if (!supabaseClient) {
+            alert('Database connection not available');
+            return;
+        }
+
+        const user = getCurrentUser();
+
+        // Update submission to flag it
+        const { error } = await supabaseClient
+            .from('submissions')
+            .update({
+                flagged_by_dean: true,
+                flag_reason: reason,
+                dean_notes: notes || null,
+                updated_at: new Date().toISOString()
+            })
+            .eq('id', fileId);
+
+        if (error) throw error;
+
+        // Log the flagging action
+        await supabaseClient
+            .from('audit_logs')
+            .insert({
+                user_id: user.id,
+                action: 'flag',
+                file_name: allFiles.find(f => f.id === fileId)?.filename,
+                category: currentCategory?.name,
+                comments: `Flagged: ${reason}`
+            });
         
         // Update local state
         const file = allFiles.find(f => f.id === fileId);
         if (file) {
-            file.status = 'rejected';
+            file.flagged_by_dean = true;
         }
         
         // Refresh display
@@ -424,13 +428,21 @@ async function handleRejectFile() {
         bootstrap.Modal.getInstance(modal).hide();
         
         // Show success message
-        alert('File rejected successfully!');
+        alert('Submission flagged successfully! Admin will review it.');
+        
+        // Reload to refresh UI
+        if (currentCategory) {
+            loadFiles(currentCategory.id);
+        }
         
     } catch (error) {
-        console.error('Error rejecting file:', error);
-        alert('Failed to reject file. Please try again.');
+        console.error('Error flagging submission:', error);
+        alert('Failed to flag submission: ' + error.message);
     }
 }
+
+// Dean can no longer approve/reject - only admins can do that
+// Deans can view and flag submissions for admin review
 
 function formatFileDate(dateString) {
     const date = new Date(dateString);

@@ -97,6 +97,92 @@
     </div>
 
 </main>
+<div class="modal fade" id="reviewModal" tabindex="-1">
+    <div class="modal-dialog modal-xl modal-dialog-centered">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Review Submission</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <div class="row">
+                    <div class="col-md-6">
+                        <div class="file-preview-section" style="text-align: center; padding: 2rem; background: var(--bg-secondary); border-radius: 0.5rem; margin-bottom: 1rem;">
+                            <div class="file-icon-large" style="width: 80px; height: 80px; margin: 0 auto 1rem; background: var(--primary); border-radius: 50%; display: flex; align-items: center; justify-content: center;">
+                                <svg viewBox="0 0 24 24" style="width: 40px; height: 40px; stroke: white; fill: none;"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
+                            </div>
+                            <h4 id="modalFileName" style="margin-bottom: 0.5rem;">filename.pdf</h4>
+                            <p id="modalFileCategory" style="color: var(--text-muted); font-size: .9rem;"></p>
+                        </div>
+
+                        <div class="file-details-section" style="background: var(--bg-secondary); padding: 1.5rem; border-radius: 0.5rem;">
+                            <h6 style="margin-bottom: 1rem; font-weight: 600;">Submission Details</h6>
+                            <div class="detail-row" style="display: flex; justify-content: space-between; padding: 0.5rem 0; border-bottom: 1px solid var(--border-color);">
+                                <span class="detail-label" style="font-weight: 500;">Uploaded by:</span>
+                                <span class="detail-value" id="modalUploader"></span>
+                            </div>
+                            <div class="detail-row" style="display: flex; justify-content: space-between; padding: 0.5rem 0; border-bottom: 1px solid var(--border-color);">
+                                <span class="detail-label" style="font-weight: 500;">Department:</span>
+                                <span class="detail-value" id="modalDepartment"></span>
+                            </div>
+                            <div class="detail-row" style="display: flex; justify-content: space-between; padding: 0.5rem 0; border-bottom: 1px solid var(--border-color);">
+                                <span class="detail-label" style="font-weight: 500;">Upload Date:</span>
+                                <span class="detail-value" id="modalUploadDate"></span>
+                            </div>
+                            <div class="detail-row" style="display: flex; justify-content: space-between; padding: 0.5rem 0;">
+                                <span class="detail-label" style="font-weight: 500;">File Size:</span>
+                                <span class="detail-value" id="modalSize"></span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="col-md-6">
+                        <div id="flagInfo" style="display: none; background: #fef3c7; border: 1px solid #f59e0b; border-radius: 0.5rem; padding: 1rem; margin-bottom: 1rem;">
+                            <h6 style="color: #92400e; margin-bottom: 0.5rem; display: flex; align-items: center;">
+                                <svg viewBox="0 0 24 24" style="width: 20px; height: 20px; margin-right: 0.5rem; stroke: #f59e0b; fill: none;">
+                                    <path d="M4 15s1-1 4-1 5 2 8 2 4-1 4-1V3s-1 1-4 1-5-2-8-2-4 1-4 1z"/><line x1="4" y1="22" x2="4" y2="15"/>
+                                </svg>
+                                Flagged by Dean
+                            </h6>
+                            <div style="margin-bottom: 0.75rem;">
+                                <strong style="color: #92400e;">Reason:</strong>
+                                <p id="modalFlagReason" style="margin: 0.25rem 0 0 0; color: #78350f;"></p>
+                            </div>
+                            <div>
+                                <strong style="color: #92400e;">Dean's Notes:</strong>
+                                <p id="modalDeanNotes" style="margin: 0.25rem 0 0 0; color: #78350f;"></p>
+                            </div>
+                        </div>
+
+                        <div class="review-section">
+                            <label for="adminRemarks" class="form-label" style="font-weight: 600; margin-bottom: 0.5rem;">Admin Remarks</label>
+                            <textarea class="form-control" id="adminRemarks" rows="6" placeholder="Add your review comments, feedback, or reason for rejection..." style="resize: vertical;"></textarea>
+                            <small class="text-muted" style="display: block; margin-top: 0.5rem;">
+                                <strong>Note:</strong> Remarks are required for rejections. The faculty member will receive notification of your decision.
+                            </small>
+                        </div>
+
+                        <div class="alert alert-info" style="margin-top: 1rem; font-size: 0.9rem;">
+                            <strong><svg viewBox="0 0 24 24" style="width: 16px; height: 16px; display: inline; vertical-align: middle; margin-right: 4px;"><circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/></svg> Admin Review</strong><br>
+                            Your action will be final. Approved submissions cannot be reverted. Rejected submissions may be re-uploaded by faculty.
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                <button type="button" class="btn btn-danger" id="rejectSubmissionBtn">
+                    <svg viewBox="0 0 24 24" style="width: 16px; height: 16px; margin-right: 4px;"><circle cx="12" cy="12" r="10"/><line x1="15" y1="9" x2="9" y2="15"/><line x1="9" y1="9" x2="15" y2="15"/></svg>
+                    Reject Submission
+                </button>
+                <button type="button" class="btn btn-success" id="approveSubmissionBtn">
+                    <svg viewBox="0 0 24 24" style="width: 16px; height: 16px; margin-right: 4px;"><polyline points="20 6 9 17 4 12"/></svg>
+                    Approve Submission
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
 
 <button class="help-btn">?</button>
 
