@@ -1,208 +1,316 @@
-
-let selectedRequirementId = null;
-let selectedRequirementData = null;
-
 document.addEventListener('DOMContentLoaded', async function () {
-    const step1          = document.getElementById('upload-step-1');
-    const step2          = document.getElementById('upload-step-2');
-    const selectedCatEl  = document.getElementById('selected-category-name');
-    const btnBackStep    = document.getElementById('btn-back-step');
-    await loadRequirements();
-
-    function attachCategoryListeners() {
-        const categoryCards = document.querySelectorAll('.category-card');
-        if (categoryCards.length) {
-            categoryCards.forEach(function (card) {
-                card.addEventListener('click', function () {
-                    categoryCards.forEach(c => c.classList.remove('selected'));
-                    card.classList.add('selected');
-                    const reqName = card.dataset.cat;
-                    selectedRequirementId = card.dataset.catId;
-                    selectedRequirementData = {
-                        id: card.dataset.catId,
-                        name: reqName,
-                        category: card.dataset.category
-                    };
-                    if (selectedCatEl) selectedCatEl.textContent = reqName;
-                    if (step1) step1.classList.remove('active');
-                    if (step2) step2.classList.add('active');
-                    const catSelect = document.getElementById('file-category');
-                    if (catSelect) catSelect.value = reqName;
-                });
-            });
+    const searchInput  = document.querySelector('.files-search');
+    const catFilter    = document.querySelector('.cat-filter');
+    const statusFilter = document.querySelector('.status-filter');
+    await loadMyFiles();
+    initializeModal();
+    
+    document.addEventListener('click', function(e) {
+        const viewBtn = e.target.closest('.view-btn');
+        const downloadBtn = e.target.closest('.download-btn');
+        const deleteBtn = e.target.closest('.delete-btn');
+        
+        if (viewBtn) {
+            console.log('View button clicked');
+            const fileUrl = viewBtn.dataset.fileUrl;
+            const fileName = viewBtn.dataset.fileName || 'File Preview';
+            console.log('File URL from dataset:', fileUrl);
+            if (fileUrl) viewFile(fileUrl, fileName);
+            else console.error('No fileUrl in dataset');
+        } else if (downloadBtn) {
+            console.log('Download button clicked');
+            const fileUrl = downloadBtn.dataset.fileUrl;
+            const fileName = downloadBtn.dataset.fileName;
+            if (fileUrl && fileName) downloadFile(fileUrl, fileName);
+        } else if (deleteBtn) {
+            console.log('Delete button clicked');
+            const submissionId = deleteBtn.dataset.submissionId;
+            if (submissionId) deleteSubmission(submissionId);
         }
-    }
+    });
+    
+    function applyFilters() {
+        const q      = (searchInput?.value || '').toLowerCase();
+        const cat    = (catFilter?.value    || '').toLowerCase();
+        const status = (statusFilter?.value || '').toLowerCase();
 
-    if (btnBackStep) {
-        btnBackStep.addEventListener('click', function () {
-            if (step2) step2.classList.remove('active');
-            if (step1) step1.classList.add('active');
-            const categoryCards = document.querySelectorAll('.category-card');
-            categoryCards.forEach(c => c.classList.remove('selected'));
+        document.querySelectorAll('.file-card[data-cat]').forEach(function (card) {
+            const matchQ      = !q      || card.dataset.name?.toLowerCase().includes(q);
+            const matchCat    = !cat    || cat === 'all categories' || card.dataset.cat?.toLowerCase() === cat;
+            const matchStatus = !status || status === 'all status'  || card.dataset.status?.toLowerCase() === status;
+            card.style.display = (matchQ && matchCat && matchStatus) ? '' : 'none';
         });
     }
-    const dropzone   = document.getElementById('dropzone');
-    const fileInput  = document.getElementById('file-input');
-    const browseBtn  = document.getElementById('browse-btn');
-    const preview    = document.getElementById('file-preview');
-    const prevName   = document.getElementById('preview-name');
-    const prevSize   = document.getElementById('preview-size');
-    const removeBtn  = document.getElementById('remove-file');
-
-    if (dropzone && fileInput) {
-        browseBtn?.addEventListener('click', () => fileInput.click());
-        dropzone.addEventListener('click', () => fileInput.click());
-
-        dropzone.addEventListener('dragover', function (e) {
-            e.preventDefault();
-            dropzone.classList.add('dragover');
-        });
-
-        dropzone.addEventListener('dragleave', function () {
-            dropzone.classList.remove('dragover');
-        });
-
-        dropzone.addEventListener('drop', function (e) {
-            e.preventDefault();
-            dropzone.classList.remove('dragover');
-            const file = e.dataTransfer.files[0];
-            if (file) showFilePreview(file);
-        });
-
-        fileInput.addEventListener('change', function () {
-            const file = fileInput.files[0];
-            if (file) showFilePreview(file);
-        });
-
-        removeBtn?.addEventListener('click', function (e) {
-            e.stopPropagation();
-            fileInput.value = '';
-            if (preview) preview.classList.remove('show');
-        });
-    }
-
-const uploadForm = document.getElementById('upload-form');
-    if (uploadForm) {
-        uploadForm.addEventListener('submit', async function (e) {
-            e.preventDefault();
-
-            const fileInput2 = document.getElementById('file-input');
-            const fileDesc   = document.getElementById('file-description');
-
-            if (!fileInput2?.files.length) {
-                alert('Please select a file to upload');
-                return;
-            }
-
-            if (!selectedRequirementId) {
-                alert('Please select a requirement first');
-                return;
-            }
-
-            await handleFileUpload(fileInput2.files[0], fileDesc.value);
-        });
-    }
+    searchInput?.addEventListener('input',  applyFilters);
+    catFilter?.addEventListener('change',   applyFilters);
+    statusFilter?.addEventListener('change', applyFilters);
 });
 
-async function loadRequirements() {
+async function loadMyFiles() {
     try {
         if (!supabaseClient) {
             console.error('Supabase client not initialized');
-            showNoCategoriesMessage();
+            showNoFilesMessage('Configuration error. Please contact support.');
             return;
         }
-
-        // Load requirements with their category information
-        const { data, error } = await supabaseClient
-            .from('requirements')
+        const { data: { user }, error: userError } = await supabaseClient.auth.getUser();
+        if (userError || !user) {
+            console.error('User not authenticated:', userError);
+            showNoFilesMessage('Please log in to view your files.');
+            return;
+        }
+        const { data: submissions, error: submissionsError } = await supabaseClient
+            .from('submissions')
             .select(`
                 *,
-                categories:category_id(
+                submission_files(*),
+                requirements!left(
                     name,
-                    icon
+                    categories:category_id(
+                        name,
+                        icon
+                    )
                 )
             `)
-            .eq('status', 'active')
-            .order('title', { ascending: true });
+            .eq('professor_id', user.id)
+            .order('submitted_at', { ascending: false });
 
-        if (error) throw error;
-
-        const categoriesGrid = document.getElementById('categoriesGridUpload');
-        const noCategoriesMessage = document.getElementById('noCategoriesMessage');
-
-        if (!data || data.length === 0) {
-            categoriesGrid.innerHTML = '';
-            noCategoriesMessage.style.display = 'block';
+        if (submissionsError) {
+            console.error('Error loading submissions:', submissionsError);
+            showNoFilesMessage('Error loading files. Please try again.');
             return;
         }
 
-        const colors = ['#fef3c7', '#dbeafe', '#fce7f3', '#e0e7ff', '#d1fae5', '#ffedd5'];
-
-        categoriesGrid.innerHTML = data.map((requirement, index) => {
-            const bgColor = colors[index % colors.length];
-            const categoryName = requirement.categories?.name || 'General';
-            let iconHtml = '📁';
-            if (requirement.categories?.icon) {
-                if (requirement.categories.icon.includes('fa-')) {
-                    iconHtml = `<i class="${requirement.categories.icon}"></i>`;
-                } else {
-                    iconHtml = requirement.categories.icon;
+        if (!submissions || submissions.length === 0) {
+            showNoFilesMessage('No files uploaded yet. Start by uploading your first file!');
+            return;
+        }
+        
+        console.log('Submissions loaded:', submissions);
+        
+        // Generate signed URLs for all files
+        for (let submission of submissions) {
+            if (submission.submission_files && submission.submission_files.length > 0) {
+                for (let file of submission.submission_files) {
+                    if (file.file_url || file.file_path) {
+                        const filePath = file.file_path || file.file_url;
+                        const { data: signedUrlData } = await supabaseClient.storage
+                            .from('faculty-submissions')
+                            .createSignedUrl(filePath, 3600); // 1 hour expiry
+                        
+                        if (signedUrlData && signedUrlData.signedUrl) {
+                            file.signed_url = signedUrlData.signedUrl;
+                        }
+                    }
                 }
             }
+        }
+        
+        try {
+            console.log('Calling updateStatistics...');
+            updateStatistics(submissions);
             
-            // Format deadline
-            const deadline = requirement.deadline ? new Date(requirement.deadline).toLocaleDateString() : 'No deadline';
-            const isMandatory = requirement.is_mandatory ? '<span style="color:#dc2626;font-weight:600;">*Required</span>' : '';
+            console.log('Calling populateCategoryFilter...');
+            populateCategoryFilter(submissions);
             
-            return `
-                <div class="category-card" data-cat="${escapeHtml(requirement.name)}" data-cat-id="${requirement.id}" data-category="${escapeHtml(categoryName)}">
-                    <div class="cat-icon" style="background:${bgColor};">${iconHtml}</div>
-                    <div class="cat-name">${escapeHtml(requirement.name)} ${isMandatory}</div>
-                    <div class="cat-desc">${escapeHtml(requirement.description || 'No description')}<br><small style="color:#666;">📅 ${deadline} | 📂 ${escapeHtml(categoryName)}</small></div>
-                </div>
-            `;
-        }).join('');
-        attachCategoryListeners();
+            console.log('Calling renderFiles...');
+            renderFiles(submissions);
+        } catch (err) {
+            console.error('Error during rendering:', err);
+            showNoFilesMessage('Error displaying files: ' + err.message);
+        }
 
     } catch (error) {
-        console.error('Error loading requirements:', error);
-        showNoCategoriesMessage();
+        console.error('Error in loadMyFiles:', error);
+        showNoFilesMessage('An unexpected error occurred. Please try again.');
     }
 }
 
-function attachCategoryListeners() {
-    const step1 = document.getElementById('upload-step-1');
-    const step2 = document.getElementById('upload-step-2');
-    const selectedCatEl = document.getElementById('selected-category-name');
-    
-    const categoryCards = document.querySelectorAll('.category-card');
-    if (categoryCards.length) {
-        categoryCards.forEach(function (card) {
-            card.addEventListener('click', function () {
-                categoryCards.forEach(c => c.classList.remove('selected'));
-                card.classList.add('selected');
-                const reqName = card.dataset.cat;
-                selectedRequirementId = card.dataset.catId;
-                selectedRequirementData = {
-                    id: card.dataset.catId,
-                    name: reqName,
-                    category: card.dataset.category
-                };
-                if (selectedCatEl) selectedCatEl.textContent = reqName;
-                if (step1) step1.classList.remove('active');
-                if (step2) step2.classList.add('active');
-                const catSelect = document.getElementById('file-category');
-                if (catSelect) catSelect.value = reqName;
-            });
+function updateStatistics(submissions) {
+    const totalEl = document.getElementById('myfiles-total');
+    const approvedEl = document.getElementById('myfiles-approved');
+    const pendingEl = document.getElementById('myfiles-pending');
+    const rejectedEl = document.getElementById('myfiles-rejected');
+
+    const total = submissions.length;
+    const approved = submissions.filter(s => s.status === 'approved').length;
+    const pending = submissions.filter(s => s.status === 'pending').length;
+    const rejected = submissions.filter(s => s.status === 'rejected').length;
+
+    if (totalEl) totalEl.textContent = total;
+    if (approvedEl) approvedEl.textContent = approved;
+    if (pendingEl) pendingEl.textContent = pending;
+    if (rejectedEl) rejectedEl.textContent = rejected;
+}
+
+function populateCategoryFilter(submissions) {
+    try {
+        const catFilter = document.querySelector('.cat-filter');
+        if (!catFilter) return;
+        const categories = new Set();
+        submissions.forEach(submission => {
+            const categoryName = submission.requirements?.categories?.name;
+            if (categoryName) categories.add(categoryName);
         });
+        const currentOptions = catFilter.innerHTML;
+        const allCategoriesOption = '<option value="all categories">All Categories</option>';
+        const categoryOptions = Array.from(categories)
+            .sort()
+            .map(cat => `<option value="${escapeHtml(cat.toLowerCase())}">${escapeHtml(cat)}</option>`)
+            .join('');
+
+        catFilter.innerHTML = allCategoriesOption + categoryOptions;
+    } catch (err) {
+        console.error('Error in populateCategoryFilter:', err);
     }
 }
 
-function showNoCategoriesMessage() {
-    const categoriesGrid = document.getElementById('categoriesGridUpload');
-    const noCategoriesMessage = document.getElementById('noCategoriesMessage');
-    categoriesGrid.innerHTML = '';
-    noCategoriesMessage.style.display = 'block';
+function renderFiles(submissions) {
+    const filesGrid = document.getElementById('files-grid');
+    if (!filesGrid) {
+        console.error('files-grid element not found');
+        return;
+    }
+
+    console.log('Rendering files, count:', submissions.length);
+    
+    try {
+
+    const statusColors = {
+        approved: '#10b981',
+        pending: '#f59e0b',
+        rejected: '#ef4444'
+    };
+
+    const statusIcons = {
+        approved: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="20 6 9 17 4 12"/></svg>',
+        pending: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>',
+        rejected: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="15" y1="9" x2="9" y2="15"/><line x1="9" y1="9" x2="15" y2="15"/></svg>'
+    };
+
+    filesGrid.innerHTML = submissions.map(submission => {
+        console.log('Processing submission:', submission.id, 'Files:', submission.submission_files);
+        const file = submission.submission_files?.[0]; 
+        if (!file) {
+            console.warn('Submission without file:', submission);
+            return '';
+        }
+
+        console.log('File found:', file.file_name);
+        console.log('File URL:', file.file_url);
+        console.log('Signed URL:', file.signed_url);
+        
+        const fileUrl = file.signed_url || file.file_url;
+
+        const requirementName = submission.requirements?.name || 'Unknown Requirement';
+        const categoryName = submission.requirements?.categories?.name || 'General';
+        let categoryIcon = submission.requirements?.categories?.icon || '📁';
+        if (categoryIcon.includes('fa-')) {
+            categoryIcon = `<i class="${categoryIcon}"></i>`;
+        }
+        const status = submission.status || 'pending';
+        const statusColor = statusColors[status] || '#6b7280';
+        const statusIcon = statusIcons[status] || '';
+        const createdDate = new Date(submission.submitted_at).toLocaleDateString('en-US', {
+            year: 'numeric',
+            month: 'short',
+            day: 'numeric'
+        });
+
+        const fileSize = formatBytes(file.file_size);
+        const fileName = file.file_name;
+        const fileExt = fileName.split('.').pop().toLowerCase();
+        const fileIcon = getFileIcon(fileExt);
+
+        return `
+            <div class="file-card" data-name="${escapeHtml(fileName)}" data-cat="${escapeHtml(categoryName.toLowerCase())}" data-status="${status}">
+                <div class="file-icon ${fileExt}">${fileIcon}</div>
+                <div class="file-info">
+                    <div class="file-name" title="${escapeHtml(fileName)}">${escapeHtml(fileName)}</div>
+                    <div class="file-meta">
+                        <span>${fileSize}</span>
+                        <span>•</span>
+                        <span>${createdDate}</span>
+                    </div>
+                    <div class="file-requirement">
+                        <span class="req-icon">${categoryIcon}</span>
+                        <span class="req-text">${escapeHtml(requirementName)}</span>
+                    </div>
+                    <div class="file-category-badge">${escapeHtml(categoryName)}</div>
+                </div>
+                <div class="file-status" style="background:${statusColor};">
+                    ${statusIcon}
+                    <span>${capitalizeFirst(status)}</span>
+                </div>
+                <div class="file-actions">
+                    <button class="btn-action view-btn" data-file-url="${fileUrl}" data-file-name="${escapeHtml(fileName)}" title="View file">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/>
+                            <circle cx="12" cy="12" r="3"/>
+                        </svg>
+                    </button>
+                    <button class="btn-action download-btn" data-file-url="${fileUrl}" data-file-name="${escapeHtml(fileName)}" title="Download file">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
+                            <polyline points="7 10 12 15 17 10"/>
+                            <line x1="12" y1="15" x2="12" y2="3"/>
+                        </svg>
+                    </button>
+                    ${status === 'pending' ? `
+                    <button class="btn-action delete delete-btn" data-submission-id="${submission.id}" title="Delete submission">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <polyline points="3 6 5 6 21 6"/>
+                            <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/>
+                        </svg>
+                    </button>
+                    ` : ''}
+                </div>
+            </div>
+        `;
+    }).filter(html => html).join('');
+    
+    console.log('Generated HTML length:', filesGrid.innerHTML.length);
+    
+    } catch (err) {
+        console.error('Error in renderFiles:', err);
+        filesGrid.innerHTML = `<div style="color:red;padding:2rem;">Error rendering files: ${err.message}</div>`;
+    }
+}
+
+function getFileIcon(extension) {
+    const icons = {
+        pdf: '📄',
+        doc: '📝',
+        docx: '📝',
+        xls: '📊',
+        xlsx: '📊',
+        ppt: '📊',
+        pptx: '📊',
+        txt: '📃',
+        zip: '🗜️',
+        rar: '🗜️',
+        jpg: '🖼️',
+        jpeg: '🖼️',
+        png: '🖼️',
+        gif: '🖼️',
+        mp4: '🎥',
+        avi: '🎥',
+        mov: '🎥',
+        mp3: '🎵',
+        wav: '🎵'
+    };
+    return icons[extension] || '📎';
+}
+
+function formatBytes(bytes) {
+    if (!bytes) return '0 B';
+    if (bytes < 1024) return bytes + ' B';
+    if (bytes < 1048576) return (bytes / 1024).toFixed(1) + ' KB';
+    return (bytes / 1048576).toFixed(1) + ' MB';
+}
+
+function capitalizeFirst(str) {
+    return str.charAt(0).toUpperCase() + str.slice(1);
 }
 
 function escapeHtml(text) {
@@ -213,126 +321,187 @@ function escapeHtml(text) {
         '"': '&quot;',
         "'": '&#039;'
     };
-    return text ? text.replace(/[&<>"']/g, m => map[m]) : '';
+    return text ? String(text).replace(/[&<>"']/g, m => map[m]) : '';
 }
 
-function showFilePreview(file) {
-    const preview  = document.getElementById('file-preview');
-    const prevName = document.getElementById('preview-name');
-    const prevSize = document.getElementById('preview-size');
-    
-    if (!preview || !prevName || !prevSize) return;
-    prevName.textContent = file.name;
-    prevSize.textContent = formatBytes(file.size);
-    preview.classList.add('show');
-}
+function showNoFilesMessage(message) {
+    const filesGrid = document.getElementById('files-grid');
+    if (!filesGrid) return;
 
-function formatBytes(bytes) {
-    if (bytes < 1024)       return bytes + ' B';
-    if (bytes < 1048576)    return (bytes / 1024).toFixed(1) + ' KB';
-    return (bytes / 1048576).toFixed(1) + ' MB';
-}
-
-async function handleFileUpload(file, description) {
-    const step2 = document.getElementById('upload-step-2');
-    if (!step2) return;
-
-    // Show uploading state
-    step2.innerHTML = `
-        <div class="panel-body" style="text-align:center; padding:3rem 2rem;">
-            <div style="width:64px;height:64px;border-radius:50%;background:#dbeafe;display:flex;align-items:center;justify-content:center;margin:0 auto 1.2rem;animation:spin 1s linear infinite;">
-                <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="#1e40af" stroke-width="2.5"><circle cx="12" cy="12" r="10" opacity="0.25"/><path d="M12 2a10 10 0 0 1 10 10" stroke-linecap="round"/></svg>
+    filesGrid.innerHTML = `
+        <div style="text-align:center; padding:4rem 2rem; grid-column:1/-1;">
+            <div style="width:80px;height:80px;border-radius:50%;background:#f3f4f6;display:flex;align-items:center;justify-content:center;margin:0 auto 1.5rem;">
+                <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="#9ca3af" stroke-width="2">
+                    <path d="M13 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V9z"/>
+                    <polyline points="13 2 13 9 20 9"/>
+                </svg>
             </div>
-            <h3 style="font-family:'Merriweather',serif;color:#1e40af;margin-bottom:.5rem;font-size:1.1rem;">Uploading...</h3>
-            <p style="color:#6b7280;font-size:.875rem;">Please wait while your file is being uploaded.</p>
+            <h3 style="font-family:'Merriweather',serif;color:#374151;margin-bottom:.5rem;font-size:1.2rem;">No Files Found</h3>
+            <p style="color:#6b7280;font-size:.95rem;margin-bottom:1.5rem;">${escapeHtml(message)}</p>
+            <a href="faculty-upload.html" style="display:inline-block;padding:.7rem 1.5rem;background:#1e40af;color:#fff;border-radius:.5rem;font-weight:600;text-decoration:none;">Upload File</a>
         </div>
     `;
+}
+
+function initializeModal() {
+    const modal = document.getElementById('file-preview-modal');
+    const closeBtn = document.getElementById('close-preview-modal');
+    const overlay = document.querySelector('.preview-modal-overlay');
+    
+    if (!modal) return;
+    
+    // Close button click
+    closeBtn?.addEventListener('click', closeModal);
+    
+    // Overlay click to close
+    overlay?.addEventListener('click', closeModal);
+    
+    // ESC key to close
+    document.addEventListener('keydown', function(e) {
+        if (e.key === 'Escape' && modal.classList.contains('active')) {
+            closeModal();
+        }
+    });
+    
+    // Download instead button
+    document.getElementById('preview-download-instead')?.addEventListener('click', function() {
+        const iframe = document.getElementById('preview-iframe');
+        const fileName = document.getElementById('preview-file-name')?.textContent || 'file';
+        if (iframe.src) {
+            downloadFile(iframe.src, fileName);
+            closeModal();
+        }
+    });
+}
+
+async function viewFile(fileUrl, fileName = 'File Preview') {
+    console.log('viewFile called with:', fileUrl);
+    if (!fileUrl) {
+        console.error('No file URL provided');
+        alert('Unable to open file: URL is missing');
+        return;
+    }
+    
+    const modal = document.getElementById('file-preview-modal');
+    const iframe = document.getElementById('preview-iframe');
+    const loading = document.getElementById('preview-loading');
+    const error = document.getElementById('preview-error');
+    const titleElement = document.getElementById('preview-file-name');
+    
+    if (!modal || !iframe) {
+        console.error('Modal elements not found');
+        alert('Preview not available');
+        return;
+    }
+    
+    // Set file name in header
+    if (titleElement) titleElement.textContent = fileName;
+    
+    // Show modal and loading state
+    modal.classList.add('active');
+    loading.style.display = 'block';
+    error.style.display = 'none';
+    iframe.style.display = 'none';
+    document.body.style.overflow = 'hidden';
+
+    // Revoke any previous blob URL to avoid memory leaks
+    if (iframe._blobUrl) {
+        URL.revokeObjectURL(iframe._blobUrl);
+        iframe._blobUrl = null;
+    }
 
     try {
-        const { data: { user }, error: userError } = await supabaseClient.auth.getUser();
-        if (userError || !user) throw new Error('User not authenticated');
-        const timestamp = Date.now();
-        const fileExt = file.name.split('.').pop();
-        const fileName = `${timestamp}-${file.name.replace(/[^a-zA-Z0-9.-]/g, '_')}`;
-        const filePath = `submissions/${user.id}/${fileName}`;
-        
-        const { data: uploadData, error: uploadError } = await supabaseClient.storage
-            .from('faculty-submissions')
-            .upload(filePath, file, {
-                cacheControl: '3600',
-                upsert: false
-            });
+        // Fetch the file using the signed URL (auth is in the URL itself)
+        // then create a local blob URL so the iframe never makes its own network request
+        const response = await fetch(fileUrl);
+        if (!response.ok) throw new Error(`Fetch failed: ${response.status} ${response.statusText}`);
 
-        if (uploadError) throw uploadError;
-        const { data: urlData } = supabaseClient.storage
-            .from('faculty-submissions')
-            .getPublicUrl(filePath);
-        const { data: submissionData, error: submissionError } = await supabaseClient
-            .from('submissions')
-            .insert({
-                professor_id: user.id,
-                requirement_id: selectedRequirementId,
-                status: 'pending',
-                remarks: description || null
-            })
-            .select()
-            .single();
+        const blob = await response.blob();
+        const blobUrl = URL.createObjectURL(blob);
+        iframe._blobUrl = blobUrl;
 
-        if (submissionError) throw submissionError;
-        const { data: fileData, error: fileError } = await supabaseClient
-            .from('submission_files')
-            .insert({
-                submission_id: submissionData.id,
-                file_name: file.name,
-                file_url: urlData.publicUrl,
-                file_size: file.size,
-                file_type: file.type || `application/${fileExt}`
-            })
-            .select()
-            .single();
+        // Handle iframe load
+        iframe.onload = function() {
+            loading.style.display = 'none';
+            iframe.style.display = 'block';
+        };
 
-        if (fileError) throw fileError;
+        // Handle iframe error
+        iframe.onerror = function() {
+            loading.style.display = 'none';
+            error.style.display = 'block';
+        };
 
-        showUploadSuccess();
+        iframe.src = blobUrl;
 
-    } catch (error) {
-        console.error('Upload error:', error);
-        showUploadError(error.message);
+    } catch (err) {
+        console.error('Error fetching file for preview:', err);
+        loading.style.display = 'none';
+        error.style.display = 'block';
     }
 }
 
-function showUploadSuccess() {
-    const step2 = document.getElementById('upload-step-2');
-    if (!step2) return;
-    step2.innerHTML = `
-        <div class="panel-header">
-            <svg viewBox="0 0 24 24"><polyline points="20 6 9 17 4 12"/></svg>
-            File Uploaded Successfully
-        </div>
-        <div class="panel-body" style="text-align:center; padding:3rem 2rem;">
-            <div style="width:64px;height:64px;border-radius:50%;background:#d1fae5;display:flex;align-items:center;justify-content:center;margin:0 auto 1.2rem;">
-                <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="#065f46" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
-            </div>
-            <h3 style="font-family:'Merriweather',serif;color:#145a2e;margin-bottom:.5rem;font-size:1.1rem;">Upload Submitted!</h3>
-            <p style="color:#6b7f6e;font-size:.875rem;margin-bottom:1.75rem;">Your file has been submitted and is pending admin review.</p>
-            <div style="display:flex;gap:.85rem;justify-content:center;">
-                <a href="faculty-upload.html" style="padding:.6rem 1.4rem;background:#1a6b36;color:#fff;border-radius:.6rem;font-weight:700;font-size:.875rem;text-decoration:none;box-shadow:0 3px 12px rgba(20,90,46,.3);">Upload Another</a>
-                <a href="faculty-myfiles.html" style="padding:.6rem 1.4rem;border:1.5px solid #d4ddd6;color:#1a2e1c;border-radius:.6rem;font-weight:600;font-size:.875rem;text-decoration:none;">View My Files</a>
-            </div>
-        </div>`;
+function closeModal() {
+    const modal = document.getElementById('file-preview-modal');
+    const iframe = document.getElementById('preview-iframe');
+    
+    if (modal) {
+        modal.classList.remove('active');
+        document.body.style.overflow = '';
+        
+        setTimeout(function() {
+            if (iframe) {
+                if (iframe._blobUrl) {
+                    URL.revokeObjectURL(iframe._blobUrl);
+                    iframe._blobUrl = null;
+                }
+                iframe.src = '';
+            }
+        }, 300);
+    }
 }
 
-function showUploadError(message) {
-    const step2 = document.getElementById('upload-step-2');
-    if (!step2) return;
-    step2.innerHTML = `
-        <div class="panel-body" style="text-align:center; padding:3rem 2rem;">
-            <div style="width:64px;height:64px;border-radius:50%;background:#fee2e2;display:flex;align-items:center;justify-content:center;margin:0 auto 1.2rem;">
-                <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="#dc2626" stroke-width="2.5"><circle cx="12" cy="12" r="10"/><line x1="15" y1="9" x2="9" y2="15"/><line x1="9" y1="9" x2="15" y2="15"/></svg>
-            </div>
-            <h3 style="font-family:'Merriweather',serif;color:#dc2626;margin-bottom:.5rem;font-size:1.1rem;">Upload Failed</h3>
-            <p style="color:#6b7280;font-size:.875rem;margin-bottom:1.75rem;">${escapeHtml(message)}</p>
-            <button onclick="location.reload()" style="padding:.6rem 1.4rem;background:#dc2626;color:#fff;border:none;border-radius:.6rem;font-weight:700;font-size:.875rem;cursor:pointer;">Try Again</button>
-        </div>
-    `;
+function downloadFile(fileUrl, fileName) {
+    console.log('downloadFile called with:', fileUrl, fileName);
+    if (!fileUrl || !fileName) {
+        console.error('Missing file URL or name');
+        alert('Unable to download file: Missing information');
+        return;
+    }
+    try {
+        const a = document.createElement('a');
+        a.href = fileUrl;
+        a.download = fileName;
+        a.target = '_blank';
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        console.log('Download initiated successfully');
+    } catch (error) {
+        console.error('Error downloading file:', error);
+        alert('Error downloading file: ' + error.message);
+    }
+}
+
+async function deleteSubmission(submissionId) {
+    if (!confirm('Are you sure you want to delete this submission? This action cannot be undone.')) {
+        return;
+    }
+
+    try {
+        const { error } = await supabaseClient
+            .from('submissions')
+            .delete()
+            .eq('id', submissionId);
+
+        if (error) throw error;
+
+        // Reload files
+        await loadMyFiles();
+        
+        alert('Submission deleted successfully.');
+    } catch (error) {
+        console.error('Error deleting submission:', error);
+        alert('Failed to delete submission. Please try again.');
+    }
 }

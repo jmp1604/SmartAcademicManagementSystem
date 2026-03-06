@@ -24,14 +24,10 @@ document.addEventListener('DOMContentLoaded', async () => {
         window.location.href = '../../auth/login.html';
         return;
     }
-
-    // Wait for Supabase client
     if (typeof supabaseClient === 'undefined') {
         console.log('Waiting for Supabase client to initialize...');
         await new Promise(resolve => setTimeout(resolve, 100));
     }
-
-    // Set active nav item
     document.querySelectorAll('.nav-item').forEach(item => {
         if (item.href && item.href.includes('admin-requirement-management.html')) {
             item.classList.add('active');

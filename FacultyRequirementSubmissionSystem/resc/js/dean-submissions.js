@@ -10,6 +10,7 @@ document.addEventListener('DOMContentLoaded', function () {
 
     loadCategories();
     setupEventListeners();
+    initializeModal();
 });
 
 function setupEventListeners() {
@@ -30,8 +31,6 @@ function setupEventListeners() {
     if (deptFilter) {
         deptFilter.addEventListener('change', filterFiles);
     }
-    
-    // Flag submission button
     const flagBtn = document.getElementById('flagSubmissionBtn');
     if (flagBtn) {
         flagBtn.addEventListener('click', handleFlagSubmission);
@@ -47,8 +46,6 @@ async function loadCategories() {
             updateOverallStats();
             return;
         }
-
-        // Load categories from database
         const { data: categories, error: categoriesError } = await supabaseClient
             .from('requirements')
             .select('*')
@@ -64,23 +61,54 @@ async function loadCategories() {
 
         const user = getCurrentUser();
         const department = user.department || 'Computer Science';
-
-        // Get all submissions from faculty in this dean's department
         const { data: submissions, error: submissionsError } = await supabaseClient
             .from('submissions')
-            .select(`
-                *,
-                professors!inner(department)
-            `)
-            .eq('professors.department', department);
+            .select(`*, submission_files(*)`);
 
         if (submissionsError) {
             console.error('Error loading submissions:', submissionsError);
         }
+        const professorIds = [...new Set((submissions || []).map(s => s.professor_id).filter(Boolean))];
+        let professorsMap = {};
+        if (professorIds.length > 0) {
+            const { data: professorsData } = await supabaseClient
+                .from('professors')
+                .select('professor_id, first_name, middle_name, last_name, department')
+                .in('professor_id', professorIds);
+            (professorsData || []).forEach(p => { professorsMap[p.professor_id] = p; });
+        }
+        const submissionsWithProfs = (submissions || []).map(s => ({
+            ...s,
+            professors: professorsMap[s.professor_id] || null
+        }));
+        const filteredSubmissions = submissionsWithProfs;
 
-        // Map categories with submission counts
+        if (filteredSubmissions && filteredSubmissions.length > 0) {
+            for (let submission of filteredSubmissions) {
+                if (submission.submission_files && submission.submission_files.length > 0) {
+                    for (let file of submission.submission_files) {
+                        const rawPath = file.file_path || file.file_url;
+                        if (rawPath) {
+                            let storagePath = rawPath;
+                            const marker = '/object/public/faculty-submissions/';
+                            if (rawPath.includes(marker)) {
+                                storagePath = decodeURIComponent(rawPath.split(marker)[1]);
+                            }
+                            const { data: signedUrlData, error: signedUrlError } = await supabaseClient.storage
+                                .from('faculty-submissions')
+                                .createSignedUrl(storagePath, 3600);
+                            if (signedUrlError) {
+                                console.error('Signed URL error for', storagePath, signedUrlError);
+                            } else if (signedUrlData?.signedUrl) {
+                                file.signed_url = signedUrlData.signedUrl;
+                            }
+                        }
+                    }
+                }
+            }
+        }
         allCategories = (categories || []).map(category => {
-            const categorySubmissions = submissions?.filter(s => s.requirement_id === category.id) || [];
+            const categorySubmissions = filteredSubmissions?.filter(s => s.requirement_id === category.id) || [];
             const iconColors = ['purple', 'green', 'blue', 'orange', 'teal', 'pink'];
             const iconIndex = allCategories.length % iconColors.length;
 
@@ -184,21 +212,14 @@ function filterCategories() {
 
 function showFilesView(category) {
     currentCategory = category;
-    
-    // Hide categories view, show files view
     document.getElementById('categoriesView').style.display = 'none';
     document.getElementById('filesView').style.display = 'block';
-    
-    // Update header
     document.getElementById('categoryTitle').textContent = category.name;
     document.getElementById('categoryDescription').textContent = category.description;
-    
-    // Update stats
     document.getElementById('catTotalFiles').textContent = category.totalFiles;
     document.getElementById('catApprovedFiles').textContent = category.approved;
     document.getElementById('catPendingFiles').textContent = category.pending;
     
-    // Load files for this category
     loadFiles(category.id);
 }
 
@@ -218,17 +239,11 @@ async function loadFiles(categoryId) {
 
         const user = getCurrentUser();
         const department = user.department || 'Computer Science';
-
-        // Load files from faculty in this dean's department for this category
         const { data: files, error } = await supabaseClient
             .from('submissions')
-            .select(`
-                *,
-                professors!inner(first_name, middle_name, last_name, department)
-            `)
+            .select(`*, submission_files(*)`)
             .eq('requirement_id', categoryId)
-            .eq('professors.department', department)
-            .order('created_at', { ascending: false });
+            .order('submitted_at', { ascending: false });
 
         if (error) {
             console.error('Error loading files:', error);
@@ -237,20 +252,60 @@ async function loadFiles(categoryId) {
             return;
         }
 
-        // Transform files to match expected format
-        allFiles = (files || []).map(file => ({
-            id: file.id,
-            filename: file.file_name,
-            category: categoryId,
-            uploadedBy: file.professors 
-                ? `${file.professors.first_name} ${file.professors.middle_name ? file.professors.middle_name + ' ' : ''}${file.professors.last_name}` 
-                : 'Unknown',
-            department: file.professors?.department || 'N/A',
-            date: file.created_at,
-            size: formatFileSize(file.file_size),
-            status: file.status,
-            fileUrl: file.file_url
+        const professorIds = [...new Set((files || []).map(s => s.professor_id).filter(Boolean))];
+        let professorsMap = {};
+        if (professorIds.length > 0) {
+            const { data: professorsData } = await supabaseClient
+                .from('professors')
+                .select('professor_id, first_name, middle_name, last_name, department')
+                .in('professor_id', professorIds);
+            (professorsData || []).forEach(p => { professorsMap[p.professor_id] = p; });
+        }
+        const filesWithProfs = (files || []).map(f => ({
+            ...f,
+            professors: professorsMap[f.professor_id] || null
         }));
+        const filteredFiles = filesWithProfs;
+
+        if (filteredFiles && filteredFiles.length > 0) {
+            for (let file of filteredFiles) {
+                if (file.submission_files && file.submission_files.length > 0) {
+                    const submissionFile = file.submission_files[0];
+                    const rawPath = submissionFile.file_path || submissionFile.file_url;
+                    if (rawPath) {
+                        let storagePath = rawPath;
+                        const marker = '/object/public/faculty-submissions/';
+                        if (rawPath.includes(marker)) {
+                            storagePath = decodeURIComponent(rawPath.split(marker)[1]);
+                        }
+                        const { data: signedUrlData, error: signedUrlError } = await supabaseClient.storage
+                            .from('faculty-submissions')
+                            .createSignedUrl(storagePath, 3600);
+                        if (!signedUrlError && signedUrlData?.signedUrl) {
+                            file.signed_url = signedUrlData.signedUrl;
+                        }
+                    }
+                }
+            }
+        }
+
+        allFiles = (filteredFiles || []).map(file => {
+            const submissionFile = file.submission_files?.[0];
+            return {
+                id: file.id,
+                filename: submissionFile?.file_name || file.file_name || 'Unknown',
+                category: categoryId,
+                uploadedBy: file.professors 
+                    ? `${file.professors.first_name} ${file.professors.middle_name ? file.professors.middle_name + ' ' : ''}${file.professors.last_name}` 
+                    : 'Unknown',
+                department: file.professors?.department || 'N/A',
+                date: file.submitted_at,
+                size: formatFileSize(submissionFile?.file_size || file.file_size),
+                status: file.status,
+                fileUrl: file.signed_url || submissionFile?.file_url || file.file_url,
+                submissionFileData: submissionFile
+            };
+        });
 
         renderFiles(allFiles);
         
@@ -279,43 +334,67 @@ function renderFiles(files) {
         return;
     }
 
+    const statusColors = {
+        approved: '#10b981',
+        pending: '#f59e0b',
+        rejected: '#ef4444'
+    };
+
+    const statusIcons = {
+        approved: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="20 6 9 17 4 12"/></svg>',
+        pending: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>',
+        rejected: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="15" y1="9" x2="9" y2="15"/><line x1="9" y1="9" x2="15" y2="15"/></svg>'
+    };
+
     files.forEach(file => {
         const card = document.createElement('div');
+        const fileExt = file.filename.split('.').pop().toLowerCase();
+        const fileIcon = getFileIcon(fileExt);
+        const statusColor = statusColors[file.status] || '#6b7280';
+        const statusIcon = statusIcons[file.status] || '';
+        
         card.className = 'file-card';
         card.innerHTML = `
-            <div class="file-card-preview">
-                ${file.status !== 'pending' ? `<div class="file-status-badge ${file.status}">${file.status}</div>` : ''}
-                <div class="file-icon">
-                    <svg viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
+            <div class="file-icon ${fileExt}">${fileIcon}</div>
+            <div class="file-info">
+                <div class="file-name" title="${escapeHtml(file.filename)}">${escapeHtml(file.filename)}</div>
+                <div class="file-meta">
+                    <span>${file.size}</span>
+                    <span>•</span>
+                    <span>${formatFileDate(file.date)}</span>
                 </div>
+                <div class="file-requirement">
+                    <span class="req-icon">👤</span>
+                    <span class="req-text">${escapeHtml(file.uploadedBy)}</span>
+                </div>
+                <div class="file-category-badge">${escapeHtml(file.department)}</div>
             </div>
-            <div class="file-card-body">
-                <div class="file-card-title">${file.filename}</div>
-                <div class="file-card-meta">
-                    <svg viewBox="0 0 24 24"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
-                    Uploaded by: ${file.uploadedBy}
-                </div>
-                <div class="file-card-meta">
-                    <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
-                    Date: ${formatFileDate(file.date)}
-                </div>
-                <div class="file-card-meta">
-                    <svg viewBox="0 0 24 24"><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/></svg>
-                    Size: ${file.size}
-                </div>
-                <div class="file-card-actions">
-                    <button class="btn-view" onclick="viewFileDetails(${file.id})" style="background: #2563eb; color: white;">
-                        <svg viewBox="0 0 24 24"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
-                        View Details
-                    </button>
-                    ${file.status === 'pending' && !file.flagged_by_dean ? `
-                        <button class="btn-flag" onclick="showFlagModal(${file.id})" style="background: #f59e0b; color: white;">
-                            <svg viewBox="0 0 24 24"><path d="M4 15s1-1 4-1 5 2 8 2 4-1 4-1V3s-1 1-4 1-5-2-8-2-4 1-4 1z"/><line x1="4" y1="22" x2="4" y2="15"/></svg>
-                            Flag for Admin
-                        </button>
-                    ` : ''}
-                    ${file.flagged_by_dean ? '<span style="color: #f59e0b; font-size: 0.85rem;">⚠️ Flagged</span>' : ''}
-                </div>
+            <div class="file-status" style="background:${statusColor};">
+                ${statusIcon}
+                <span>${capitalizeFirst(file.status)}</span>
+            </div>
+            <div class="file-actions">
+                <button class="btn-action" onclick="viewFilePreview('${file.id}')" title="Preview file">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/>
+                        <circle cx="12" cy="12" r="3"/>
+                    </svg>
+                </button>
+                <button class="btn-action" onclick="viewFileDetails('${file.id}')" title="View details">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <circle cx="12" cy="12" r="10"/>
+                        <line x1="12" y1="16" x2="12" y2="12"/>
+                        <line x1="12" y1="8" x2="12.01" y2="8"/>
+                    </svg>
+                </button>
+                ${file.status === 'pending' && !file.flagged_by_dean ? `
+                <button class="btn-action" onclick="showFlagModal(${file.id})" title="Flag for admin" style="border-color: #f59e0b;">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="#f59e0b" stroke-width="2">
+                        <path d="M4 15s1-1 4-1 5 2 8 2 4-1 4-1V3s-1 1-4 1-5-2-8-2-4 1-4 1z"/>
+                        <line x1="4" y1="22" x2="4" y2="15"/>
+                    </svg>
+                </button>
+                ` : ''}
             </div>
         `;
         grid.appendChild(card);
@@ -342,8 +421,6 @@ function filterFiles() {
 function viewFileDetails(fileId) {
     const file = allFiles.find(f => f.id === fileId);
     if (!file) return;
-
-    // Populate modal
     document.getElementById('modalFileName').textContent = file.filename;
     document.getElementById('modalFileCategory').textContent = currentCategory?.name || '';
     document.getElementById('modalUploader').textContent = file.uploadedBy;
@@ -351,8 +428,6 @@ function viewFileDetails(fileId) {
     document.getElementById('modalDate').textContent = formatFileDate(file.date);
     document.getElementById('modalSize').textContent = file.size;
     document.getElementById('modalStatus').textContent = file.status.toUpperCase();
-    
-    // Show modal
     const modal = new bootstrap.Modal(document.getElementById('fileDetailsModal'));
     modal.show();
 }
@@ -360,14 +435,10 @@ function viewFileDetails(fileId) {
 function showFlagModal(fileId) {
     const file = allFiles.find(f => f.id === fileId);
     if (!file) return;
-
-    // Store file ID for later
     document.getElementById('flagModal').dataset.fileId = fileId;
     document.getElementById('flagFileName').textContent = file.filename;
     document.getElementById('flagReason').value = '';
     document.getElementById('flagNotes').value = '';
-    
-    // Show modal
     const modal = new bootstrap.Modal(document.getElementById('flagModal'));
     modal.show();
 }
@@ -388,10 +459,7 @@ async function handleFlagSubmission() {
             alert('Database connection not available');
             return;
         }
-
         const user = getCurrentUser();
-
-        // Update submission to flag it
         const { error } = await supabaseClient
             .from('submissions')
             .update({
@@ -403,8 +471,6 @@ async function handleFlagSubmission() {
             .eq('id', fileId);
 
         if (error) throw error;
-
-        // Log the flagging action
         await supabaseClient
             .from('audit_logs')
             .insert({
@@ -414,23 +480,15 @@ async function handleFlagSubmission() {
                 category: currentCategory?.name,
                 comments: `Flagged: ${reason}`
             });
-        
-        // Update local state
-        const file = allFiles.find(f => f.id === fileId);
+    
+    const file = allFiles.find(f => f.id === fileId);
         if (file) {
             file.flagged_by_dean = true;
         }
-        
-        // Refresh display
         filterFiles();
-        
-        // Close modal
         bootstrap.Modal.getInstance(modal).hide();
-        
-        // Show success message
         alert('Submission flagged successfully! Admin will review it.');
         
-        // Reload to refresh UI
         if (currentCategory) {
             loadFiles(currentCategory.id);
         }
@@ -441,10 +499,184 @@ async function handleFlagSubmission() {
     }
 }
 
-// Dean can no longer approve/reject - only admins can do that
-// Deans can view and flag submissions for admin review
-
 function formatFileDate(dateString) {
     const date = new Date(dateString);
     return date.toLocaleDateString('en-US', { year: 'numeric', month: '2-digit', day: '2-digit' });
+}
+
+function viewFilePreview(fileId) {
+    const file = allFiles.find(f => f.id === fileId);
+    if (!file || !file.fileUrl) {
+        alert('File URL not available');
+        return;
+    }
+    viewFile(file.fileUrl, file.filename);
+}
+
+function initializeModal() {
+    const modal = document.getElementById('file-preview-modal');
+    const closeBtn = document.getElementById('close-preview-modal');
+    const overlay = document.querySelector('.preview-modal-overlay');
+    
+    if (!modal) return;
+    
+    closeBtn?.addEventListener('click', closeModal);
+    overlay?.addEventListener('click', closeModal);
+    
+    document.addEventListener('keydown', function(e) {
+        if (e.key === 'Escape' && modal.classList.contains('active')) {
+            closeModal();
+        }
+    });
+    
+    document.getElementById('preview-download-instead')?.addEventListener('click', function() {
+        const iframe = document.getElementById('preview-iframe');
+        const fileName = document.getElementById('preview-file-name')?.textContent || 'file';
+        if (iframe.src) {
+            downloadFile(iframe.src, fileName);
+            closeModal();
+        }
+    });
+}
+
+async function viewFile(fileUrl, fileName = 'File Preview') {
+    console.log('viewFile called with:', fileUrl);
+    if (!fileUrl) {
+        console.error('No file URL provided');
+        alert('Unable to open file: URL is missing');
+        return;
+    }
+
+    const modal = document.getElementById('file-preview-modal');
+    const iframe = document.getElementById('preview-iframe');
+    const loading = document.getElementById('preview-loading');
+    const error = document.getElementById('preview-error');
+    const titleElement = document.getElementById('preview-file-name');
+
+    if (!modal || !iframe) {
+        console.error('Modal elements not found');
+        alert('Preview not available');
+        return;
+    }
+
+    if (titleElement) titleElement.textContent = fileName;
+
+    modal.classList.add('active');
+    loading.style.display = 'block';
+    error.style.display = 'none';
+    iframe.style.display = 'none';
+    document.body.style.overflow = 'hidden';
+
+    if (iframe._blobUrl) {
+        URL.revokeObjectURL(iframe._blobUrl);
+        iframe._blobUrl = null;
+    }
+
+    try {
+        const response = await fetch(fileUrl);
+        if (!response.ok) throw new Error(`Fetch failed: ${response.status} ${response.statusText}`);
+
+        const blob = await response.blob();
+        const blobUrl = URL.createObjectURL(blob);
+        iframe._blobUrl = blobUrl;
+
+        iframe.onload = function() {
+            loading.style.display = 'none';
+            iframe.style.display = 'block';
+        };
+        iframe.onerror = function() {
+            loading.style.display = 'none';
+            error.style.display = 'block';
+        };
+
+        iframe.src = blobUrl;
+
+    } catch (err) {
+        console.error('Error fetching file for preview:', err);
+        loading.style.display = 'none';
+        error.style.display = 'block';
+    }
+}
+
+function closeModal() {
+    const modal = document.getElementById('file-preview-modal');
+    const iframe = document.getElementById('preview-iframe');
+
+    if (modal) {
+        modal.classList.remove('active');
+        document.body.style.overflow = '';
+
+        setTimeout(function() {
+            if (iframe) {
+                if (iframe._blobUrl) {
+                    URL.revokeObjectURL(iframe._blobUrl);
+                    iframe._blobUrl = null;
+                }
+                iframe.src = '';
+            }
+        }, 300);
+    }
+}
+
+function downloadFile(fileUrl, fileName) {
+    console.log('downloadFile called with:', fileUrl, fileName);
+    if (!fileUrl || !fileName) {
+        console.error('Missing file URL or name');
+        alert('Unable to download file: Missing information');
+        return;
+    }
+    try {
+        const a = document.createElement('a');
+        a.href = fileUrl;
+        a.download = fileName;
+        a.target = '_blank';
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        console.log('Download initiated successfully');
+    } catch (error) {
+        console.error('Error downloading file:', error);
+        alert('Error downloading file: ' + error.message);
+    }
+}
+
+function getFileIcon(extension) {
+    const icons = {
+        pdf: '📄',
+        doc: '📝',
+        docx: '📝',
+        xls: '📊',
+        xlsx: '📊',
+        ppt: '📊',
+        pptx: '📊',
+        txt: '📃',
+        zip: '🗜️',
+        rar: '🗜️',
+        jpg: '🖼️',
+        jpeg: '🖼️',
+        png: '🖼️',
+        gif: '🖼️',
+        mp4: '🎥',
+        avi: '🎥',
+        mov: '🎥',
+        mp3: '🎵',
+        wav: '🎵'
+    };
+    return icons[extension] || '📎';
+}
+
+function capitalizeFirst(str) {
+    if (!str) return '';
+    return str.charAt(0).toUpperCase() + str.slice(1);
+}
+
+function escapeHtml(text) {
+    const map = {
+        '&': '&amp;',
+        '<': '&lt;',
+        '>': '&gt;',
+        '"': '&quot;',
+        "'": '&#039;'
+    };
+    return text ? String(text).replace(/[&<>"']/g, m => map[m]) : '';
 }

@@ -3,6 +3,7 @@ document.addEventListener('DOMContentLoaded', async function () {
     const catFilter    = document.querySelector('.cat-filter');
     const statusFilter = document.querySelector('.status-filter');
     await loadMyFiles();
+    initializeModal();
     
     document.addEventListener('click', function(e) {
         const viewBtn = e.target.closest('.view-btn');
@@ -10,10 +11,11 @@ document.addEventListener('DOMContentLoaded', async function () {
         const deleteBtn = e.target.closest('.delete-btn');
         
         if (viewBtn) {
-                console.log('View button clicked');
+            console.log('View button clicked');
             const fileUrl = viewBtn.dataset.fileUrl;
+            const fileName = viewBtn.dataset.fileName || 'File Preview';
             console.log('File URL from dataset:', fileUrl);
-            if (fileUrl) viewFile(fileUrl);
+            if (fileUrl) viewFile(fileUrl, fileName);
             else console.error('No fileUrl in dataset');
         } else if (downloadBtn) {
             console.log('Download button clicked');
@@ -85,7 +87,31 @@ async function loadMyFiles() {
         }
         
         console.log('Submissions loaded:', submissions);
-        
+
+        for (let submission of submissions) {
+            if (submission.submission_files && submission.submission_files.length > 0) {
+                for (let file of submission.submission_files) {
+                    const rawPath = file.file_path || file.file_url;
+                    if (rawPath) {
+                        let storagePath = rawPath;
+                        const marker = '/object/public/faculty-submissions/';
+                        if (rawPath.includes(marker)) {
+                            storagePath = decodeURIComponent(rawPath.split(marker)[1]);
+                        }
+                        const { data: signedUrlData, error: signedUrlError } = await supabaseClient.storage
+                            .from('faculty-submissions')
+                            .createSignedUrl(storagePath, 3600);
+                        if (signedUrlError) {
+                            console.error('Signed URL error for', storagePath, signedUrlError);
+                        } else if (signedUrlData?.signedUrl) {
+                            file.signed_url = signedUrlData.signedUrl;
+                            console.log('Signed URL created for:', file.file_name);
+                        }
+                    }
+                }
+            }
+        }
+
         try {
             console.log('Calling updateStatistics...');
             updateStatistics(submissions);
@@ -220,13 +246,13 @@ function renderFiles(submissions) {
                     <span>${capitalizeFirst(status)}</span>
                 </div>
                 <div class="file-actions">
-                    <button class="btn-action view-btn" data-file-url="${file.file_url}" title="View file">
+                    <button class="btn-action view-btn" data-file-url="${file.signed_url}" data-file-name="${escapeHtml(fileName)}" title="View file">
                         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                             <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/>
                             <circle cx="12" cy="12" r="3"/>
                         </svg>
                     </button>
-                    <button class="btn-action download-btn" data-file-url="${file.file_url}" data-file-name="${escapeHtml(fileName)}" title="Download file">
+                    <button class="btn-action download-btn" data-file-url="${file.signed_url}" data-file-name="${escapeHtml(fileName)}" title="Download file">
                         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                             <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
                             <polyline points="7 10 12 15 17 10"/>
@@ -320,22 +346,116 @@ function showNoFilesMessage(message) {
     `;
 }
 
-function viewFile(fileUrl) {
+function initializeModal() {
+    const modal = document.getElementById('file-preview-modal');
+    const closeBtn = document.getElementById('close-preview-modal');
+    const overlay = document.querySelector('.preview-modal-overlay');
+    
+    if (!modal) return;
+    
+    // Close button click
+    closeBtn?.addEventListener('click', closeModal);
+    
+    // Overlay click to close
+    overlay?.addEventListener('click', closeModal);
+    
+    // ESC key to close
+    document.addEventListener('keydown', function(e) {
+        if (e.key === 'Escape' && modal.classList.contains('active')) {
+            closeModal();
+        }
+    });
+    
+    // Download instead button
+    document.getElementById('preview-download-instead')?.addEventListener('click', function() {
+        const iframe = document.getElementById('preview-iframe');
+        const fileName = document.getElementById('preview-file-name')?.textContent || 'file';
+        if (iframe.src) {
+            downloadFile(iframe.src, fileName);
+            closeModal();
+        }
+    });
+}
+
+async function viewFile(fileUrl, fileName = 'File Preview') {
     console.log('viewFile called with:', fileUrl);
     if (!fileUrl) {
         console.error('No file URL provided');
         alert('Unable to open file: URL is missing');
         return;
     }
+
+    const modal = document.getElementById('file-preview-modal');
+    const iframe = document.getElementById('preview-iframe');
+    const loading = document.getElementById('preview-loading');
+    const error = document.getElementById('preview-error');
+    const titleElement = document.getElementById('preview-file-name');
+
+    if (!modal || !iframe) {
+        console.error('Modal elements not found');
+        alert('Preview not available');
+        return;
+    }
+
+    if (titleElement) titleElement.textContent = fileName;
+
+    modal.classList.add('active');
+    loading.style.display = 'block';
+    error.style.display = 'none';
+    iframe.style.display = 'none';
+    document.body.style.overflow = 'hidden';
+
+    // Revoke any previous blob URL to avoid memory leaks
+    if (iframe._blobUrl) {
+        URL.revokeObjectURL(iframe._blobUrl);
+        iframe._blobUrl = null;
+    }
+
     try {
-        const newWindow = window.open(fileUrl, '_blank');
-        if (!newWindow) {
-            console.error('Popup blocked');
-            alert('Please allow popups for this site to view files');
-        }
-    } catch (error) {
-        console.error('Error opening file:', error);
-        alert('Error opening file: ' + error.message);
+        // Fetch via signed URL in JS — then serve as blob so iframe
+        // never makes its own unauthenticated request to Supabase storage
+        const response = await fetch(fileUrl);
+        if (!response.ok) throw new Error(`Fetch failed: ${response.status} ${response.statusText}`);
+
+        const blob = await response.blob();
+        const blobUrl = URL.createObjectURL(blob);
+        iframe._blobUrl = blobUrl;
+
+        iframe.onload = function() {
+            loading.style.display = 'none';
+            iframe.style.display = 'block';
+        };
+        iframe.onerror = function() {
+            loading.style.display = 'none';
+            error.style.display = 'block';
+        };
+
+        iframe.src = blobUrl;
+
+    } catch (err) {
+        console.error('Error fetching file for preview:', err);
+        loading.style.display = 'none';
+        error.style.display = 'block';
+    }
+}
+
+function closeModal() {
+    const modal = document.getElementById('file-preview-modal');
+    const iframe = document.getElementById('preview-iframe');
+
+    if (modal) {
+        modal.classList.remove('active');
+        document.body.style.overflow = '';
+
+        setTimeout(function() {
+            if (iframe) {
+                if (iframe._blobUrl) {
+                    URL.revokeObjectURL(iframe._blobUrl);
+                    iframe._blobUrl = null;
+                }
+                iframe.src = '';
+            }
+        }, 300);
     }
 }
 
