@@ -1,0 +1,114 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Login | Laboratory Attendance System</title>
+
+    <!-- Fonts -->
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet">
+    <!-- Icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
+
+    <!-- Page styles -->
+    <link rel="stylesheet" href="../resc/css/login.css">
+</head>
+<body>
+
+<!-- ══ LEFT PANEL ════════════════════════════════════════════ -->
+<div class="left-panel">
+    <div class="hex-grid"></div>
+
+    <div class="left-top">
+        <div class="brand-icon"><i class="fa-solid fa-flask"></i></div>
+        <span class="brand-name">Laboratory Attendance System</span>
+    </div>
+
+    <div class="left-center">
+        <div class="badge">
+            <i class="fa-solid fa-circle"></i> Admin Portal
+        </div>
+        <h1>Manage Your<br><span>Laboratory</span><br>Efficiently</h1>
+        <p>A centralized platform for attendance tracking, scheduling, and laboratory resource management.</p>
+
+        <div class="features">
+            <div class="feature-item">
+                <div class="feature-dot"><i class="fa-solid fa-calendar-check"></i></div>
+                <div class="feature-text"><strong>Attendance Tracking</strong> — Real-time monitoring</div>
+            </div>
+            <div class="feature-item">
+                <div class="feature-dot"><i class="fa-solid fa-users"></i></div>
+                <div class="feature-text"><strong>Student &amp; Professor</strong> — Records management</div>
+            </div>
+            <div class="feature-item">
+                <div class="feature-dot"><i class="fa-solid fa-shield-halved"></i></div>
+                <div class="feature-text"><strong>Secure Access</strong> — Role-based permissions</div>
+            </div>
+        </div>
+    </div>
+
+    <div class="left-bottom">
+        &copy; 2025 Laboratory Attendance System &middot; All rights reserved
+    </div>
+</div>
+
+<!-- ══ RIGHT PANEL ═══════════════════════════════════════════ -->
+<div class="right-panel">
+    <div class="login-box">
+        <div class="login-card">
+            <div class="card-accent"></div>
+
+            <div class="login-header">
+                <div class="welcome">Welcome back</div>
+                <h2>Sign in to your account</h2>
+                <p>Enter your credentials to access the dashboard</p>
+            </div>
+
+            <!-- Error box — shown by login.js when credentials are wrong -->
+            <div class="error-box" id="errorBox" style="display:none;">
+                <i class="fa-solid fa-circle-exclamation"></i>
+                <span id="errorMsg"></span>
+            </div>
+
+            <form id="loginForm" autocomplete="off">
+                <div class="fg">
+                    <label><i class="fa-solid fa-id-badge"></i> Employee ID</label>
+                    <input type="text" name="employee_id" id="employee_id"
+                           placeholder="Enter your Employee ID"
+                           required autocomplete="username">
+                </div>
+
+                <div class="fg">
+                    <label><i class="fa-solid fa-lock"></i> Password</label>
+                    <div class="pw-wrap">
+                        <input type="password" name="password" id="password"
+                               placeholder="Enter your password"
+                               required autocomplete="current-password">
+                        <i class="fa-solid fa-eye-slash pw-eye" id="togglePw"></i>
+                    </div>
+                </div>
+
+                <div class="forgot-row">
+                    <a href="forgotPassword.html">Forgot password?</a>
+                </div>
+
+                <button type="submit" class="btn-login" id="btnLogin">
+                    <i class="fa-solid fa-right-to-bracket"></i> Log In
+                </button>
+            </form>
+
+            <div class="divider"><span>don't have an account?</span></div>
+
+            <div class="footer-links">
+                <p>New administrator? <a href="createAccount.html">Create account</a></p>
+                <p>Not an admin? <a href="homepage.html">Go to homepage</a></p>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- ══ SCRIPTS ═══════════════════════════════════════════════ -->
+<script type="module" src="../resc/js/login.js"></script>
+
+</body>
+</html>
