@@ -79,6 +79,24 @@ async function loginUser(email, password) {
         throw new Error('Your account is not active. Please contact the administrator.');
     }
 
+    const { error: authSignInError } = await supabaseClient.auth.signInWithPassword({
+        email: email,
+        password: password
+    });
+
+    if (authSignInError) {
+        console.warn('Supabase Auth sign-in failed, attempting sign-up:', authSignInError.message);
+        const { error: signUpError } = await supabaseClient.auth.signUp({
+            email: email,
+            password: password
+        });
+        if (signUpError) {
+            console.warn('Supabase Auth sign-up also failed:', signUpError.message);
+        } else {
+            await supabaseClient.auth.signInWithPassword({ email, password });
+        }
+    }
+
     sessionStorage.setItem('user', JSON.stringify({
         id: userData.professor_id || userData.admin_id,
         employeeId: userData.employee_id,
