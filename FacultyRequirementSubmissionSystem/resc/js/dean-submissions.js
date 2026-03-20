@@ -265,6 +265,12 @@ async function loadFiles(categoryId) {
             ...f,
             professors: professorsMap[f.professor_id] || null
         }));
+        console.log('[DEAN DEBUG] Files loaded for category:', categoryId);
+        console.log('[DEAN DEBUG] Professor IDs from submissions:', professorIds);
+        console.log('[DEAN DEBUG] Professor map:', professorsMap);
+        files.forEach(f => {
+            console.log(`[DEAN DEBUG] File submission - ID: ${f.id}, professor_id: ${f.professor_id}, mapped to: ${filesWithProfs.find(fp => fp.id === f.id)?.professors?.first_name || 'NOT FOUND'}`);
+        });
         const filteredFiles = filesWithProfs;
 
         if (filteredFiles && filteredFiles.length > 0) {

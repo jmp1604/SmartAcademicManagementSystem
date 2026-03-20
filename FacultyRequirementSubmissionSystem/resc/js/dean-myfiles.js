@@ -116,15 +116,10 @@ async function loadMyFiles() {
     }
 }
 
-/**
- * Accepts either a plain storage path ("uuid/1234_file.pdf")
- * or a full Supabase Storage URL, and returns a fresh signed URL.
- * Falls back to the raw value if it's already a usable http URL.
- */
 async function resolveFileUrl(raw, fileName) {
     if (!raw) { console.warn('No file URL for:', fileName); return null; }
 
-    // Extract the storage path from a full Supabase URL if needed
+    // Extract the plain storage path from a full Supabase URL if needed
     let storagePath = raw;
     const match = raw.match(/\/storage\/v1\/object\/(?:public|sign)\/faculty-submissions\/([^?]+)/);
     if (match) storagePath = decodeURIComponent(match[1]);
@@ -135,13 +130,13 @@ async function resolveFileUrl(raw, fileName) {
             .createSignedUrl(storagePath, 3600);
 
         if (error) {
-            console.error('createSignedUrl failed for', storagePath, ':', error.message);
-            return raw.startsWith('http') ? raw : null;
+            console.error('createSignedUrl failed — check Supabase storage RLS policy for dean role:', error.message);
+            return null;
         }
         return data.signedUrl;
     } catch (err) {
         console.error('resolveFileUrl exception:', err);
-        return raw.startsWith('http') ? raw : null;
+        return null;
     }
 }
 
@@ -354,7 +349,7 @@ function showNoFilesMessage(message) {
             </div>
             <h3 style="font-family:'Merriweather',serif;color:#374151;margin-bottom:.5rem;font-size:1.2rem;">No Files Found</h3>
             <p style="color:#6b7280;font-size:.95rem;margin-bottom:1.5rem;">${escapeHtml(message)}</p>
-            <a href="faculty-upload.html" style="display:inline-block;padding:.7rem 1.5rem;background:#1e40af;color:#fff;border-radius:.5rem;font-weight:600;text-decoration:none;">Upload File</a>
+            <a href="dean-upload.html" style="display:inline-block;padding:.7rem 1.5rem;background:#1e40af;color:#fff;border-radius:.5rem;font-weight:600;text-decoration:none;">Upload File</a>
         </div>
     `;
 }
@@ -366,20 +361,16 @@ function initializeModal() {
     
     if (!modal) return;
     
-    // Close button click
     closeBtn?.addEventListener('click', closeModal);
     
-    // Overlay click to close
     overlay?.addEventListener('click', closeModal);
     
-    // ESC key to close
     document.addEventListener('keydown', function(e) {
         if (e.key === 'Escape' && modal.classList.contains('active')) {
             closeModal();
         }
     });
     
-    // Download instead button
     document.getElementById('preview-download-instead')?.addEventListener('click', function() {
         const iframe = document.getElementById('preview-iframe');
         const fileName = document.getElementById('preview-file-name')?.textContent || 'file';
@@ -418,17 +409,14 @@ async function viewFile(fileUrl, fileName = 'File Preview') {
     iframe.style.display = 'none';
     document.body.style.overflow = 'hidden';
 
-    // Revoke any previous blob URL to avoid memory leaks
     if (iframe._blobUrl) {
         URL.revokeObjectURL(iframe._blobUrl);
         iframe._blobUrl = null;
     }
 
     try {
-        // Fetch via signed URL in JS — then serve as blob so iframe
-        // never makes its own unauthenticated request to Supabase storage
         const response = await fetch(fileUrl);
-        if (!response.ok) throw new Error(`Fetch failed: ${response.status} ${response.statusText}`);
+        if (!response.ok) throw new Error(`Fetch failed: ${response.status} — signed URL may have expired or the storage RLS policy for deans is missing`);
 
         const blob = await response.blob();
         const blobUrl = URL.createObjectURL(blob);
@@ -449,6 +437,11 @@ async function viewFile(fileUrl, fileName = 'File Preview') {
         console.error('Error fetching file for preview:', err);
         loading.style.display = 'none';
         error.style.display = 'block';
+        const dlBtn = document.getElementById('preview-download-instead');
+        if (dlBtn) {
+            dlBtn.style.display = 'inline-block';
+            dlBtn.dataset.fallbackUrl = fileUrl;
+        }
     }
 }
 
@@ -507,7 +500,6 @@ async function deleteSubmission(submissionId) {
 
         if (error) throw error;
 
-        // Reload files
         await loadMyFiles();
         
         alert('Submission deleted successfully.');
