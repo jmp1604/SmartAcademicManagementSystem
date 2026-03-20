@@ -116,37 +116,52 @@ async function loadMyFiles() {
     }
 }
 
-/**
- * Accepts either a plain storage path ("uuid/1234_file.pdf")
- * or a full Supabase Storage URL, and returns a fresh signed URL.
- * Falls back to the raw value if it's already a usable http URL.
- */
 async function resolveFileUrl(raw, fileName) {
     if (!raw) { console.warn('No file URL for:', fileName); return null; }
 
-    // If it's already a full http URL, return it directly — it's usable as-is
-    // (older records stored the public URL instead of a storage path)
+    let storagePath;
+
     if (raw.startsWith('http')) {
-        return raw;
-    }
-
-    // raw is a plain storage path like "uuid/1234567890_filename.pdf"
-    // IMPORTANT: Pass the raw path as-is — the Supabase JS client handles
-    // URL encoding internally. Pre-encoding the path causes double-encoding → 400 errors.
-    try {
-        const { data, error } = await supabaseClient.storage
-            .from('faculty-submissions')
-            .createSignedUrl(raw, 3600);
-
-        if (error) {
-            console.error('createSignedUrl failed for', raw, ':', error.message);
-            return null;
+        const marker = '/object/public/faculty-submissions/';
+        const idx = raw.indexOf(marker);
+        if (idx !== -1) {
+            storagePath = decodeURIComponent(raw.substring(idx + marker.length));
+        } else {
+            return raw;
         }
-        return data.signedUrl;
-    } catch (err) {
-        console.error('resolveFileUrl exception:', err);
-        return null;
+    } else {
+        storagePath = raw;
     }
+    const pathsToTry = new Set();
+    pathsToTry.add(storagePath);
+
+    const parts = storagePath.split('/');
+    if (parts.length === 2) {
+        pathsToTry.add(`${parts[0]}/${parts[0]}/${parts[1]}`);
+    }
+    if (parts.length === 3 && parts[0] === parts[1]) {
+        pathsToTry.add(`${parts[0]}/${parts[2]}`);
+    }
+
+    for (const path of [...pathsToTry]) {
+        console.log('Trying path:', path);
+        try {
+            const { data, error } = await supabaseClient.storage
+                .from('faculty-submissions')
+                .createSignedUrl(path, 3600);
+
+            if (!error && data?.signedUrl) {
+                console.log('✓ Success with path:', path);
+                return data.signedUrl;
+            }
+            console.warn(`✗ Failed (${path}):`, error?.message);
+        } catch (err) {
+            console.warn(`✗ Exception (${path}):`, err.message);
+        }
+    }
+
+    console.error('All paths failed for:', storagePath);
+    return raw;
 }
 
 function updateStatistics(submissions) {
@@ -369,21 +384,13 @@ function initializeModal() {
     const overlay = document.querySelector('.preview-modal-overlay');
     
     if (!modal) return;
-    
-    // Close button click
     closeBtn?.addEventListener('click', closeModal);
-    
-    // Overlay click to close
     overlay?.addEventListener('click', closeModal);
-    
-    // ESC key to close
     document.addEventListener('keydown', function(e) {
         if (e.key === 'Escape' && modal.classList.contains('active')) {
             closeModal();
         }
     });
-    
-    // Download instead button
     document.getElementById('preview-download-instead')?.addEventListener('click', function() {
         const iframe = document.getElementById('preview-iframe');
         const fileName = document.getElementById('preview-file-name')?.textContent || 'file';

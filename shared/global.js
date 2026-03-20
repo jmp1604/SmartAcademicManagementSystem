@@ -59,19 +59,6 @@ function isProfessor() {
     }
 }
 
-function isDean() {
-    const userStr = sessionStorage.getItem('user');
-    if (!userStr) return false;
-    
-    try {
-        const user = JSON.parse(userStr);
-        return user.userType === 'professor' && user.role === 'dean';
-    } catch (e) {
-        console.error('Error parsing user session:', e);
-        return false;
-    }
-}
-
 function getCurrentUser() {
     const userStr = sessionStorage.getItem('user');
     if (!userStr) return null;
