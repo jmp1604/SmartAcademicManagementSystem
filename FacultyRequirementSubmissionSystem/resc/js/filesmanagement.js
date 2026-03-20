@@ -122,10 +122,6 @@ function renderSubmissions() {
             statusBadge = '<span class="badge-status status-rejected">Rejected</span>';
         }
 
-        const flagBadge = submission.flagged_by_dean 
-            ? '<span style="color: #f59e0b; font-size: 1.2rem; margin-left: 0.5rem;" title="Flagged by Dean">⚠️</span>' 
-            : '';
-
         return `
             <tr class="searchable-row" 
                 data-dept="${department.toLowerCase()}" 
@@ -136,7 +132,7 @@ function renderSubmissions() {
                         <div class="file-icon small">
                             <svg viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
                         </div>
-                        <span>${submission.file_name || 'document.pdf'}${flagBadge}</span>
+                        <span>${submission.file_name || 'document.pdf'}</span>
                     </div>
                 </td>
                 <td>${facultyName}</td>
@@ -197,16 +193,6 @@ function showReviewModal(submissionId) {
     document.getElementById('modalUploadDate').textContent = formatDate(submission.created_at);
     document.getElementById('modalSize').textContent = formatFileSize(submission.file_size);
     
-    // Show flag info if flagged
-    const flagInfo = document.getElementById('flagInfo');
-    if (submission.flagged_by_dean) {
-        flagInfo.style.display = 'block';
-        document.getElementById('modalFlagReason').textContent = submission.flag_reason || 'No reason provided';
-        document.getElementById('modalDeanNotes').textContent = submission.dean_notes || 'No notes';
-    } else {
-        flagInfo.style.display = 'none';
-    }
-    
     document.getElementById('adminRemarks').value = '';
 
     const modal = new bootstrap.Modal(document.getElementById('reviewModal'));
@@ -237,8 +223,7 @@ async function handleReviewSubmission(action) {
                 status: action,
                 reviewed_by: user.id,
                 reviewed_at: new Date().toISOString(),
-                remarks: remarks,
-                flagged_by_dean: false  // Clear flag after review
+                remarks: remarks
             })
             .eq('id', currentSubmissionId);
 

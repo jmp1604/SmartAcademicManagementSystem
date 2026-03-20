@@ -240,13 +240,15 @@ async function submitUpload() {
         submitBtn.disabled = true;
         submitBtn.innerHTML = '<span>Uploading...</span>';
 
+        // Sanitize filename: replace spaces and special characters with underscores
+        const sanitizedFileName = file.name.replace(/\s+/g, '_').replace(/[^\w._-]/g, '_');
         const timestamp = Date.now();
-        const filePath = `${sessionUser.id}/${timestamp}_${file.name}`;
+        const filePath = `${sessionUser.id}/${timestamp}_${sanitizedFileName}`;
         
         console.log('[UPLOAD] Starting file upload...');
         console.log('[UPLOAD] File path:', filePath);
-        console.log('[UPLOAD] File object:', file);
-        console.log('[UPLOAD] File name:', file.name);
+        console.log('[UPLOAD] Original file name:', file.name);
+        console.log('[UPLOAD] Sanitized file name:', sanitizedFileName);
         console.log('[UPLOAD] File size:', file.size);
         console.log('[UPLOAD] File type:', file.type);
         
@@ -294,7 +296,7 @@ async function submitUpload() {
             .from('submission_files')
             .insert({
                 submission_id: submission.id,
-                file_name: file.name,
+                file_name: sanitizedFileName,
                 file_url: filePath,
                 file_size: file.size,
                 file_type: file.type
