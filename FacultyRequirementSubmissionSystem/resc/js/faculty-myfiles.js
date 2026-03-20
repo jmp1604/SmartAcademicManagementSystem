@@ -124,24 +124,28 @@ async function loadMyFiles() {
 async function resolveFileUrl(raw, fileName) {
     if (!raw) { console.warn('No file URL for:', fileName); return null; }
 
-    // Extract the storage path from a full Supabase URL if needed
-    let storagePath = raw;
-    const match = raw.match(/\/storage\/v1\/object\/(?:public|sign)\/faculty-submissions\/([^?]+)/);
-    if (match) storagePath = decodeURIComponent(match[1]);
+    // If it's already a full http URL, return it directly — it's usable as-is
+    // (older records stored the public URL instead of a storage path)
+    if (raw.startsWith('http')) {
+        return raw;
+    }
 
+    // raw is a plain storage path like "uuid/1234567890_filename.pdf"
+    // IMPORTANT: Pass the raw path as-is — the Supabase JS client handles
+    // URL encoding internally. Pre-encoding the path causes double-encoding → 400 errors.
     try {
         const { data, error } = await supabaseClient.storage
             .from('faculty-submissions')
-            .createSignedUrl(storagePath, 3600);
+            .createSignedUrl(raw, 3600);
 
         if (error) {
-            console.error('createSignedUrl failed for', storagePath, ':', error.message);
-            return raw.startsWith('http') ? raw : null;
+            console.error('createSignedUrl failed for', raw, ':', error.message);
+            return null;
         }
         return data.signedUrl;
     } catch (err) {
         console.error('resolveFileUrl exception:', err);
-        return raw.startsWith('http') ? raw : null;
+        return null;
     }
 }
 

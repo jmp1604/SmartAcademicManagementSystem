@@ -120,14 +120,7 @@ function updateHeaderSubtitle() {
                 subtitle = 'Administrator Portal';
             }
         } else if (user.userType === 'professor') {
-            const role = (user.role || '').toLowerCase();
-            if (role === 'dean') {
-                subtitle = 'Dean Portal';
-            } else if (role === 'professor' || role === 'faculty') {
-                subtitle = 'Professor Portal';
-            } else {
-                subtitle = 'Faculty Portal';
-            }
+            subtitle = 'Faculty Portal';
         } else if (user.userType === 'student') {
             subtitle = 'Student Portal';
         }

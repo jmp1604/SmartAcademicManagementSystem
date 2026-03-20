@@ -66,7 +66,6 @@ function loadSidebar(activePage) {
     let userStr = sessionStorage.getItem('user');
     let isSuperAdmin = false;
     let isProfessor = false;
-    let isDean = false;
     let user = null;
     
     if (userStr) {
@@ -74,47 +73,9 @@ function loadSidebar(activePage) {
             user = JSON.parse(userStr);
             isSuperAdmin = user.userType === 'admin' && user.adminLevel === 'super_admin';
             isProfessor = user.userType === 'professor';
-            isDean = user.userType === 'professor' && user.role === 'dean';
         } catch (e) {
             console.error('Error parsing user session:', e);
         }
-    }
-    
-    if (isDean) {
-        const sidebarHTML = `
-        <nav class="sidebar">
-            <a href="dashboard.html" class="nav-item ${activePage === 'dashboard' ? 'active' : ''}">
-                <svg viewBox="0 0 24 24"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/></svg>
-                Department Dashboard
-            </a>
-            <a href="dean-submissions.html" class="nav-item ${activePage === 'dean-submissions' ? 'active' : ''}">
-                <svg viewBox="0 0 24 24"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/></svg>
-                Monitor Submissions
-            </a>
-            <a href="dean-flagged.html" class="nav-item ${activePage === 'dean-flagged' ? 'active' : ''}">
-                <svg viewBox="0 0 24 24"><path d="M4 15s1-1 4-1 5 2 8 2 4-1 4-1V3s-1 1-4 1-5-2-8-2-4 1-4 1z"/><line x1="4" y1="22" x2="4" y2="15"/></svg>
-                Flagged Items
-            </a>
-            <a href="dean-audit.html" class="nav-item ${activePage === 'dean-audit' ? 'active' : ''}">
-                <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
-                Audit Trailing
-            </a>
-            <a href="dean-reports.html" class="nav-item ${activePage === 'dean-reports' ? 'active' : ''}">
-                <svg viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg>
-                Report Generation
-            </a>
-            <a href="dean-upload.html" class="nav-item ${activePage === 'dean-upload' ? 'active' : ''}">
-                <svg viewBox="0 0 24 24"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
-                My Uploads
-            </a>
-            <a href="dean-myfiles.html" class="nav-item ${activePage === 'dean-myfiles' ? 'active' : ''}">
-                <svg viewBox="0 0 24 24"><path d="M13 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V9z"/><polyline points="13 2 13 9 20 9"/></svg>
-                My Files
-            </a>
-        </nav>`;
-        
-        document.getElementById('sidebar-container').innerHTML = sidebarHTML;
-        return;
     }
     
     if (isProfessor) {
