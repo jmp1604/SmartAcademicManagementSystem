@@ -1,0 +1,89 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Laboratory Attendance System - Admin Panel</title>
+    
+    <!-- Fonts -->
+    <link href="https://fonts.googleapis.com/css2?family=Nunito:wght@400;500;600;700;800&family=Nunito+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
+    
+    <!-- Font Awesome -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
+    
+    <!-- Your CSS Files -->
+    <link rel="stylesheet" href="../resc/css/iframe.css">
+</head>
+<body>
+    <!-- Status Indicator -->
+    <div class="status-indicator" id="statusIndicator">
+        <i class="fa-solid fa-sync-alt fa-spin"></i> Updating...
+    </div>
+    
+    <!-- Sidebar -->
+    <aside class="sidebar">
+        <div class="sidebar-header">
+            <img src="../../auth/assets/plplogo.png" alt="PLP Logo">
+            <img src="../../auth/assets/ccslogo.png" alt="CCS Logo">
+        </div>
+        
+        <nav class="sidebar-nav">
+            <ul>
+                <li><a href="dashboard.html" class="menu-item active" target="mainFrame"><i class="fa-solid fa-house icon"></i> Dashboard</a></li>
+                <li><a href="laboratoryManagement.html" class="menu-item" target="mainFrame"><i class="fa-solid fa-microscope icon"></i> Labs</a></li>
+                <li><a href="laboratorySessions.html" class="menu-item" target="mainFrame"><i class="fa-solid fa-desktop icon"></i> Laboratory Sessions</a></li>
+                <li><a href="subjectsManagement.html" class="menu-item" target="mainFrame"><i class="fa-solid fa-book icon"></i> Subjects</a></li>
+                <li><a href="attendeesList.html" class="menu-item" target="mainFrame"><i class="fa-solid fa-users icon"></i> Students</a></li>
+                <li><a href="professorsManagement.html" class="menu-item" target="mainFrame"><i class="fa-solid fa-chalkboard-teacher icon"></i> Professors</a></li>
+                <li><a href="schedules.html" class="menu-item" target="mainFrame"><i class="fa-solid fa-calendar-days icon"></i> Schedules</a></li>
+                <li><a href="studentEnrollment.html" class="menu-item" target="mainFrame"><i class="fa-solid fa-user-plus icon"></i> Enrollment</a></li>
+                <li><a href="studentAttendance.html" class="menu-item" target="mainFrame"><i class="fa-solid fa-clipboard-user icon"></i> Student Attendance</a></li>
+                <li><a href="reports.html" class="menu-item" target="mainFrame"><i class="fa-solid fa-file-lines icon"></i> Reports</a></li>
+            </ul>
+        </nav>
+    </aside>
+
+    <!-- Header -->
+    <header>
+        <!-- Left: Brand -->
+        <div class="top-left">
+            <div class="top-left-text">
+                <h2>Laboratory Attendance System</h2>
+                <p>Admin Panel</p>
+            </div>
+        </div>
+
+        <!-- Center: Live Clock -->
+        <div class="header-time">
+            <span class="time-display" id="manilaTime">--:--:--</span>
+            <div class="time-meta">
+                <i class="fa-regular fa-clock"></i>
+                <span id="manilaDate">--- --, ----</span>
+            </div>
+        </div>
+
+        <!-- Right: User Info + Logout -->
+        <div class="header-right">
+            <span id="userName" style="color: rgba(255,255,255,.65); font-size: 13px; font-weight: 600;">
+                <i class="fa-solid fa-user-circle"></i> Loading...
+            </span>
+            <button class="header-logout" onclick="logout()">
+                <i class="fa-solid fa-arrow-right-from-bracket"></i> Log Out
+            </button>
+        </div>
+    </header>
+
+    <!-- Main Content -->
+    <main class="main-content">
+        <iframe name="mainFrame" src="dashboard.html"></iframe>
+    </main>
+
+    <!-- Supabase -->
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <script src="../../config/.env.js"></script>
+    <script src="../../config/config.js"></script>
+    
+    <!-- Your JavaScript -->
+    <script src="../resc/js/iframe.js"></script>
+</body>
+</html>
