@@ -1,0 +1,208 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8"/>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+    <title>System Settings — Smart Academic Management System</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet"/>
+    <link href="https://fonts.googleapis.com/css2?family=Merriweather:wght@400;700&family=Source+Sans+3:wght@400;500;600&display=swap" rel="stylesheet"/>
+    <link rel="stylesheet" href="../shared/global.css"/>
+    <link rel="stylesheet" href="admin-specific.css"/>
+    <link rel="stylesheet" href="system-settings.css"/>
+</head>
+<body>
+
+<div id="header-container"></div>
+
+<div id="sidebar-container"></div>
+
+<main class="main-content">
+
+    <div class="page-header anim anim-1" style="display:flex;align-items:flex-start;justify-content:space-between;flex-wrap:wrap;gap:1rem;">
+        <div>
+            <h1>System Settings</h1>
+            <p>Configure global system settings and preferences</p>
+        </div>
+    </div>
+
+    <div class="settings-container anim anim-2">
+        
+        <!-- College Settings -->
+        <div class="settings-section">
+            <div class="settings-header">
+                <h2>College Settings</h2>
+                <p>Configure basic college information</p>
+            </div>
+            
+            <div class="settings-form">
+                <div class="form-group">
+                    <label for="collegeName" class="form-label">College Name</label>
+                    <input type="text" class="form-control" id="collegeName" placeholder="e.g., College of Computer Studies"/>
+                </div>
+                
+                <div class="form-group">
+                    <label for="collegeCode" class="form-label">College Code</label>
+                    <input type="text" class="form-control" id="collegeCode" placeholder="e.g., CCS"/>
+                </div>
+                
+                <div class="form-group">
+                    <label for="collegeEmail" class="form-label">Contact Email</label>
+                    <input type="email" class="form-control" id="collegeEmail" placeholder="contact@college.edu"/>
+                </div>
+                
+                <div class="form-group">
+                    <label for="collegeAddress" class="form-label">College Address</label>
+                    <textarea class="form-control" id="collegeAddress" rows="3" placeholder="Enter college address"></textarea>
+                </div>
+                
+                <div class="form-group">
+                    <label for="collegeLogo" class="form-label">College Logo URL</label>
+                    <input type="url" class="form-control" id="collegeLogo" placeholder="https://example.com/logo.png"/>
+                </div>
+
+                <button class="btn btn-primary" id="saveCollegeSettings">Save Changes</button>
+            </div>
+        </div>
+
+        <!-- Academic Calendar -->
+        <div class="settings-section">
+            <div class="settings-header">
+                <h2>Academic Calendar</h2>
+                <p>Set academic year and semester dates</p>
+            </div>
+            
+            <div class="settings-form">
+                <div class="row">
+                    <div class="col-md-6">
+                        <div class="form-group">
+                            <label for="academicYear" class="form-label">Current Academic Year</label>
+                            <input type="text" class="form-control" id="academicYear" placeholder="e.g., 2025-2026"/>
+                        </div>
+                    </div>
+                    <div class="col-md-6">
+                        <div class="form-group">
+                            <label for="currentSemester" class="form-label">Current Semester</label>
+                            <select class="form-control" id="currentSemester">
+                                <option value="">Select Semester</option>
+                                <option value="1">1st Semester</option>
+                                <option value="2">2nd Semester</option>
+                                <option value="3">Summer</option>
+                            </select>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="form-group">
+                    <label for="semesterStartDate" class="form-label">Semester Start Date</label>
+                    <input type="date" class="form-control" id="semesterStartDate"/>
+                </div>
+
+                <div class="form-group">
+                    <label for="semesterEndDate" class="form-label">Semester End Date</label>
+                    <input type="date" class="form-control" id="semesterEndDate"/>
+                </div>
+
+                <button class="btn btn-primary" id="saveAcademicSettings">Save Changes</button>
+            </div>
+        </div>
+
+        <!-- Grading System -->
+        <div class="settings-section">
+            <div class="settings-header">
+                <h2>Grading System</h2>
+                <p>Configure grading scales and policies</p>
+            </div>
+            
+            <div class="settings-form">
+                <div class="form-group">
+                    <label for="passingGrade" class="form-label">Passing Grade</label>
+                    <input type="number" class="form-control" id="passingGrade" placeholder="e.g., 60" min="0" max="100"/>
+                </div>
+
+                <div class="form-group">
+                    <label for="gradeMode" class="form-label">Grade Display Mode</label>
+                    <select class="form-control" id="gradeMode">
+                        <option value="numeric">Numeric (0-100)</option>
+                        <option value="letter">Letter Grade (A-F)</option>
+                        <option value="weighted">Weighted Scale</option>
+                    </select>
+                </div>
+
+                <button class="btn btn-primary" id="saveGradingSettings">Save Changes</button>
+            </div>
+        </div>
+
+        <!-- System Features -->
+        <div class="settings-section">
+            <div class="settings-header">
+                <h2>System Features</h2>
+                <p>Enable or disable system modules</p>
+            </div>
+            
+            <div class="settings-form">
+                <div class="feature-toggles">
+                    <div class="feature-item">
+                        <div class="feature-info">
+                            <label for="facultyRequirements" class="form-check-label">Faculty Requirement Submission System</label>
+                            <small>Allow faculty to submit requirement files</small>
+                        </div>
+                        <div class="form-check form-switch">
+                            <input class="form-check-input" type="checkbox" id="facultyRequirements" checked/>
+                        </div>
+                    </div>
+
+                    <div class="feature-item">
+                        <div class="feature-info">
+                            <label for="timeMonitoring" class="form-check-label">Time In/Out Monitoring</label>
+                            <small>Track attendance and time logs</small>
+                        </div>
+                        <div class="form-check form-switch">
+                            <input class="form-check-input" type="checkbox" id="timeMonitoring" checked/>
+                        </div>
+                    </div>
+
+                    <div class="feature-item">
+                        <div class="feature-info">
+                            <label for="thesisArchiving" class="form-check-label">Thesis & Capstone Archiving</label>
+                            <small>Store and manage thesis/capstone projects</small>
+                        </div>
+                        <div class="form-check form-switch">
+                            <input class="form-check-input" type="checkbox" id="thesisArchiving" checked/>
+                        </div>
+                    </div>
+
+                    <div class="feature-item">
+                        <div class="feature-info">
+                            <label for="studentViolations" class="form-check-label">Student Violation Management</label>
+                            <small>Track and manage student violations</small>
+                        </div>
+                        <div class="form-check form-switch">
+                            <input class="form-check-input" type="checkbox" id="studentViolations" checked/>
+                        </div>
+                    </div>
+                </div>
+
+                <button class="btn btn-primary" id="saveFeatureSettings">Save Changes</button>
+            </div>
+        </div>
+
+    </div>
+
+</main>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="../config/.env.js"></script>
+<script src="../config/config.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
+<script src="../shared/global.js"></script>
+<script src="admin-specific.js"></script>
+<script src="system-settings.js"></script>
+
+<script>
+    requireSuperAdmin();
+    loadHeader();
+    loadSidebar('system-settings');
+</script>
+
+</body>
+</html>

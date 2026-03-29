@@ -101,11 +101,26 @@ function loadSidebar(activePage = '') {
     }
 
     const userManagementClass = activePage === 'usermanagement' ? 'active' : '';
+    const departmentManagementClass = activePage === 'admin-department-management' ? 'active' : '';
+    const systemSettingsClass = activePage === 'system-settings' ? 'active' : '';
+    
     const backToPortalLink = isSuperAdmin ? '' : `
             <a href="../portal/portal.html" class="nav-item">
                 <svg viewBox="0 0 24 24"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>
                 Back to Portal
             </a>`;
+
+    const departmentManagementLink = isSuperAdmin ? `
+            <a href="admin-department-management.html" class="nav-item ${departmentManagementClass}">
+                <svg viewBox="0 0 24 24"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>
+                Department Management
+            </a>` : '';
+
+    const systemSettingsLink = isSuperAdmin ? `
+            <a href="system-settings.html" class="nav-item ${systemSettingsClass}">
+                <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="1"/><path d="M12 1v6m0 6v6M4.22 4.22l4.24 4.24m5.08 5.08l4.24 4.24M1 12h6m6 0h6M4.22 19.78l4.24-4.24m5.08-5.08l4.24-4.24"/></svg>
+                System Settings
+            </a>` : '';
 
     sidebarContainer.innerHTML = `
         <nav class="sidebar">
@@ -114,6 +129,8 @@ function loadSidebar(activePage = '') {
                 <svg viewBox="0 0 24 24"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
                 User Management
             </a>
+            ${departmentManagementLink}
+            ${systemSettingsLink}
         </nav>
     `;
 }

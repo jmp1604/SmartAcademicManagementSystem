@@ -10,17 +10,11 @@
     border-radius: var(--radius);
     padding: 1.4rem 1.5rem;
     box-shadow: var(--shadow-sm);
-    border-top: 3.5px solid transparent;
     position: relative;
     transition: box-shadow .2s;
 }
 
 .stat-card:hover { box-shadow: var(--shadow-md); }
-
-.stat-card.green  { border-top-color: #1a6b36; }
-.stat-card.blue   { border-top-color: #2563eb; }
-.stat-card.purple { border-top-color: #7c3aed; }
-.stat-card.orange { border-top-color: #ea580c; }
 
 .stat-label {
     font-size: .82rem;
@@ -123,7 +117,7 @@
     align-items: flex-start;
     gap: .85rem;
     padding: .85rem 0;
-    border-bottom: 1px solid var(--border);
+
 }
 
 .activity-item:last-child { border-bottom: none; }
