@@ -44,6 +44,7 @@ async function loadCategories() {
             console.error('Supabase client not initialized');
             showEmptyState();
             return;
+        }
         
         const { data, error } = await supabaseClient
             .from('categories')

@@ -117,19 +117,19 @@ function populateSettings(settings) {
 
 const COLLEGE_LOGO_BUCKET = 'dept-logos';
 
-async function saveCollegeSettings() {
+async function saveAcademicSettings() {
     try {
-        const collegeLogoFile = document.getElementById('collegeLogoFile').files[0];
-        let logoUrl = null;
-        
-        if (collegeLogoFile) {
-            const MAX_SIZE = 2 * 1024 * 1024;
-            const ALLOWED = ['image/png', 'image/jpeg', 'image/jpg', 'image/webp', 'image/svg+xml'];
-
-            if (!ALLOWED.includes(collegeLogoFile.type)) {
-                showAlert('Invalid file type. Please upload PNG, JPG, WEBP, or SVG.', 'warning');
-                return;
-      DEPARTMENT_LOGO_BUCKET = 'dept-logos';       console.error('Error saving academic settings:', error);
+        const settingsData = {
+            academic_year: document.getElementById('academicYear').value,
+            current_semester: document.getElementById('currentSemester').value,
+            semester_start_date: document.getElementById('semesterStartDate').value,
+            semester_end_date: document.getElementById('semesterEndDate').value,
+            updated_at: new Date().toISOString()
+        };
+        await updateSystemSettings(settingsData);
+        showAlert('Academic settings saved successfully', 'success');
+    } catch (error) {
+        console.error('Error saving academic settings:', error);
         showAlert('Error saving academic settings: ' + error.message, 'danger');
     }
 }
@@ -345,3 +345,4 @@ function showAlert(message, type = 'info') {
     mainContent.insertBefore(alertDiv, mainContent.firstChild);
     setTimeout(() => alertDiv.remove(), 5000);
 }
+
