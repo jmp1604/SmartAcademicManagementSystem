@@ -44,8 +44,7 @@ async function loadCategories() {
             console.error('Supabase client not initialized');
             showEmptyState();
             return;
-        }
-
+        
         const { data, error } = await supabaseClient
             .from('categories')
             .select('*')
@@ -54,6 +53,7 @@ async function loadCategories() {
         if (error) throw error;
 
         categories = data || [];
+        console.log('Loaded categories for department:', categories.length);
         updateStats();
         renderCategories(categories);
 
@@ -255,18 +255,35 @@ async function saveCategory() {
             return;
         }
 
+        // Get user from session
+        const userStr = sessionStorage.getItem('user');
+        if (!userStr) {
+            throw new Error('User not authenticated');
+        }
+        
+        const currentUser = JSON.parse(userStr);
+        
+        // Check if user has a department assigned
+        if (!currentUser.departmentId) {
+            showNotification('Error: Your account is not assigned to a department', 'error');
+            return;
+        }
+
         const categoryData = {
             name,
             description,
             icon: icon || 'fas fa-folder',
-            status
+            status,
+            department_id: currentUser.departmentId
         };
 
         if (categoryId) {
+            // Update existing category (don't change department_id)
+            const { department_id, ...updateData } = categoryData;
             const { error } = await supabaseClient
                 .from('categories')
                 .update({
-                    ...categoryData,
+                    ...updateData,
                     updated_at: new Date().toISOString()
                 })
                 .eq('id', categoryId);
@@ -274,12 +291,7 @@ async function saveCategory() {
             if (error) throw error;
             showNotification('Category updated successfully', 'success');
         } else {
-            const userStr = sessionStorage.getItem('user');
-            if (!userStr) {
-                throw new Error('User not authenticated');
-            }
-            
-            const currentUser = JSON.parse(userStr);
+            // Create new category with department_id
             console.log('Current user ID:', currentUser.id);
             
             const insertData = {
@@ -287,6 +299,7 @@ async function saveCategory() {
                 description: categoryData.description,
                 icon: categoryData.icon,
                 status: categoryData.status,
+                department_id: categoryData.department_id,
                 created_by: currentUser.id
             };
             

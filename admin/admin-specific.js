@@ -46,16 +46,32 @@ function loadHeader() {
     const userStr = sessionStorage.getItem('user');
     let subtitle = 'Administration';
     let userDisplay = 'Administrator';
+    let departmentLogo = '../auth/assets/ccslogo.png';
+    let siteName = 'SAMS Admin Panel';
 
     if (userStr) {
         try {
             const user = JSON.parse(userStr);
             if (user.adminLevel === 'super_admin') {
-                subtitle = 'Super Administrator';
+                subtitle = 'Super Administrator — Full System Access';
                 userDisplay = 'Super Admin';
             } else {
                 subtitle = 'Administrator';
                 userDisplay = 'Admin';
+                
+                // For department admins, show which department they manage
+                if (user.department) {
+                    subtitle = `${user.department} Administrator`;
+                }
+            }
+            
+            // Update site name and logo based on department
+            if (user.department) {
+                siteName = `${user.department} — Admin Panel`;
+            }
+            
+            if (user.departmentLogo) {
+                departmentLogo = user.departmentLogo;
             }
         } catch (e) {
             console.error('Error parsing user:', e);
@@ -66,9 +82,9 @@ function loadHeader() {
         <header class="topbar">
             <div class="topbar-left">
                 <img src="../auth/assets/plplogo.png" alt="PLP Logo" class="topbar-logo"/>
-                <img src="../auth/assets/ccslogo.png" alt="CCS Logo" class="topbar-logo-ccs"/>
+                <img src="${departmentLogo}" alt="Department Logo" class="topbar-logo-ccs"/>
                 <div class="topbar-info">
-                    <div class="topbar-title">SAMS Admin Panel</div>
+                    <div class="topbar-title">${siteName}</div>
                     <div class="topbar-subtitle" id="topbarSubtitle">${subtitle}</div>
                 </div>
             </div>

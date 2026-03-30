@@ -175,7 +175,6 @@ function openEditDepartmentModal(departmentId) {
     document.getElementById('departmentName').value = currentDepartment.department_name;
     document.getElementById('departmentCode').value = currentDepartment.department_code;
     document.getElementById('departmentDescription').value = currentDepartment.description || '';
-    document.getElementById('departmentLogo').value = currentDepartment.logo_url || '';
     document.getElementById('departmentStatus').value = currentDepartment.is_active ? 'true' : 'false';
     
     if (!departmentModal) {
@@ -188,7 +187,6 @@ async function saveDepartment() {
     const departmentName = document.getElementById('departmentName').value.trim();
     const departmentCode = document.getElementById('departmentCode').value.trim();
     const departmentDescription = document.getElementById('departmentDescription').value.trim();
-    const departmentLogo = document.getElementById('departmentLogo').value.trim();
     const departmentStatus = document.getElementById('departmentStatus').value === 'true';
 
     if (!departmentName || !departmentCode) {
@@ -205,7 +203,6 @@ async function saveDepartment() {
                     department_name: departmentName,
                     department_code: departmentCode,
                     description: departmentDescription,
-                    logo_url: departmentLogo,
                     is_active: departmentStatus,
                     updated_at: new Date().toISOString()
                 })
@@ -221,7 +218,6 @@ async function saveDepartment() {
                     department_name: departmentName,
                     department_code: departmentCode,
                     description: departmentDescription,
-                    logo_url: departmentLogo,
                     is_active: departmentStatus,
                     created_at: new Date().toISOString(),
                     updated_at: new Date().toISOString()
