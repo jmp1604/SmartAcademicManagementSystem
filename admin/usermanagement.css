@@ -1,73 +1,97 @@
-.stat-cards {
-    display: grid;
-    grid-template-columns: repeat(4, 1fr);
-    gap: 1.2rem;
-    margin-bottom: 1.5rem;
+/* User Management Page Styles */
+/* Inherits base styles from admin-specific.css */
+
+.page-header {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    flex-wrap: wrap;
+    gap: 1rem !important;
 }
 
-.stat-card {
-    background: var(--card-bg);
-    border-radius: var(--radius);
-    padding: 1.4rem 1.5rem;
-    box-shadow: var(--shadow-sm);
-    border-top: 3.5px solid transparent;
-    position: relative;
-    transition: box-shadow .2s;
+.page-header > div {
+    flex: 1;
 }
 
-.stat-card:hover { box-shadow: var(--shadow-md); }
-
-.stat-card.green  { border-top-color: #1a6b36; }
-.stat-card.blue   { border-top-color: #2563eb; }
-.stat-card.purple { border-top-color: #7c3aed; }
-.stat-card.orange { border-top-color: #ea580c; }
-
-.stat-label {
-    font-size: .82rem;
-    color: var(--text-muted);
+.btn-add-user {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.5rem;
+    background: var(--green-btn);
+    color: white;
+    padding: 0.75rem 1.5rem;
+    border: none;
+    border-radius: 0.5rem;
     font-weight: 500;
-    margin-bottom: .7rem;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    white-space: nowrap;
+    margin-top: 0.3rem;
 }
 
-.stat-value {
-    font-size: 2rem;
-    font-weight: 700;
-    line-height: 1.1;
-    color: var(--text-main);
+.btn-add-user:hover {
+    background: var(--green-active);
+    transform: translateY(-2px);
+    box-shadow: var(--shadow-md);
 }
 
-.stat-card.blue   .stat-value { color: #2563eb; }
-.stat-card.purple .stat-value { color: #7c3aed; }
-.stat-card.orange .stat-value { color: #ea580c; }
+.btn-add-user svg {
+    width: 20px;
+    height: 20px;
+    stroke: currentColor;
+    stroke-width: 2;
+    fill: none;
+}
 
 .badge {
     display: inline-block;
-    padding: .22rem .7rem;
+    padding: 0.35rem 0.8rem;
     border-radius: 99px;
-    font-size: .75rem;
+    font-size: 0.75rem;
     font-weight: 600;
-    letter-spacing: .02em;
+    letter-spacing: 0.02em;
 }
 
-.badge-faculty    { background: #dbeafe; color: #1e40af; }
-.badge-dean       { background: #ede9fe; color: #5b21b6; }
-.badge-admin      { background: #ffedd5; color: #9a3412; }
+.badge-faculty {
+    background: #dbeafe;
+    color: #1e40af;
+}
 
-.badge-active     { background: #d1fae5; color: #065f46; }
-.badge-inactive   { background: #f1f5f9; color: #64748b; }
+.badge-dean {
+    background: #ede9fe;
+    color: #5b21b6;
+}
+
+.badge-admin {
+    background: #ffedd5;
+    color: #9a3412;
+}
+
+.badge-super-admin {
+    background: #fed7aa;
+    color: #92400e;
+}
+
+.badge-active {
+    background: #d1fae5;
+    color: #065f46;
+}
+
+.badge-inactive {
+    background: #f1f5f9;
+    color: #64748b;
+}
 
 .btn-action {
-    display: inline-flex;
-    align-items: center;
-    gap: .35rem;
-    padding: .4rem .8rem;
-    font-size: .8rem;
+    display: inline-block;
+    padding: 0.4rem 0.8rem;
+    font-size: 0.8rem;
     font-weight: 500;
     border: none;
     border-radius: 5px;
     cursor: pointer;
-    transition: all .2s;
-    margin-right: .4rem;
+    transition: all 0.2s;
+    text-decoration: none;
 }
 
 .btn-action svg {
@@ -86,17 +110,97 @@
     transform: translateY(-1px);
 }
 
-.btn-reject, .btn-delete {
+.btn-delete {
     background: #fee2e2;
     color: #991b1b;
 }
 
-.btn-reject:hover, .btn-delete:hover {
+.btn-delete:hover {
     background: #ef4444;
     color: white;
     transform: translateY(-1px);
 }
 
-@media (max-width: 900px) {
-    .stat-cards { grid-template-columns: repeat(2, 1fr); }
+/* Empty state */
+.empty-state {
+    text-align: center;
+    padding: 3rem 2rem;
+    color: var(--text-muted);
 }
+
+.empty-state svg {
+    width: 64px;
+    height: 64px;
+    margin-bottom: 1rem;
+    opacity: 0.3;
+    stroke: currentColor;
+    fill: none;
+}
+
+@media (max-width: 768px) {
+    .page-header {
+        flex-direction: column-reverse;
+    }
+
+    .btn-add-user {
+        width: 100%;
+        justify-content: center;
+    }
+
+    .stat-cards {
+        grid-template-columns: 1fr 1fr !important;
+    }
+}
+
+/* Delete Button Icon Style */
+.btn-delete-icon {
+    background: none;
+    border: none;
+    padding: 0.5rem;
+    cursor: pointer;
+    color: #dc3545;
+    transition: all 0.2s ease;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 0.35rem;
+}
+
+.btn-delete-icon:hover {
+    background-color: rgba(220, 53, 69, 0.1);
+    color: #bb2d3b;
+}
+
+.btn-delete-icon svg {
+    width: 18px;
+    height: 18px;
+    stroke: currentColor;
+    stroke-width: 2;
+}
+
+/* Approve Button Icon Style */
+.btn-approve-icon {
+    background: none;
+    border: none;
+    padding: 0.5rem;
+    cursor: pointer;
+    color: #10b981;
+    transition: all 0.2s ease;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 0.35rem;
+}
+
+.btn-approve-icon:hover {
+    background-color: rgba(16, 185, 129, 0.1);
+    color: #059669;
+}
+
+.btn-approve-icon svg {
+    width: 18px;
+    height: 18px;
+    stroke: currentColor;
+    stroke-width: 2;
+}
+

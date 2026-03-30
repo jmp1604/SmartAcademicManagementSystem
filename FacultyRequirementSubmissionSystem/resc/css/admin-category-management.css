@@ -18,22 +18,6 @@
     box-shadow: var(--shadow-md);
 }
 
-.stat-card.white {
-    border-left: 4px solid #6b7280;
-}
-
-.stat-card.green {
-    border-left: 4px solid #10b981;
-}
-
-.stat-card.gray {
-    border-left: 4px solid #9ca3af;
-}
-
-.stat-card.blue {
-    border-left: 4px solid #3b82f6;
-}
-
 .stat-label {
     font-size: .8rem;
     color: var(--text-muted);
@@ -50,7 +34,6 @@
     font-family: 'Merriweather', serif;
 }
 
-/* Categories Grid */
 .categories-grid {
     display: grid;
     grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
@@ -68,7 +51,6 @@
 }
 
 .category-card:hover {
-    border-color: var(--green-mid);
     box-shadow: var(--shadow-md);
     transform: translateY(-2px);
 }

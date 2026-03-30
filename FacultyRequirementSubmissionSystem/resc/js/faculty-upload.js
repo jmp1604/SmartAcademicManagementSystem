@@ -11,10 +11,59 @@ async function loadCategories() {
             return;
         }
 
-        const { data: categories, error } = await supabaseClient
-            .from('categories')
-            .select('*')
-            .order('name', { ascending: true });
+        // Get faculty's department from session
+        const userStr = sessionStorage.getItem('user');
+        let departmentId = null;
+        
+        if (userStr) {
+            try {
+                const user = JSON.parse(userStr);
+                departmentId = user.departmentId;
+                console.log('Faculty department ID:', departmentId);
+            } catch (e) {
+                console.error('Error parsing user session:', e);
+            }
+        }
+
+        // FIX: categories don't have department_id directly.
+        // Instead, filter by fetching only category IDs that have a requirement
+        // belonging to the faculty's department, then load those categories.
+        let categoryIds = null;
+
+        if (departmentId) {
+            const { data: requirements, error: reqError } = await supabaseClient
+                .from('requirements')
+                .select('category_id')
+                .eq('department_id', departmentId);
+
+            if (reqError) {
+                console.error('Error loading requirements for department:', reqError);
+                showNoCategoriesMessage();
+                return;
+            }
+
+            if (!requirements || requirements.length === 0) {
+                showNoCategoriesMessage();
+                return;
+            }
+
+            // Extract unique category IDs that belong to this department
+            categoryIds = [...new Set(requirements.map(r => r.category_id).filter(Boolean))];
+
+            if (categoryIds.length === 0) {
+                showNoCategoriesMessage();
+                return;
+            }
+        }
+
+        // Now fetch only the categories that belong to this department
+        let query = supabaseClient.from('categories').select('*');
+
+        if (categoryIds) {
+            query = query.in('id', categoryIds);
+        }
+
+        const { data: categories, error } = await query.order('name', { ascending: true });
 
         if (error) {
             console.error('Error loading categories:', error);
@@ -216,13 +265,30 @@ async function submitUpload() {
         console.log('[UPLOAD DEBUG] Current professor_id from session:', sessionUser.id);
         console.log('[UPLOAD DEBUG] User name:', sessionUser.firstName, sessionUser.lastName);
 
-        const { data: requirement, error: reqError } = await supabaseClient
+        // FIX: also filter by department_id so a CCS requirement is never
+        // accidentally matched for a CON faculty member (or vice versa).
+        const departmentId = sessionUser.departmentId;
+
+        let reqQuery = supabaseClient
             .from('requirements')
             .select('id')
             .eq('category_id', categoryId)
             .order('created_at', { ascending: false })
             .limit(1)
             .single();
+
+        if (departmentId) {
+            reqQuery = supabaseClient
+                .from('requirements')
+                .select('id')
+                .eq('category_id', categoryId)
+                .eq('department_id', departmentId)
+                .order('created_at', { ascending: false })
+                .limit(1)
+                .single();
+        }
+
+        const { data: requirement, error: reqError } = await reqQuery;
 
         if (reqError && reqError.code !== 'PGRST116') {
             console.error('Error fetching requirement:', reqError);
@@ -268,7 +334,6 @@ async function submitUpload() {
         
         console.log('[UPLOAD] File uploaded successfully to:', filePath);
 
-        // FIX: changed 'notes' to 'remarks' to match the submissions table schema
         const { data: submission, error: submissionError } = await supabaseClient
             .from('submissions')
             .insert({

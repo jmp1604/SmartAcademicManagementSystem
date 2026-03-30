@@ -24,14 +24,26 @@ async function loadUsers() {
 
         const { data: professors, error: profError } = await supabaseClient
             .from('professors')
-            .select('*')
-            .order('created_at', { ascending: false });
+            .select(`
+                *,
+                departments (
+                    department_name,
+                    department_code
+                )
+            `)
+            .order('created_at', { ascending: false }); 
 
         if (profError) throw profError;
 
         const { data: admins, error: adminError } = await supabaseClient
             .from('admins')
-            .select('*')
+            .select(`
+                *,
+                departments:department_id (
+                    department_name,
+                    department_code
+                )
+            `)
             .order('created_at', { ascending: false });
 
         if (adminError) throw adminError;
@@ -39,20 +51,20 @@ async function loadUsers() {
         allUsers = [];
 
         if (professors) {
-            professors.forEach(prof => {
-                allUsers.push({
-                    id: prof.professor_id,
-                    type: 'professor',
-                    name: `${prof.first_name} ${prof.middle_name ? prof.middle_name + ' ' : ''}${prof.last_name}`,
-                    email: prof.email,
-                    role: prof.role || 'faculty',
-                    department: prof.department || 'N/A',
-                    status: prof.status || 'inactive',
-                    created_at: prof.created_at,
-                    rawData: prof
-                });
+        professors.forEach(prof => {
+            allUsers.push({
+                id: prof.professor_id,
+                type: 'professor',
+                name: `${prof.first_name} ${prof.middle_name ? prof.middle_name + ' ' : ''}${prof.last_name}`,
+                email: prof.email,
+                role: prof.role || 'faculty',
+                department: prof.departments?.department_name || 'N/A',
+                status: prof.status || 'inactive',
+                created_at: prof.created_at,
+                rawData: prof
             });
-        }
+        });
+    }
 
         if (admins) {
             admins.forEach(admin => {
@@ -62,13 +74,18 @@ async function loadUsers() {
                     return; 
                 }
                 
+                // Get admin's department or default to Administration
+                const adminDepartment = admin.departments?.department_name || 
+                                       (admin.admin_level === 'super_admin' ? 'All Departments' : 'N/A');
+                
                 allUsers.push({
                     id: admin.admin_id,
                     type: 'admin',
                     name: admin.admin_name || 'N/A',
                     email: admin.email,
                     role: adminRole,
-                    department: 'Administration',
+                    department: adminDepartment,
+                    departmentId: admin.department_id,
                     status: admin.status || 'active',
                     created_at: admin.created_at,
                     rawData: admin
@@ -144,28 +161,25 @@ function displayUsers(users) {
         
         if (user.status === 'inactive' && user.type === 'professor' && canModify) {
             actionButtons = `
-                <button class="btn-action btn-approve" title="Approve User" onclick="approveUser('${user.id}', '${user.type}')">
+                <button class="btn-approve-icon" title="Approve User" onclick="approveUser('${user.id}', '${user.type}')">
                     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                         <polyline points="20 6 9 17 4 12"></polyline>
                     </svg>
-                    Approve
                 </button>
-                <button class="btn-action btn-reject" title="Reject User" onclick="deleteUser('${user.id}', '${user.type}', '${user.name}')">
+                <button class="btn-delete-icon" title="Reject User" onclick="deleteUser('${user.id}', '${user.type}', '${user.name}')">
                     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                         <line x1="18" y1="6" x2="6" y2="18"></line>
                         <line x1="6" y1="6" x2="18" y2="18"></line>
                     </svg>
-                    Reject
                 </button>
             `;
         } else if (canModify && user.role !== 'super admin') {
             actionButtons = `
-                <button class="btn-action btn-delete" title="Delete User" onclick="deleteUser('${user.id}', '${user.type}', '${user.name}')">
+                <button class="btn-delete-icon" title="Delete" onclick="deleteUser('${user.id}', '${user.type}', '${user.name}')">
                     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                         <polyline points="3 6 5 6 21 6"></polyline>
                         <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>
                     </svg>
-                    Delete
                 </button>
             `;
         } else if (!canModify) {
@@ -317,15 +331,71 @@ function setupAddUserButton() {
     if (addUserBtn) {
         addUserBtn.addEventListener('click', function () {
             if (isUserSuperAdmin) {
-                alert('Add User feature: Super Admins can add Faculty, Deans, and Admins. Coming soon!');
+                alert('Add User Feature (Coming Soon):\n\n' +
+                      'As Super Admin, you will be able to:\n' +
+                      '✓ Add Faculty members (assign to departments)\n' +
+                      '✓ Add Deans (assign to departments)\n' +
+                      '✓ Add Department Admins (assign to specific departments)\n' +
+                      '✓ Add Super Admins (system-wide access)\n\n' +
+                      'Department assignments control which data each admin can manage.');
             } else {
-                alert('Add User feature: You can add Faculty and Deans. Coming soon!');
+                alert('Add User Feature (Coming Soon):\n\n' +
+                      'As Department Admin, you will be able to:\n' +
+                      '✓ Add Faculty members to your department\n' +
+                      '✓ Add Deans for your department\n\n' +
+                      'Note: Department Admins can only manage users within their assigned department.');
             }
         });
     }
 }
 
+// Helper function for the upcoming Add User modal - loads departments for dropdown
+async function loadDepartmentsForUserForm() {
+    try {
+        if (!supabaseClient) {
+            console.error('Supabase client not initialized');
+            return [];
+        }
+
+        const { data: departments, error } = await supabaseClient
+            .from('departments')
+            .select('id, department_name, department_code')
+            .eq('is_active', true)
+            .order('department_name', { ascending: true });
+
+        if (error) throw error;
+
+        return departments || [];
+    } catch (error) {
+        console.error('Error loading departments:', error);
+        return [];
+    }
+}
+
+// Helper function to validate if a department admin can manage a specific user
+function canManageUser(targetUser, currentAdminUser) {
+    // Super admins can manage anyone
+    if (currentAdminUser.adminLevel === 'super_admin') {
+        return true;
+    }
+
+    // Department admins can only manage users in their department
+    if (currentAdminUser.adminLevel === 'admin' && currentAdminUser.departmentId) {
+        // For admins: check if they share the same department
+        if (targetUser.type === 'admin') {
+            return targetUser.departmentId === currentAdminUser.departmentId;
+        }
+        // For faculty: check if faculty's department matches admin's department
+        if (targetUser.type === 'professor') {
+            return targetUser.rawData?.department_id === currentAdminUser.departmentId;
+        }
+    }
+
+    return false;
+}
+
 document.addEventListener('DOMContentLoaded', function () {
+    checkSupabaseConnection();
     initializeUserSession();
     loadUsers();
     setupSearch();

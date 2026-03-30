@@ -1,11 +1,42 @@
 function loadHeader() {
+    // Get department information from session
+    let userStr = sessionStorage.getItem('user');
+    let departmentName = 'Faculty';
+    let departmentLogo = '../../auth/assets/ccslogo.png';
+    let systemTitle = 'Faculty Requirement Submission System';
+    
+    console.log('=== loadHeader() called ===');
+    console.log('User sessionStorage:', userStr);
+    
+    if (userStr) {
+        try {
+            const user = JSON.parse(userStr);
+            console.log('Parsed user object:', user);
+            console.log('User department:', user.department);
+            console.log('User departmentLogo:', user.departmentLogo);
+            
+            if (user.department) {
+                departmentName = user.department;
+                systemTitle = `${user.department} — Faculty Requirement Submission System`;
+            }
+            if (user.departmentLogo) {
+                departmentLogo = user.departmentLogo;
+            }
+        } catch (e) {
+            console.error('Error parsing user session:', e);
+        }
+    }
+    
+    console.log('Final systemTitle:', systemTitle);
+    console.log('Final departmentLogo:', departmentLogo);
+    
     const headerHTML = `
     <header class="topbar">
         <div class="topbar-left">
             <img src="../../auth/assets/plplogo.png" alt="PLP" class="topbar-logo"/>
-            <img src="../../auth/assets/ccslogo.png" alt="CCS" class="topbar-logo-ccs"/>
+            <img src="${departmentLogo}" alt="Department Logo" class="topbar-logo-ccs"/>
             <div class="topbar-info">
-                <span class="topbar-title">CCS Faculty Requirement Submission System</span>
+                <span class="topbar-title">${systemTitle}</span>
                 <span class="topbar-subtitle" id="topbarSubtitle">Faculty Portal</span>
             </div>
         </div>
@@ -55,6 +86,9 @@ function loadHeader() {
             }
             if (typeof updateHeaderSubtitle === 'function') {
                 updateHeaderSubtitle();
+            }
+            if (typeof updatePageDepartmentContent === 'function') {
+                updatePageDepartmentContent();
             }
         }, 0);
     } else {

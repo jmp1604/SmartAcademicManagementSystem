@@ -1,3 +1,37 @@
+// Update page content based on department
+function updatePageDepartmentContent() {
+    const userStr = sessionStorage.getItem('user');
+    if (!userStr) return;
+    
+    try {
+        const user = JSON.parse(userStr);
+        const department = user.department || 'College of Computer Studies';
+        
+        // Update page header description if it contains "College of Computer Studies"
+        const pageDesc = document.querySelector('.page-header p');
+        if (pageDesc && pageDesc.textContent.includes('College of Computer Studies')) {
+            // Extract the base text and replace the department
+            const originalText = pageDesc.textContent;
+            const newText = originalText.replace('College of Computer Studies', department);
+            pageDesc.textContent = newText;
+            console.log('Updated page description to:', newText);
+        }
+        
+        // Update any other elements that reference the old department
+        const allElements = document.querySelectorAll('*');
+        allElements.forEach(el => {
+            if (el.textContent && el.textContent.includes('College of Computer Studies') && el !== pageDesc) {
+                // Only update text content if it's just the department reference
+                if (el.textContent.trim() === 'College of Computer Studies') {
+                    el.textContent = department;
+                }
+            }
+        });
+    } catch (e) {
+        console.error('Error updating page department content:', e);
+    }
+}
+
 function loadUserInfo() {
     const userStr = sessionStorage.getItem('user');
     if (!userStr) {
@@ -32,6 +66,15 @@ function loadUserInfo() {
         if (userAvatarLarge) userAvatarLarge.textContent = initials.toUpperCase();
         if (userFullName) userFullName.textContent = fullName;
         if (userEmail) userEmail.textContent = email;
+        
+        // Load department logo
+        if (user.departmentLogo) {
+            const deptLogoImg = document.getElementById('deptLogoFaculty');
+            if (deptLogoImg) {
+                deptLogoImg.src = user.departmentLogo;
+                deptLogoImg.alt = user.department || 'Department Logo';
+            }
+        }
         
     } catch (e) {
         console.error('Error loading user info:', e);
@@ -106,12 +149,19 @@ function checkFacultySession() {
 function updateHeaderSubtitle() {
     const userStr = sessionStorage.getItem('user');
     const subtitleElement = document.getElementById('topbarSubtitle');
+    const titleElement = document.getElementById('headerSystemTitle');
     
-    if (!userStr || !subtitleElement) return;
+    if (!userStr) return;
     
     try {
         const user = JSON.parse(userStr);
         let subtitle = 'Portal'; 
+        let systemTitle = 'Faculty Requirement Submission System';
+        
+        // Update system title based on department
+        if (user.department) {
+            systemTitle = `${user.department} — Faculty Requirement Submission System`;
+        }
         
         if (user.userType === 'admin') {
             if (user.adminLevel === 'super_admin') {
@@ -125,7 +175,13 @@ function updateHeaderSubtitle() {
             subtitle = 'Student Portal';
         }
         
-        subtitleElement.textContent = subtitle;
+        if (subtitleElement) {
+            subtitleElement.textContent = subtitle;
+        }
+        
+        if (titleElement) {
+            titleElement.textContent = systemTitle;
+        }
     } catch (e) {
         console.error('Error updating header subtitle:', e);
     }
@@ -153,7 +209,11 @@ function requireSuperAdmin() {
 }
 
 document.addEventListener('DOMContentLoaded', function () {
+    console.log('=== Faculty Specific DOMContentLoaded ===');
     checkFacultySession();
+    // Update page department content
+    updatePageDepartmentContent();
+    
     const currentPage = window.location.pathname.split('/').pop();
     document.querySelectorAll('.nav-item').forEach(function (el) {
         if (el.getAttribute('href') === currentPage) {
@@ -163,7 +223,19 @@ document.addEventListener('DOMContentLoaded', function () {
     const helpBtn = document.querySelector('.help-btn');
     if (helpBtn) {
         helpBtn.addEventListener('click', function () {
-            alert('For assistance, please contact the CCS System Administrator.');
+            const userStr = sessionStorage.getItem('user');
+            let departmentName = 'CCS';
+            if (userStr) {
+                try {
+                    const user = JSON.parse(userStr);
+                    if (user.department) {
+                        departmentName = user.department;
+                    }
+                } catch (e) {
+                    console.error('Error parsing user:', e);
+                }
+            }
+            alert(`For assistance, please contact the ${departmentName} System Administrator.`);
         });
     }
 });

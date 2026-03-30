@@ -7,11 +7,14 @@ const nextBtn = document.getElementById('nextBtn');
 const prevBtn = document.getElementById('prevBtn');
 const submitBtn = document.getElementById('submitBtn');
 
+let departmentsLoaded = false;  
+
 document.addEventListener('DOMContentLoaded', function() {
     setupPasswordToggles();
     setupFormNavigation();
     setupFormValidation();
     setupUserTypeToggle();
+    loadDepartmentsForRegistration();
 });
 
 function setupPasswordToggles() {
@@ -224,6 +227,8 @@ function setupUserTypeToggle() {
     const lastNameField = document.getElementById('lastNameField');
     const lastNameInput = document.getElementById('lastName');
     const adminLevelField = document.getElementById('adminLevelField');
+    const departmentField = document.getElementById('departmentField');
+    const departmentSelect = document.getElementById('department');
     
     function toggleRoleField() {
         if (userTypeSelect.value === 'admin') {
@@ -231,7 +236,9 @@ function setupUserTypeToggle() {
             employeeIdField.style.display = 'none';
             middleNameField.style.display = 'none';
             lastNameField.style.display = 'none';
+            departmentField.style.display = 'none';
             adminLevelField.style.display = 'block'; 
+            if (departmentSelect) departmentSelect.removeAttribute('required');
             if (firstNameLabel) firstNameLabel.textContent = 'Admin Name';
             firstNameInput.placeholder = 'Enter admin name';
             lastNameInput.removeAttribute('required');
@@ -242,7 +249,9 @@ function setupUserTypeToggle() {
             employeeIdField.style.display = 'block';
             middleNameField.style.display = 'block';
             lastNameField.style.display = 'block';
+            departmentField.style.display = 'block';
             adminLevelField.style.display = 'none';
+            if (departmentSelect) departmentSelect.setAttribute('required', 'required');
             if (firstNameLabel) firstNameLabel.textContent = 'First Name';
             firstNameInput.placeholder = 'First name';
             lastNameInput.setAttribute('required', 'required');
@@ -255,22 +264,68 @@ function setupUserTypeToggle() {
     userTypeSelect.addEventListener('change', toggleRoleField);
 }
 
-async function submitRegistration() {
+async function loadDepartmentsForRegistration() {
+    try {
+        if (!supabaseClient) {
+            console.error('Supabase client not initialized');
+            return;
+        }
+
+        const { data: departments, error } = await supabaseClient
+            .from('departments')
+            .select('id, department_name, department_code')
+            .eq('is_active', true)
+            .order('department_name', { ascending: true });
+
+        if (error) throw error;
+
+        const departmentSelect = document.getElementById('department');
+        if (departmentSelect && departments && departments.length > 0) {
+            departments.forEach(dept => {
+                const option = document.createElement('option');
+                option.value = dept.id;
+                option.textContent = `${dept.department_name} (${dept.department_code})`;
+                departmentSelect.appendChild(option);
+            });
+            departmentsLoaded = true; // Mark as loaded
+            console.log('Departments loaded successfully');
+        }
+    } catch (error) {
+        console.error('Error loading departments for registration:', error);
+    }
+}
+// Check if departments are loaded for professors
+    const userType = document.getElementById('userType').value;
+    if (userType === 'professor' && !departmentsLoaded) {
+        alert('Please wait for departments to load before submitting. Try again in a moment.');
+        return;
+    }
+
     submitBtn.disabled = true;
     submitBtn.textContent = 'Registering...';
 
-    const userType = document.getElementById('userType').value;
     const employeeId = document.getElementById('employeeId').value.trim();
     const firstName = document.getElementById('firstName').value.trim();
     const middleName = document.getElementById('middleName').value.trim();
     const lastName = document.getElementById('lastName').value.trim();
     const role = document.getElementById('role').value;
+    const department = document.getElementById('department').value;
     const adminLevelElement = document.getElementById('adminLevel');
     const adminLevel = adminLevelElement ? adminLevelElement.value : 'admin'; 
     const email = document.getElementById('email').value.trim();
     const password = document.getElementById('password').value;
 
-    console.log('Registration data:', { userType, adminLevel, email }); 
+    // Additional validation for professors
+    if (userType === 'professor' && !department) {
+        alert('Please select a department');
+        submitBtn.disabled = false;
+        submitBtn.textContent = 'Complete Registration';
+        return;
+    }lue : 'admin'; 
+    const email = document.getElementById('email').value.trim();
+    const password = document.getElementById('password').value;
+
+    console.log('Registration data:', { userType, adminLevel, email, department }); 
 
     try {
         if (!supabaseClient) {
@@ -339,6 +394,7 @@ async function submitRegistration() {
                     email: email,
                     password: password,
                     role: role,
+                    department_id: department || null,
                     status: 'inactive',
                     created_at: new Date().toISOString(),
                     updated_at: new Date().toISOString()

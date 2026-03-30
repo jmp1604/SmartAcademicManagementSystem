@@ -247,10 +247,6 @@ body {
 }
 
 .stat-card:hover { box-shadow: var(--shadow-md); }
-.stat-card.green  { border-left-color: #1a6b36; }
-.stat-card.teal   { border-left-color: #059669; }
-.stat-card.orange { border-left-color: #ea580c; }
-.stat-card.red    { border-left-color: #dc2626; }
 
 .stat-label {
     font-size: .8rem;
