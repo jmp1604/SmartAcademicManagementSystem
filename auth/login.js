@@ -97,6 +97,24 @@ async function loginUser(email, password) {
         }
     }
 
+    // Fetch department info for professors and department-assigned admins
+    let departmentInfo = null;
+    if (userData.department_id) {
+        try {
+            const { data: deptData } = await supabaseClient
+                .from('departments')
+                .select('id, department_name, department_code, logo_url')
+                .eq('id', userData.department_id)
+                .single();
+            
+            if (deptData) {
+                departmentInfo = deptData;
+            }
+        } catch (error) {
+            console.error('Error fetching department info:', error);
+        }
+    }
+
     sessionStorage.setItem('user', JSON.stringify({
         id: userData.professor_id || userData.admin_id,
         employeeId: userData.employee_id,
@@ -107,7 +125,10 @@ async function loginUser(email, password) {
         role: userRole,
         userType: tableName === 'admins' ? 'admin' : 'professor',
         adminLevel: tableName === 'admins' ? (userData.admin_level || 'admin') : null, 
-        department: userData.department || null,
+        departmentId: userData.department_id || null,
+        department: departmentInfo ? departmentInfo.department_name : (userData.department || null),
+        departmentCode: departmentInfo ? departmentInfo.department_code : null,
+        departmentLogo: departmentInfo ? departmentInfo.logo_url : null,
         loginTime: new Date().toISOString()
     }));
 
@@ -115,6 +136,7 @@ async function loginUser(email, password) {
     console.log('- userType:', tableName === 'admins' ? 'admin' : 'professor');
     console.log('- role:', userRole);
     console.log('- email:', userData.email);
+    console.log('- department:', departmentInfo ? departmentInfo.department_name : 'N/A');
 
     if (tableName === 'admins' && userData.admin_level === 'super_admin') {
         window.location.href = '../admin/usermanagement.html';

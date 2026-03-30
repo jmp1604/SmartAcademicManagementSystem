@@ -3,6 +3,7 @@ console.log('=== PORTAL.JS LOADED ===');
 document.addEventListener('DOMContentLoaded', function () {
     console.log('=== DOMContentLoaded fired ===');
     checkUserSession();
+    loadDepartmentLogoAndInfo();
     displayUserInfo();
     showAdminCardIfNeeded();
     setFacultyRequirementLink();
@@ -20,7 +21,19 @@ document.addEventListener('DOMContentLoaded', function () {
     const helpBtn = document.querySelector('.help-btn');
     if (helpBtn) {
         helpBtn.addEventListener('click', function () {
-            alert('For assistance, please contact the CCS System Administrator.');
+            const userStr = sessionStorage.getItem('user');
+            let departmentName = 'CCS';
+            if (userStr) {
+                try {
+                    const user = JSON.parse(userStr);
+                    if (user.department) {
+                        departmentName = user.department;
+                    }
+                } catch (e) {
+                    console.error('Error parsing user:', e);
+                }
+            }
+            alert(`For assistance, please contact the ${departmentName} System Administrator.`);
         });
     }
 
@@ -45,6 +58,22 @@ function checkUserSession() {
     const user = sessionStorage.getItem('user');
     if (!user) {
         window.location.href = '../auth/login.html';
+    }
+}
+
+function loadDepartmentLogoAndInfo() {
+    const user = getCurrentUser();
+    if (user && user.departmentLogo) {
+        const deptLogo = document.getElementById('deptLogoPortal');
+        if (deptLogo) {
+            deptLogo.src = user.departmentLogo;
+            deptLogo.alt = user.department || 'Department Logo';
+        }
+        
+        const deptName = document.getElementById('deptNamePortal');
+        if (deptName && user.department) {
+            deptName.textContent = `Pamantasan ng Lungsod ng Pasig — ${user.department}`;
+        }
     }
 }
 

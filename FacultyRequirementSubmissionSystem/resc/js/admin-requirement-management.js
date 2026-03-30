@@ -82,6 +82,28 @@ async function loadRequirements() {
             return;
         }
 
+        // Get admin's department from session
+        const userStr = sessionStorage.getItem('user');
+        let departmentId = null;
+        
+        if (userStr) {
+            try {
+                const user = JSON.parse(userStr);
+                departmentId = user.departmentId;
+                console.log('Admin department ID:', departmentId);
+            } catch (e) {
+                console.error('Error parsing user session:', e);
+            }
+        }
+
+        // Check if admin has a department assigned
+        if (!departmentId) {
+            console.warn('Admin user does not have a department assigned');
+            showNotification('Warning: Your account is not assigned to a department. You cannot manage requirements.', 'warning');
+            showEmptyState();
+            return;
+        }
+
         const { data, error } = await supabaseClient
             .from('requirements')
             .select(`
@@ -91,11 +113,13 @@ async function loadRequirements() {
                     icon
                 )
             `)
+            .eq('department_id', departmentId)
             .order('created_at', { ascending: false });
 
         if (error) throw error;
 
         requirements = data || [];
+        console.log('Loaded requirements for department:', requirements.length);
         updateStats();
         renderRequirements(requirements);
 
@@ -287,11 +311,21 @@ async function handleSaveRequirement(e) {
         return;
     }
 
+    // Get admin's department ID from session
+    const userStr = sessionStorage.getItem('user');
+    const user = JSON.parse(userStr);
+    
+    if (!user.departmentId) {
+        showNotification('Error: Your account is not assigned to a department', 'error');
+        return;
+    }
+
     const requirementData = {
         name: title,  // Map 'title' to 'name' column
         description: description || null,
         category_id: categoryId,
         department: department || null,
+        department_id: user.departmentId,  // Add department_id
         semester: semester || null,
         academic_year: academicYear || null,
         deadline: deadline || null,
@@ -302,16 +336,14 @@ async function handleSaveRequirement(e) {
     try {
         let result;
         if (currentEditId) {
-            // Update existing requirement
+            // Update existing requirement (don't change department_id)
+            const { department_id, ...updateData } = requirementData;
             result = await supabaseClient
                 .from('requirements')
-                .update(requirementData)
+                .update(updateData)
                 .eq('id', currentEditId);
         } else {
             // Create new requirement
-            const userStr = sessionStorage.getItem('user');
-            const user = JSON.parse(userStr);
-            
             requirementData.created_by = user.id;
             
             result = await supabaseClient

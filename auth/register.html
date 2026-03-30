@@ -14,8 +14,6 @@
 
     <div class="logos">
         <img src="assets/plplogo.png" alt="PLP Logo" class="plp-logo"/>
-        <div class="logo-divider"></div>
-        <img src="assets/ccslogo.png" alt="CCS Logo" class="ccs-logo"/>
     </div>
 
     <h1 class="card-title">CCS Faculty Registration</h1>
@@ -93,6 +91,14 @@
                     <option value="part_time">Part-time Professor</option>
                     <option value="dean">Dean</option>
                 </select>
+            </div>
+
+            <div class="mb-field" id="departmentField">
+                <label class="form-label" for="department">Department <span class="required">*</span></label>
+                <select id="department" name="department" class="form-select" required>
+                    <option value="">Select your department...</option>
+                </select>
+                <small class="field-hint">Select the department you belong to</small>
             </div>
 
             <div class="mb-field">

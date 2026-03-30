@@ -71,6 +71,15 @@ function getCurrentUser() {
     }
 }
 
+function getDepartmentLogo() {
+    const user = getCurrentUser();
+    if (user && user.departmentLogo) {
+        return user.departmentLogo;
+    }
+    // Fallback to default if no department logo
+    return '../auth/assets/ccslogo.png';
+}
+
 document.addEventListener('DOMContentLoaded', function () {
     checkSupabaseConnection();
     document.addEventListener('click', function(e) {
@@ -93,7 +102,19 @@ document.addEventListener('DOMContentLoaded', function () {
     const helpBtn = document.querySelector('.help-btn');
     if (helpBtn) {
         helpBtn.addEventListener('click', function () {
-            alert('For assistance, please contact the CCS System Administrator.');
+            const userStr = sessionStorage.getItem('user');
+            let departmentName = 'CCS';
+            if (userStr) {
+                try {
+                    const user = JSON.parse(userStr);
+                    if (user.department) {
+                        departmentName = user.department;
+                    }
+                } catch (e) {
+                    console.error('Error parsing user:', e);
+                }
+            }
+            alert(`For assistance, please contact the ${departmentName} System Administrator.`);
         });
     }
 });
