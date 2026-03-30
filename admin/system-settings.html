@@ -27,43 +27,6 @@
 
     <div class="settings-container anim anim-2">
         
-        <!-- College Settings -->
-        <div class="settings-section">
-            <div class="settings-header">
-                <h2>College Settings</h2>
-                <p>Configure basic college information</p>
-            </div>
-            
-            <div class="settings-form">
-                <div class="form-group">
-                    <label for="collegeName" class="form-label">College Name</label>
-                    <input type="text" class="form-control" id="collegeName" placeholder="e.g., College of Computer Studies"/>
-                </div>
-                
-                <div class="form-group">
-                    <label for="collegeCode" class="form-label">College Code</label>
-                    <input type="text" class="form-control" id="collegeCode" placeholder="e.g., CCS"/>
-                </div>
-                
-                <div class="form-group">
-                    <label for="collegeEmail" class="form-label">Contact Email</label>
-                    <input type="email" class="form-control" id="collegeEmail" placeholder="contact@college.edu"/>
-                </div>
-                
-                <div class="form-group">
-                    <label for="collegeAddress" class="form-label">College Address</label>
-                    <textarea class="form-control" id="collegeAddress" rows="3" placeholder="Enter college address"></textarea>
-                </div>
-                
-                <div class="form-group">
-                    <label for="collegeLogo" class="form-label">College Logo URL</label>
-                    <input type="url" class="form-control" id="collegeLogo" placeholder="https://example.com/logo.png"/>
-                </div>
-
-                <button class="btn btn-primary" id="saveCollegeSettings">Save Changes</button>
-            </div>
-        </div>
-
         <!-- Academic Calendar -->
         <div class="settings-section">
             <div class="settings-header">
@@ -183,6 +146,63 @@
                 </div>
 
                 <button class="btn btn-primary" id="saveFeatureSettings">Save Changes</button>
+            </div>
+        </div>
+
+        <!-- Department Management -->
+        <div class="settings-section">
+            <div class="settings-header">
+                <h2>Department Management</h2>
+                <p>Manage college departments and upload department logos</p>
+            </div>
+            
+            <div class="settings-form">
+                <div class="form-group">
+                    <label for="departmentSelect" class="form-label">Select Department</label>
+                    <select class="form-control" id="departmentSelect">
+                        <option value="">Choose a department...</option>
+                    </select>
+                    <small class="form-text text-muted">Select a department to view and manage its logo</small>
+                </div>
+
+                <div id="departmentDetailsContainer" style="display: none; border: 1px solid #dee2e6; border-radius: 0.375rem; padding: 1.5rem; margin-top: 1.5rem; background-color: #f8f9fa;">
+                    <div class="row">
+                        <div class="col-md-6">
+                            <div class="form-group">
+                                <label class="form-label">Department Name</label>
+                                <input type="text" class="form-control" id="deptName" disabled/>
+                            </div>
+                            <div class="form-group">
+                                <label class="form-label">Department Code</label>
+                                <input type="text" class="form-control" id="deptCode" disabled/>
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="form-group">
+                                <label class="form-label">Current Logo</label>
+                                <div id="currentLogoPreview" style="background-color: white; border: 1px solid #dee2e6; border-radius: 0.375rem; padding: 1rem; height: 150px; display: flex; align-items: center; justify-content: center;">
+                                    <img id="currentDeptLogo" src="" alt="Department Logo" style="max-width: 100%; max-height: 100%; object-fit: contain; display: none;"/>
+                                    <span id="noLogoText" style="color: #6c757d;">No logo uploaded</span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="form-group">
+                        <label for="departmentLogoFile" class="form-label">Upload New Logo</label>
+                        <div class="file-upload-group">
+                            <input type="file" class="form-control" id="departmentLogoFile" accept="image/png,image/jpeg,image/jpg,image/webp,image/svg+xml"/>
+                            <small class="form-text text-muted">PNG, JPG, WEBP, or SVG (Max 2 MB)</small>
+                            <div id="newLogoPreview" style="margin-top: 1rem; display: none;">
+                                <p style="font-weight: 500; margin-bottom: 0.5rem;">Preview:</p>
+                                <img id="newDeptLogo" src="" alt="New Department Logo" style="max-width: 150px; max-height: 150px; border-radius: 0.5rem;"/>
+                            </div>
+                        </div>
+                    </div>
+
+                    <button class="btn btn-primary" id="saveDepartmentLogo">Save Department Logo</button>
+                    <button class="btn btn-secondary" id="clearDepartmentLogoBtn">Clear Selection</button>
+                </div>
             </div>
         </div>
 

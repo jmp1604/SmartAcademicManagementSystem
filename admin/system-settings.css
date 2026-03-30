@@ -185,6 +185,13 @@ textarea.form-control {
     border-color: var(--green-btn);
 }
 
+/* File Upload Group */
+.file-upload-group {
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+}
+
 /* Two-column layout for larger screens */
 @media (min-width: 1200px) {
     .settings-container {
@@ -252,4 +259,42 @@ textarea.form-control {
 
 .anim-3 {
     animation-delay: 0.3s;
+}
+
+/* Department Management Styles */
+#departmentDetailsContainer {
+    animation: slideIn 0.3s ease-out forwards;
+}
+
+#departmentDetailsContainer .form-group:last-of-type {
+    margin-bottom: 1rem;
+}
+
+#departmentDetailsContainer .btn {
+    margin-right: 0.75rem;
+    align-self: flex-start;
+}
+
+#departmentDetailsContainer .btn-secondary {
+    margin-right: 0;
+}
+
+#currentLogoPreview {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    min-height: 150px;
+    background-color: #f8f9fa;
+    border: 2px dashed #dee2e6;
+}
+
+#currentLogoPreview img {
+    border-radius: 0.375rem;
+}
+
+#newLogoPreview {
+    padding: 1rem;
+    background-color: #f8f9fa;
+    border: 1px solid #dee2e6;
+    border-radius: 0.375rem;
 }
