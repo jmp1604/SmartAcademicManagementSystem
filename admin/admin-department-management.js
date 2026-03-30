@@ -31,18 +31,44 @@ function setupEventListeners() {
     const saveBtn = document.getElementById('saveDepartmentBtn');
     const deleteBtn = document.getElementById('confirmDeleteBtn');
     const searchInput = document.querySelector('.search-input');
+    const table = document.getElementById('departmentsTable');
     
+    // Add button
     if (addBtn) {
         addBtn.addEventListener('click', openAddDepartmentModal);
     }
+    
+    // Save button
     if (saveBtn) {
         saveBtn.addEventListener('click', saveDepartment);
     }
+    
+    // Confirm delete button
     if (deleteBtn) {
         deleteBtn.addEventListener('click', confirmDelete);
     }
+    
+    // Search input
     if (searchInput) {
         searchInput.addEventListener('keyup', filterDepartments);
+    }
+    
+    // Edit buttons (event delegation)
+    if (table) {
+        table.addEventListener('click', (e) => {
+            const editBtn = e.target.closest('.edit-btn');
+            const deleteActionBtn = e.target.closest('.delete-btn');
+            
+            if (editBtn) {
+                const id = editBtn.getAttribute('data-id');
+                openEditDepartmentModal(id);
+            }
+            
+            if (deleteActionBtn) {
+                const id = deleteActionBtn.getAttribute('data-id');
+                openDeleteConfirmModal(id);
+            }
+        });
     }
 }
 
@@ -108,10 +134,10 @@ function displayDepartments(departments) {
             </td>
             <td>
                 <div class="action-buttons">
-                    <button class="btn-icon" title="Edit" onclick="openEditDepartmentModal(${dept.id})">
+                    <button class="btn-icon edit-btn" data-id="${dept.id}" title="Edit">
                         <svg viewBox="0 0 24 24"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
                     </button>
-                    <button class="btn-icon danger" title="Delete" onclick="openDeleteConfirmModal(${dept.id})">
+                    <button class="btn-icon danger delete-btn" data-id="${dept.id}" title="Delete">
                         <svg viewBox="0 0 24 24"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>
                     </button>
                 </div>
