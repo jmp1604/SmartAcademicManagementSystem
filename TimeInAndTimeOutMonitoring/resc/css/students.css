@@ -107,6 +107,9 @@ hr {
     border-bottom: 2px solid rgba(255,255,255,.18);
 }
 
+.attendees-table th { border-right: 1px solid rgba(255,255,255,.2); }
+.attendees-table th:last-child { border-right: none; }
+
 .attendees-table td {
     padding: 14px 15px;
     border-bottom: 1px solid var(--border);

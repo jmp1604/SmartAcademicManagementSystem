@@ -158,6 +158,9 @@ th {
     text-transform: uppercase; letter-spacing: .5px;
     font-family: 'Nunito', sans-serif;
 }
+
+th { border-right: 1px solid rgba(255,255,255,.2); }
+th:last-child { border-right: none; }
 td {
     padding: 14px 16px; border-bottom: 1px solid var(--border);
     font-size: 14px; color: var(--text-body);

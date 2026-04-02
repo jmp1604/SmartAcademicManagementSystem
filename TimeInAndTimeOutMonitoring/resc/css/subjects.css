@@ -242,6 +242,7 @@ hr {
     text-transform: uppercase;
     border-bottom: none;
     font-family: 'Nunito Sans', sans-serif;
+    border-right: 1px solid rgba(255, 255, 255, 0.2); /* ← add this */
 }
 
 /* Updated to match laboratories.css border and hover */

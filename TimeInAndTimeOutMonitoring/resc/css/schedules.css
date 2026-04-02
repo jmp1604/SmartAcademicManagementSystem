@@ -217,3 +217,6 @@ hr { border: 0; height: 2px; background: linear-gradient(90deg, var(--green-dark
     .main-content { margin-left: 0; margin-top: 0; }
     .container { padding: 20px 16px 40px; } 
 }
+
+.data-table th { border-right: 1px solid rgba(255,255,255,.2); }
+.data-table th:last-child { border-right: none; }

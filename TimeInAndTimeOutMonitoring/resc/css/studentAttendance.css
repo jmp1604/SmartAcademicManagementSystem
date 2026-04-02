@@ -183,3 +183,6 @@ body {
 @media(max-width:1200px){ .fg-grid{grid-template-columns:1fr 1fr 1fr 1fr;} }
 @media(max-width:900px){ .main-content{margin-left:0; margin-top:0;} .container{padding:20px 16px 40px;} .stats-row{grid-template-columns:repeat(3,1fr);} }
 @media(max-width:600px){ .stats-row{grid-template-columns:1fr 1fr;} .fg-grid{grid-template-columns:1fr 1fr;} }
+
+.attendance-table thead th { border-right: 1px solid rgba(255,255,255,.2); }
+.attendance-table thead th:last-child { border-right: none; }
