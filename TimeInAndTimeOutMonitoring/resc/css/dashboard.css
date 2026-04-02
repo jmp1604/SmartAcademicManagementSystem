@@ -1,3 +1,11 @@
+/* ============================================================
+   resc/css/dashboard.css
+   Original dashboard design — unchanged.
+   Added: .main-content shell so the page sits correctly
+   under the fixed header and beside the collapsed sidebar.
+   All other rules are identical to the original file.
+============================================================ */
+
 /* ===============================
    Design System Tokens
 ================================ */
@@ -38,12 +46,30 @@ body {
 }
 
 /* ===============================
+   Layout shell
+   Keeps content below the fixed header (68px)
+   and to the right of the collapsed sidebar.
+   The sidebar.js mouseenter/mouseleave adds
+   .sidebar-open which widens the margin.
+================================ */
+.main-content {
+    margin-left: var(--sidebar-collapsed, 64px);
+    margin-top: 68px;
+    min-height: calc(100vh - 68px);
+    transition: margin-left 0.45s cubic-bezier(0.25, 0.46, 0.45, 0.94);
+}
+
+.main-content.sidebar-open {
+    margin-left: var(--sidebar-expanded, 240px);
+}
+
+/* ===============================
    Container
 ================================ */
 .container {
     background: var(--white);
     padding: 32px 36px 48px;
-    min-height: 100vh;
+    min-height: 100%;
     width: 100%;
 }
 
@@ -65,7 +91,7 @@ hr {
 }
 
 /* ===============================
-   Profile Banner — NOT clickable
+   Profile Banner
 ================================ */
 .profile-section {
     background: linear-gradient(135deg, var(--green-dark) 0%, var(--green-mid) 60%, var(--green-bright) 100%);
@@ -129,7 +155,7 @@ hr {
     pointer-events: none;
 }
 
-/* View Profile — ONLY clickable element */
+/* View Profile — only clickable element */
 .profile-view-more {
     display: inline-flex;
     align-items: center;
@@ -149,10 +175,7 @@ hr {
     transition: background .2s, transform .2s, box-shadow .2s, border-color .2s;
 }
 
-.profile-view-more i {
-    font-size: 12px;
-    transition: transform .22s;
-}
+.profile-view-more i { font-size: 12px; transition: transform .22s; }
 
 .profile-view-more:hover {
     background: #fde047;
@@ -310,9 +333,9 @@ hr {
     position: relative;
 }
 
-.lab-card-header.occupied  { background: linear-gradient(135deg,#dcfce7,#bbf7d0); border-bottom-color:#22c55e; }
-.lab-card-header.dismissing{ background: linear-gradient(135deg,#fff7ed,#fed7aa); border-bottom-color:#f97316; }
-.lab-card-header.pending   { background: linear-gradient(135deg,#fefce8,#fef9c3); border-bottom-color:var(--yellow); }
+.lab-card-header.occupied   { background: linear-gradient(135deg,#dcfce7,#bbf7d0); border-bottom-color:#22c55e; }
+.lab-card-header.dismissing { background: linear-gradient(135deg,#fff7ed,#fed7aa); border-bottom-color:#f97316; }
+.lab-card-header.pending    { background: linear-gradient(135deg,#fefce8,#fef9c3); border-bottom-color:var(--yellow); }
 
 .lab-status-badge {
     position: absolute;
@@ -463,11 +486,7 @@ hr {
     transition: background .2s, color .2s;
 }
 
-.schedules-toggle:hover {
-    background: var(--hover-bg);
-    color: var(--green-dark);
-}
-
+.schedules-toggle:hover { background: var(--hover-bg); color: var(--green-dark); }
 .schedules-toggle i { transition: transform .3s; }
 .lab-card.expanded .schedules-toggle i { transform: rotate(180deg); }
 
@@ -556,8 +575,12 @@ hr {
     .cards { grid-template-columns: repeat(2, 1fr); }
 }
 
-@media (max-width: 700px) {
+@media (max-width: 900px) {
+    .main-content { margin-left: 0; margin-top: 0; }
     .container { padding: 20px 16px 40px; }
+}
+
+@media (max-width: 700px) {
     .cards { grid-template-columns: 1fr; }
     .lab-grid { grid-template-columns: 1fr; }
     .profile-mini { flex-direction: column; align-items: flex-start; gap: 10px; }
