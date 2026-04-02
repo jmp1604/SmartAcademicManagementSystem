@@ -98,7 +98,7 @@ function renderTable(students) {
     tbody.innerHTML = students.map(s => {
         const hasFace    = !!s.facial_dataset_path;
         
-        // FORMAT CHANGE HERE: Removes the hyphen (e.g., "3A" instead of "3 - A")
+        // UPDATED: Combined format like "3A"
         const yearSec    = `${s.year_level || ''}${s.section || ''}` || '-';
         
         const dateReg    = s.created_at
@@ -449,11 +449,11 @@ async function searchStudent() {
         rb.style.display = hasFace ? 'none' : 'block';
         rb.dataset.studentId = studentId;
 
-        document.getElementById('studentInfo').innerHTML = `
+    document.getElementById('studentInfo').innerHTML = `
             <div class="info-item"><label>Student ID</label><div class="value">${escHtml(s.id_number)}</div></div>
             <div class="info-item"><label>Full Name</label><div class="value">${escHtml(s.first_name)} ${escHtml(s.middle_name || '')} ${escHtml(s.last_name)}</div></div>
             <div class="info-item"><label>Course</label><div class="value">${escHtml(s.course || '-')}</div></div>
-            <div class="info-item"><label>Year &amp; Section</label><div class="value">${s.year_level ? s.year_level + 'yr' : '-'} ${escHtml(s.section || '')}</div></div>
+            <div class="info-item"><label>Year &amp; Section</label><div class="value">${s.year_level || ''}${escHtml(s.section || '')}</div></div>
             <div class="info-item"><label>Email</label><div class="value">${escHtml(s.email || '-')}</div></div>
         `;
         searchResult.classList.add('active');

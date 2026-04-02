@@ -252,15 +252,14 @@ hr {
 }
 
 .employees-table thead { 
-    background: var(--surface); 
+    background: linear-gradient(90deg, #166534, #14532d);
     border-bottom: 1.5px solid var(--border);
 }
-
 .employees-table th {
     padding: 14px 16px;
     text-align: left;
     font-family: 'Nunito Sans', sans-serif;
-    color: var(--green-dark);
+    color: #ffffff;
     font-weight: 800;
     font-size: 12px;
     letter-spacing: 0.5px;

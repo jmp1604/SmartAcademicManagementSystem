@@ -73,12 +73,11 @@ hr { border: 0; height: 2px; background: linear-gradient(90deg, var(--green-dark
 .search-container input:focus, .filter-container select:focus { border-color: var(--green-bright); box-shadow: 0 0 0 3px rgba(64,145,108,.15); }
 .btn-clear { height: 40px; padding: 0 16px; border-radius: 8px; background: var(--surface); color: var(--text-muted); border: 1px solid var(--border); font-family: 'Nunito Sans', sans-serif; font-weight: 600; font-size: 13px; cursor: pointer; transition: all .2s; }
 .btn-clear:hover { background: var(--hover-bg); color: var(--green-dark); }
-
 /* Table Styling */
 .table-container { margin-top: 10px; }
 .students-table { width: 100%; border-collapse: collapse; background: var(--white); border-radius: var(--radius-lg); overflow: hidden; box-shadow: var(--shadow-sm); border: 1.5px solid var(--border); }
-.students-table thead { background: var(--surface); border-bottom: 1.5px solid var(--border); }
-.students-table th { padding: 14px 16px; text-align: left; font-family: 'Nunito Sans', sans-serif; color: var(--green-dark); font-weight: 800; font-size: 12px; letter-spacing: 0.5px; text-transform: uppercase; }
+.students-table thead { background: linear-gradient(90deg, #166534, #14532d); border-bottom: 1.5px solid var(--border); }
+.students-table th { padding: 14px 16px; text-align: left; font-family: 'Nunito', sans-serif; color: #ffffff; font-weight: 700; font-size: 12.5px; letter-spacing: 0.5px; text-transform: uppercase; }
 .students-table td { padding: 14px 16px; text-align: left; border-bottom: 1px solid var(--border); font-size: 13.5px; vertical-align: middle; }
 
 /* Expandable Rows */

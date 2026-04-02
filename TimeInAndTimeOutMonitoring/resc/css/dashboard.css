@@ -350,7 +350,7 @@ hr {
 }
 
 .lab-status-badge.occupied    { background: var(--green-dark);   color: var(--white); animation: pulse 2s infinite; }
-.lab-status-badge.available   { background: var(--green-bright); color: var(--white); }
+.lab-status-badge.available   { background: #166534; color: var(--white); }
 .lab-status-badge.maintenance { background: #6b7280; color: var(--white); }
 .lab-status-badge.dismissing  { background: #f97316; color: var(--white); animation: pulse 2s infinite; }
 .lab-status-badge.pending     { background: var(--yellow); color: var(--green-dark); }

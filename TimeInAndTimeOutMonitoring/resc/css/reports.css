@@ -95,7 +95,8 @@ body {
 /* Table Section */
 .table-container { background: var(--white); border-radius: var(--radius-lg); box-shadow: var(--shadow-sm); border: 1.5px solid var(--border); overflow: hidden; margin-bottom: 20px;}
 .reports-table { width: 100%; border-collapse: collapse; font-size: 13.5px; }
-.reports-table thead th { background: var(--surface); color: var(--green-dark); font-size: 11px; font-weight: 800; text-transform: uppercase; letter-spacing: .5px; padding: 14px 16px; text-align: left; white-space: nowrap; border-bottom: 1.5px solid var(--border);}
+.reports-table thead { background: linear-gradient(90deg, #166534, #14532d); }
+.reports-table thead th { background: transparent; color: #ffffff; font-size: 12.5px; font-weight: 700; font-family: 'Nunito', sans-serif; text-transform: uppercase; letter-spacing: .5px; padding: 14px 16px; text-align: left; white-space: nowrap; border-bottom: 2px solid rgba(255,255,255,.18);}
 .reports-table tbody tr { border-bottom: 1px solid var(--border); transition: background .15s; }
 .reports-table tbody tr:nth-child(even) { background: var(--off-white); }
 .reports-table tbody tr:last-child { border-bottom: none; }

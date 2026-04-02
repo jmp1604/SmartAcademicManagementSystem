@@ -81,7 +81,7 @@ hr { border: 0; height: 2px; background: linear-gradient(90deg, var(--green-dark
 /* Table */
 .table-container { margin-top: 10px; }
 .data-table { width: 100%; border-collapse: collapse; background: var(--white); border-radius: var(--radius-lg); overflow: hidden; box-shadow: var(--shadow-sm); border: 1.5px solid var(--border); }
-.data-table thead { background: var(--green-dark); border-bottom: 1.5px solid var(--border); }
+.data-table thead { background: linear-gradient(90deg, #166534, #14532d); border-bottom: 1.5px solid var(--border); }
 .data-table th { padding: 14px 16px; text-align: left; font-family: 'Nunito Sans', sans-serif; color: var(--white); font-weight: 700; font-size: 12px; }
 .data-table td { padding: 14px 16px; text-align: left; border-bottom: 1px solid var(--border); font-size: 13px; vertical-align: middle; }
 .data-table tbody tr:last-child td { border-bottom: none; }

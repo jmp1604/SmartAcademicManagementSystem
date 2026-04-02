@@ -220,7 +220,7 @@ hr {
     border: none;
 }
 
-/* ── Subjects Table ── */
+/* ── Subjects Table (Main Page) ── */
 .subjects-table {
     width: 100%;
     border-collapse: collapse;
@@ -230,28 +230,32 @@ hr {
     box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
 }
 
-.subjects-table thead { background: #166534; }
+.subjects-table thead { background: linear-gradient(90deg, #166534, #14532d); }
 .subjects-table th {
-    background: #166534;
+    background: transparent;
     color: rgba(255, 255, 255, 0.9);
     padding: 15px;
     text-align: left;
-    font-weight: 600;
-    font-size: 10.5px;
+    font-weight: 700;
+    font-size: 12.5px;
     letter-spacing: 0.7px;
     text-transform: uppercase;
     border-bottom: none;
     font-family: 'Nunito Sans', sans-serif;
 }
 
+/* Updated to match laboratories.css border and hover */
 .subjects-table td {
     padding: 15px;
-    border-bottom: 1px solid #f0f0f0;
+    border-bottom: 1px solid var(--border); /* Standardized border */
     font-size: 14px;
     font-family: 'Nunito Sans', sans-serif;
+    background: transparent;
 }
-
-.subjects-table tbody tr:hover { background: #f0fdf4; }
+/* Standardized Hover color (#edf4ef) */
+.subjects-table tbody tr:hover { 
+    background: var(--surface); 
+}
 
 .subject-code  { font-weight: 700; color: #166534; font-size: 15px; }
 .subject-name  { color: #333; font-weight: 500; }
@@ -548,7 +552,12 @@ hr {
 
 .rm-body { overflow-y: auto; flex: 1; }
 
-.rm-table { width: 100%; border-collapse: collapse; font-size: 13px; }
+/* ── Report Modal Table (.rm-table) ── */
+.rm-table { 
+    width: 100%; 
+    border-collapse: collapse; 
+    font-size: 13px; 
+}
 .rm-table thead th {
     background: #166534;
     color: white;
@@ -564,9 +573,19 @@ hr {
     z-index: 2;
     font-family: 'Nunito Sans', sans-serif;
 }
-.rm-table tbody tr { border-bottom: 1px solid #f0fdf4; transition: background 0.1s; }
-.rm-table tbody tr:nth-child(even) { background: #f9fffe; }
-.rm-table tbody tr:hover { background: #f0fdf4; }
+/* Updated zebra striping and hover to match laboratory standard */
+.rm-table tbody tr { 
+    border-bottom: 1px solid #f0fdf4; 
+    transition: background 0.1s; 
+}
+/* Standardized Even Row color (#f9fffe) */
+.rm-table tbody tr:nth-child(even) { 
+    background: #f9fffe; 
+}
+/* Standardized Modal Hover color (#ecfdf5) */
+.rm-table tbody tr:hover { 
+    background: #ecfdf5; 
+}
 .rm-table td { padding: 11px 14px; vertical-align: middle; font-family: 'Nunito Sans', sans-serif; }
 
 /* ── Toast ── */
