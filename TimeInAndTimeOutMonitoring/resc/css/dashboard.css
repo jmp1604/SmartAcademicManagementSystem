@@ -577,7 +577,7 @@ hr {
 
 @media (max-width: 900px) {
     .main-content { margin-left: 0; margin-top: 0; }
-    .container { padding: 20px 16px 40px; }
+    .container { padding: 20px 16px 40px; } 
 }
 
 @media (max-width: 700px) {
