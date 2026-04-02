@@ -29,7 +29,6 @@ document.addEventListener('DOMContentLoaded', async () => {
 // ══════════════════════════════════════════════════════════
 async function loadStudents() {
     try {
-        // Fetch all students
         const { data: students, error } = await supabaseClient
             .from('students')
             .select(`
@@ -52,7 +51,6 @@ async function loadStudents() {
 
         allStudents = students || [];
 
-        // Compute stats
         const total      = allStudents.length;
         const registered = allStudents.filter(s => s.facial_dataset_path).length;
         const pending    = total - registered;
@@ -64,7 +62,6 @@ async function loadStudents() {
             date: new Date().toLocaleString('en-US', { month: 'long', day: 'numeric', year: 'numeric', hour: '2-digit', minute: '2-digit' })
         };
 
-        // Update stat badges
         document.getElementById('statTotal').textContent      = total;
         document.getElementById('statRegistered').textContent = registered;
         document.getElementById('statPending').textContent    = pending;
@@ -96,19 +93,19 @@ function renderTable(students) {
     }
 
     tbody.innerHTML = students.map(s => {
-        const hasFace    = !!s.facial_dataset_path;
-        
-        // UPDATED: Combined format like "3A"
-        const yearSec    = `${s.year_level || ''}${s.section || ''}` || '-';
-        
-        const dateReg    = s.created_at
+        const hasFace = !!s.facial_dataset_path;
+        const yearSec = `${s.year_level || ''}${s.section || ''}` || '-';
+        const dateReg = s.created_at
             ? new Date(s.created_at).toLocaleDateString('en-US', { month: 'short', day: '2-digit', year: 'numeric' })
             : '-';
-        const statusCls  = (s.status || 'active').toLowerCase();
-        const faceData   = hasFace ? 'registered' : 'not-registered';
+        const statusCls = (s.status || 'active').toLowerCase();
+        const faceData  = hasFace ? 'registered' : 'not-registered';
+
+        // Display formatted ID (e.g. "23-00221")
+        const displayId = formatStudentId(s.id_number);
 
         return `<tr data-id="${s.student_id}" data-status="${statusCls}" data-face="${faceData}">
-            <td style="font-weight:700;color:#166534">${escHtml(s.id_number)}</td>
+            <td style="font-weight:700;color:#166534">${escHtml(displayId)}</td>
             <td>${escHtml(s.first_name)}</td>
             <td>${escHtml(s.middle_name || '-')}</td>
             <td style="font-weight:600">${escHtml(s.last_name)}</td>
@@ -126,6 +123,9 @@ function renderTable(students) {
             </td>
             <td style="font-size:12.5px">${dateReg}</td>
             <td>
+                <button class="btn-edit-student" onclick="openEditModal('${s.student_id}')" title="Edit Student">
+                    <i class="fa-solid fa-pen-to-square"></i>
+                </button>
                 <button class="btn-danger" onclick="removeStudent('${s.student_id}')" title="Remove Student">
                     <i class="fa-solid fa-trash"></i>
                 </button>
@@ -157,13 +157,16 @@ function initFilters() {
 }
 
 function applyFilters() {
-    const q   = document.getElementById('searchInput').value.toLowerCase().trim();
-    const st  = document.getElementById('statusFilter').value;
-    const fc  = document.getElementById('faceFilter').value;
-    const so  = document.getElementById('sortFilter').value;
+    const q  = document.getElementById('searchInput').value.toLowerCase().trim();
+    const st = document.getElementById('statusFilter').value;
+    const fc = document.getElementById('faceFilter').value;
+    const so = document.getElementById('sortFilter').value;
 
     let filtered = allStudents.filter(s => {
+        // Allow searching both raw ("2300221") and formatted ("23-00221")
+        const formattedId = formatStudentId(s.id_number || '').toLowerCase();
         const matchQ  = !q || s.id_number?.toLowerCase().includes(q)
+                           || formattedId.includes(q)
                            || s.first_name?.toLowerCase().includes(q)
                            || s.last_name?.toLowerCase().includes(q);
         const matchSt = !st || (s.status || 'active').toLowerCase() === st;
@@ -178,22 +181,12 @@ function applyFilters() {
 }
 
 // ══════════════════════════════════════════════════════════
-// 4. ADD STUDENT
+// 4. ADD / EDIT STUDENT
 // ══════════════════════════════════════════════════════════
-
-/**
- * generateUUID — crypto-safe UUID v4.
- * student_id is a UUID PK in Supabase (linked to auth.users).
- * Since we manage students directly (no auth signup flow here),
- * we generate the UUID on the client and insert it explicitly.
- * NOTE: Remove the FK constraint on students.student_id → auth.users(id)
- * in Supabase if you are adding students without creating auth accounts.
- */
 function generateUUID() {
     if (typeof crypto !== 'undefined' && crypto.randomUUID) {
         return crypto.randomUUID();
     }
-    // Fallback for older browsers
     return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, c => {
         const r = Math.random() * 16 | 0;
         return (c === 'x' ? r : (r & 0x3 | 0x8)).toString(16);
@@ -201,10 +194,41 @@ function generateUUID() {
 }
 
 function initAddStudentForm() {
+    // ── Live ID formatter: auto-insert dash after 2 digits ──
+    const idInput = document.getElementById('field_id_number');
+    if (idInput) {
+        idInput.addEventListener('input', function () {
+            const start = this.selectionStart;
+            const prev  = this.value;
+            this.value  = formatStudentId(this.value);
+            // Adjust caret position for the inserted dash
+            const diff  = this.value.length - prev.length;
+            this.setSelectionRange(start + diff, start + diff);
+        });
+    }
+
+     // ── Course: force uppercase ──
+    const courseInput = document.querySelector('[name="course"]');
+    if (courseInput) {
+        courseInput.addEventListener('input', function () {
+            const pos = this.selectionStart;
+            this.value = this.value.toUpperCase();
+            this.setSelectionRange(pos, pos);
+        });
+    }
+
+
+     // ── Section: 1 letter only, uppercase ──
+    const sectionInput = document.querySelector('[name="section"]');
+    if (sectionInput) {
+        sectionInput.addEventListener('input', function () {
+            this.value = this.value.toUpperCase().replace(/[^A-Z]/g, '').slice(0, 1);
+        });
+    }
+
     document.getElementById('addStudentForm').addEventListener('submit', async function (e) {
         e.preventDefault();
 
-        // Block if any dup errors are showing
         if (document.querySelector('#addStudentModal .dup-msg.show')) {
             showToast('⚠️ Fix duplicate errors before saving.', false);
             return;
@@ -216,94 +240,129 @@ function initAddStudentForm() {
 
         const fd = new FormData(this);
 
-        // ── Mirror add_student.php validation ──────────────────
-        const idNumber  = fd.get('id_number')?.trim() || '';
-        const firstName = fd.get('first_name')?.trim() || '';
-        const lastName  = fd.get('last_name')?.trim() || '';
-        const email     = fd.get('email')?.trim() || '';
+        // Strip dash → raw 7-digit string for DB
+        const idNumberRaw = rawStudentId(fd.get('id_number')?.trim() || '');
+        const firstName   = fd.get('first_name')?.trim() || '';
+        const lastName    = fd.get('last_name')?.trim() || '';
+        const email       = fd.get('email')?.trim() || '';
+        const editId      = this.dataset.editId;
 
-        if (!idNumber) {
+        // Validation
+        if (!editId && !idNumberRaw) {
             showToast('❌ Student ID is required.', false);
-            btn.disabled = false;
-            btn.innerHTML = '<i class="fa-solid fa-save"></i> Save Student';
-            return;
+            btn.disabled = false; btn.innerHTML = '<i class="fa-solid fa-save"></i> Save Student'; return;
         }
-        if (!/^\d{7}$/.test(idNumber)) {
-            showToast('❌ Student ID must be exactly 7 digits.', false);
-            btn.disabled = false;
-            btn.innerHTML = '<i class="fa-solid fa-save"></i> Save Student';
-            return;
+        if (!editId && !/^\d{7}$/.test(idNumberRaw)) {
+            showToast('❌ Student ID must be in format 23-00221 (7 digits).', false);
+            btn.disabled = false; btn.innerHTML = '<i class="fa-solid fa-save"></i> Save Student'; return;
         }
         if (!firstName) {
             showToast('❌ First name is required.', false);
-            btn.disabled = false;
-            btn.innerHTML = '<i class="fa-solid fa-save"></i> Save Student';
-            return;
+            btn.disabled = false; btn.innerHTML = '<i class="fa-solid fa-save"></i> Save Student'; return;
         }
         if (!lastName) {
             showToast('❌ Last name is required.', false);
-            btn.disabled = false;
-            btn.innerHTML = '<i class="fa-solid fa-save"></i> Save Student';
-            return;
+            btn.disabled = false; btn.innerHTML = '<i class="fa-solid fa-save"></i> Save Student'; return;
         }
         if (email && !/^[a-z]+_[a-z]+@plpasig\.edu\.ph$/i.test(email)) {
             showToast('❌ Invalid email format. Must be: lastname_firstname@plpasig.edu.ph', false);
-            btn.disabled = false;
-            btn.innerHTML = '<i class="fa-solid fa-save"></i> Save Student';
-            return;
+            btn.disabled = false; btn.innerHTML = '<i class="fa-solid fa-save"></i> Save Student'; return;
         }
-        // ───────────────────────────────────────────────────────
-
-        const payload = {
-            // ★ KEY FIX: supply student_id explicitly so the NOT NULL constraint is satisfied.
-            // The students table has student_id UUID PK with a FK to auth.users(id).
-            // For admin-managed students without an auth account, generate a standalone UUID.
-            // You MUST drop/disable the FK: ALTER TABLE students DROP CONSTRAINT students_student_id_fkey;
-            student_id:   generateUUID(),
-            id_number:    idNumber,
-            first_name:   firstName,
-            middle_name:  fd.get('middle_name')?.trim() || null,
-            last_name:    lastName,
-            course:       fd.get('course')?.trim() || null,
-            section:      fd.get('section')?.trim() || null,
-            year_level:   fd.get('year_level') ? parseInt(fd.get('year_level')) : null,
-            email:        email || null,
-            status:       fd.get('status') || 'active',
-            password:     'changeme123',  // hashed on the DB side ideally; placeholder for now
-        };
 
         try {
-            const { data, error } = await supabaseClient
-                .from('students')
-                .insert([payload])
-                .select()
-                .single();
+            if (editId) {
+                // ── UPDATE existing student ──
+                const { error } = await supabaseClient
+                    .from('students')
+                    .update({
+                        first_name:  firstName,
+                        middle_name: fd.get('middle_name')?.trim() || null,
+                        last_name:   lastName,
+                        course:      fd.get('course')?.trim() || null,
+                        section:     fd.get('section')?.trim() || null,
+                        year_level:  fd.get('year_level') ? parseInt(fd.get('year_level')) : null,
+                        email:       email || null,
+                        status:      fd.get('status') || 'active',
+                    })
+                    .eq('student_id', editId);
 
-            if (error) throw error;
+                if (error) throw error;
+                showToast('✅ Student updated successfully!', false);
+                delete this.dataset.editId;
 
-            showToast('✅ Student added successfully!', false);
+            } else {
+                // ── INSERT new student — store raw digits in DB ──
+                const payload = {
+                    student_id:  generateUUID(),
+                    id_number:   idNumberRaw,   // always raw digits, never formatted
+                    first_name:  firstName,
+                    middle_name: fd.get('middle_name')?.trim() || null,
+                    last_name:   lastName,
+                    course:      fd.get('course')?.trim() || null,
+                    section:     fd.get('section')?.trim() || null,
+                    year_level:  fd.get('year_level') ? parseInt(fd.get('year_level')) : null,
+                    email:       email || null,
+                    status:      fd.get('status') || 'active',
+                    password:    'changeme123',
+                };
+
+                const { error } = await supabaseClient
+                    .from('students')
+                    .insert([payload])
+                    .select()
+                    .single();
+
+                if (error) {
+                    let msg = error.message || 'Unknown error';
+                    if (msg.includes('id_number') && msg.includes('unique'))
+                        msg = `Student ID "${formatStudentId(idNumberRaw)}" already exists.`;
+                    else if (msg.includes('email') && msg.includes('unique'))
+                        msg = `Email "${email}" is already registered.`;
+                    throw new Error(msg);
+                }
+                showToast('✅ Student added successfully!', false);
+            }
+
             closeModal('addStudentModal');
             this.reset();
             clearAddStudentDups();
             await loadStudents();
 
         } catch (err) {
-            console.error('addStudent error:', err);
-            // Surface a user-friendly message for common constraint errors
-            let msg = err.message || 'Unknown error';
-            if (msg.includes('student_id') && msg.includes('not-null')) {
-                msg = 'student_id constraint error — see console. You may need to drop the FK to auth.users.';
-            } else if (msg.includes('id_number') && msg.includes('unique')) {
-                msg = `Student ID "${idNumber}" already exists.`;
-            } else if (msg.includes('email') && msg.includes('unique')) {
-                msg = `Email "${email}" is already registered.`;
-            }
-            showToast('❌ Error: ' + msg, false);
+            console.error('save student error:', err);
+            showToast('❌ Error: ' + err.message, false);
         } finally {
             btn.disabled = false;
             btn.innerHTML = '<i class="fa-solid fa-save"></i> Save Student';
         }
     });
+}
+
+async function openEditModal(studentId) {
+    const student = allStudents.find(s => s.student_id === studentId);
+    if (!student) return;
+
+    // Pre-fill — show formatted ID in the input
+    document.getElementById('field_id_number').value    = formatStudentId(student.id_number || '');
+    document.getElementById('field_first_name').value   = student.first_name || '';
+    document.querySelector('[name="middle_name"]').value = student.middle_name || '';
+    document.getElementById('field_last_name').value    = student.last_name || '';
+    document.querySelector('[name="course"]').value      = student.course || '';
+    document.querySelector('[name="section"]').value     = student.section || '';
+    document.querySelector('[name="year_level"]').value  = student.year_level || '';
+    document.querySelector('[name="status"]').value      = student.status || 'active';
+    document.getElementById('field_email').value         = student.email || '';
+
+    // Mark form as edit mode
+    document.getElementById('addStudentForm').dataset.editId = studentId;
+
+    // Update modal title and button
+    document.querySelector('#addStudentModal .modal-header h2').innerHTML =
+        '<i class="fa-solid fa-pen-to-square"></i> Edit Student';
+    document.getElementById('addStudentBtn').innerHTML =
+        '<i class="fa-solid fa-save"></i> Update Student';
+
+    openModal('addStudentModal');
 }
 
 // ══════════════════════════════════════════════════════════
@@ -340,8 +399,9 @@ function initDuplicateChecks() {
 
     if (idField) {
         idField.addEventListener('input', debounce(async () => {
-            const val = idField.value.trim();
-            if (!val) { setDupState(idField, 'dup_id_number', false, ''); return; }
+            // Strip dash before querying DB
+            const val = rawStudentId(idField.value.trim());
+            if (!val || val.length < 7) { setDupState(idField, 'dup_id_number', false, ''); return; }
             const { count } = await supabaseClient
                 .from('students').select('student_id', { count: 'exact', head: true })
                 .eq('id_number', val);
@@ -365,7 +425,6 @@ function initDuplicateChecks() {
     if (emailField) {
         emailField.addEventListener('input', debounce(async () => {
             const val = emailField.value.trim();
-            const msgEl = document.getElementById('dup_email');
 
             if (val && !/^[a-z]+_[a-z]+@plpasig\.edu\.ph$/i.test(val)) {
                 setDupState(emailField, 'dup_email', true, 'Format must be: <strong>lastname_firstname@plpasig.edu.ph</strong>');
@@ -380,7 +439,6 @@ function initDuplicateChecks() {
         }, 500));
     }
 
-    // Clear errors on modal close
     document.querySelectorAll('#addStudentModal .close-modal').forEach(btn => {
         btn.addEventListener('click', clearAddStudentDups);
     });
@@ -417,8 +475,8 @@ function clearAddStudentDups() {
 // 7. FACE REGISTRATION SEARCH (replaces search_student.php)
 // ══════════════════════════════════════════════════════════
 async function searchStudent() {
-    const studentId = document.getElementById('studentIdSearch').value.trim();
-    const searchBtn = document.getElementById('searchBtn');
+    const studentId    = document.getElementById('studentIdSearch').value.trim();
+    const searchBtn    = document.getElementById('searchBtn');
     const searchResult = document.getElementById('searchResult');
 
     if (!studentId) { showToast('Please enter a Student ID.', false); return; }
@@ -449,8 +507,8 @@ async function searchStudent() {
         rb.style.display = hasFace ? 'none' : 'block';
         rb.dataset.studentId = studentId;
 
-    document.getElementById('studentInfo').innerHTML = `
-            <div class="info-item"><label>Student ID</label><div class="value">${escHtml(s.id_number)}</div></div>
+        document.getElementById('studentInfo').innerHTML = `
+            <div class="info-item"><label>Student ID</label><div class="value">${escHtml(formatStudentId(s.id_number))}</div></div>
             <div class="info-item"><label>Full Name</label><div class="value">${escHtml(s.first_name)} ${escHtml(s.middle_name || '')} ${escHtml(s.last_name)}</div></div>
             <div class="info-item"><label>Course</label><div class="value">${escHtml(s.course || '-')}</div></div>
             <div class="info-item"><label>Year &amp; Section</label><div class="value">${s.year_level || ''}${escHtml(s.section || '')}</div></div>
@@ -478,19 +536,15 @@ function redirectToFaceReg() {
 }
 
 // ══════════════════════════════════════════════════════════
-// 8a. DOWNLOAD EXCEL TEMPLATE (replaces download_template.php)
-//     Generates the same template as PhpSpreadsheet version
-//     using SheetJS entirely client-side — no server needed.
+// 8a. DOWNLOAD EXCEL TEMPLATE
 // ══════════════════════════════════════════════════════════
 async function downloadExcelTemplate() {
-    // Load SheetJS on demand if not already loaded
     if (typeof XLSX === 'undefined') {
         await loadScript('https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js');
     }
 
     const wb = XLSX.utils.book_new();
 
-    // ── Sheet 1: Student Import Template ──────────────────
     const headers = ['Student ID', 'First Name', 'Middle Name', 'Last Name',
                      'Course', 'Year Level', 'Section', 'Email'];
 
@@ -500,24 +554,13 @@ async function downloadExcelTemplate() {
         ['2300223', 'Pedro', '',       'Reyes',  'Computer Engineering',   '1', 'A', 'reyes_pedro@plpasig.edu.ph'],
     ];
 
-    const wsData = [headers, ...sampleData];
-    const ws = XLSX.utils.aoa_to_sheet(wsData);
-
-    // Set column widths (mirrors PhpSpreadsheet version)
+    const ws = XLSX.utils.aoa_to_sheet([headers, ...sampleData]);
     ws['!cols'] = [
-        { wch: 15 }, // A - Student ID
-        { wch: 20 }, // B - First Name
-        { wch: 20 }, // C - Middle Name
-        { wch: 20 }, // D - Last Name
-        { wch: 25 }, // E - Course
-        { wch: 12 }, // F - Year Level
-        { wch: 15 }, // G - Section
-        { wch: 30 }, // H - Email
+        { wch: 15 }, { wch: 20 }, { wch: 20 }, { wch: 20 },
+        { wch: 25 }, { wch: 12 }, { wch: 15 }, { wch: 30 },
     ];
-
     XLSX.utils.book_append_sheet(wb, ws, 'Student Import Template');
 
-    // ── Sheet 2: Instructions ──────────────────────────────
     const instructions = [
         ['STUDENT IMPORT TEMPLATE - INSTRUCTIONS'],
         [''],
@@ -550,26 +593,21 @@ async function downloadExcelTemplate() {
     wsInstructions['!cols'] = [{ wch: 25 }, { wch: 15 }, { wch: 55 }];
     XLSX.utils.book_append_sheet(wb, wsInstructions, 'Instructions');
 
-    // Trigger download
     XLSX.writeFile(wb, 'student_import_template.xlsx');
 }
 
-
-// Column layout mirrors import_students.php + download_template.php:
-//   A(0) Student ID | B(1) First Name | C(2) Middle Name | D(3) Last Name
-//   E(4) Course     | F(5) Year Level  | G(6) Section     | H(7) Email
-// Mirrors PHP ON DUPLICATE KEY UPDATE behaviour via Supabase upsert.
+// ══════════════════════════════════════════════════════════
+// 8b. IMPORT STUDENTS FROM EXCEL
 // ══════════════════════════════════════════════════════════
 async function handleImport() {
-    const fileInput   = document.getElementById('excelFile');
-    const importBtn   = document.getElementById('importBtn');
-    const progressDiv = document.getElementById('importProgress');
+    const fileInput    = document.getElementById('excelFile');
+    const importBtn    = document.getElementById('importBtn');
+    const progressDiv  = document.getElementById('importProgress');
     const progressFill = document.getElementById('progressFill');
-    const summaryDiv  = document.getElementById('importSummary');
+    const summaryDiv   = document.getElementById('importSummary');
 
     if (!fileInput.files[0]) { showToast('Please select an Excel file.', false); return; }
 
-    // Dynamically load SheetJS if not already loaded
     if (typeof XLSX === 'undefined') {
         await loadScript('https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js');
     }
@@ -585,51 +623,41 @@ async function handleImport() {
             const ws   = wb.Sheets[wb.SheetNames[0]];
             const rows = XLSX.utils.sheet_to_json(ws, { header: 1, defval: '' });
 
-            // Skip header row; skip fully empty rows
             const dataRows = rows.slice(1).filter(r => String(r[0] || '').trim() !== '');
             let successCount = 0;
             let errorCount   = 0;
             const errors     = [];
 
             for (let i = 0; i < dataRows.length; i++) {
-                const r       = dataRows[i];
-                const rowNum  = i + 2;  // human-readable row number (1-indexed + header)
-                const pct     = Math.round(((i + 1) / dataRows.length) * 100);
+                const r      = dataRows[i];
+                const rowNum = i + 2;
+                const pct    = Math.round(((i + 1) / dataRows.length) * 100);
                 progressFill.style.width = pct + '%';
                 progressFill.textContent = pct + '%';
 
-                // ── Parse columns (mirrors import_students.php) ──
-                const idNumber   = String(r[0] || '').trim();
+                // Strip any dashes from imported ID (supports both "2300221" and "23-00221")
+                const idNumber   = rawStudentId(String(r[0] || '').trim());
                 const firstName  = String(r[1] || '').trim();
                 const middleName = String(r[2] || '').trim() || null;
                 const lastName   = String(r[3] || '').trim();
                 const course     = String(r[4] || '').trim() || null;
                 const yearRaw    = r[5] !== '' ? parseInt(r[5]) : null;
                 const section    = String(r[6] || '').trim() || null;
-                const email      = String(r[7] || '').trim() || null; // col H = index 7
+                const email      = String(r[7] || '').trim() || null;
 
-                // ── Validate required fields ──
                 if (!idNumber || !firstName || !lastName) {
                     errors.push(`Row ${rowNum}: Missing required fields (ID, First Name, or Last Name)`);
-                    errorCount++;
-                    continue;
+                    errorCount++; continue;
                 }
-
-                // ── Validate year level ──
                 if (yearRaw !== null && (isNaN(yearRaw) || yearRaw < 1 || yearRaw > 5)) {
                     errors.push(`Row ${rowNum}: Invalid year level "${r[5]}" (must be 1–5)`);
-                    errorCount++;
-                    continue;
+                    errorCount++; continue;
                 }
-
-                // ── Validate PLP email format ──
                 if (email && !/^[a-z]+_[a-z]+@plpasig\.edu\.ph$/i.test(email)) {
                     errors.push(`Row ${rowNum}: Invalid email "${email}". Must be lastname_firstname@plpasig.edu.ph`);
-                    errorCount++;
-                    continue;
+                    errorCount++; continue;
                 }
 
-                // ── Check if id_number already exists (upsert approach) ──
                 const { data: existing } = await supabaseClient
                     .from('students')
                     .select('student_id')
@@ -638,46 +666,20 @@ async function handleImport() {
 
                 let opError;
                 if (existing) {
-                    // UPDATE existing record (mirrors ON DUPLICATE KEY UPDATE)
                     const { error } = await supabaseClient
                         .from('students')
-                        .update({
-                            first_name:  firstName,
-                            middle_name: middleName,
-                            last_name:   lastName,
-                            course,
-                            year_level:  yearRaw,
-                            section,
-                            email,
-                        })
+                        .update({ first_name: firstName, middle_name: middleName, last_name: lastName, course, year_level: yearRaw, section, email })
                         .eq('student_id', existing.student_id);
                     opError = error;
                 } else {
-                    // INSERT new record — generate UUID for student_id
                     const { error } = await supabaseClient
                         .from('students')
-                        .insert([{
-                            student_id:  generateUUID(),   // ★ fix NOT NULL constraint
-                            id_number:   idNumber,
-                            first_name:  firstName,
-                            middle_name: middleName,
-                            last_name:   lastName,
-                            course,
-                            year_level:  yearRaw,
-                            section,
-                            email,
-                            status:      'active',
-                            password:    'changeme123',
-                        }]);
+                        .insert([{ student_id: generateUUID(), id_number: idNumber, first_name: firstName, middle_name: middleName, last_name: lastName, course, year_level: yearRaw, section, email, status: 'active', password: 'changeme123' }]);
                     opError = error;
                 }
 
-                if (opError) {
-                    errors.push(`Row ${rowNum}: ${opError.message}`);
-                    errorCount++;
-                } else {
-                    successCount++;
-                }
+                if (opError) { errors.push(`Row ${rowNum}: ${opError.message}`); errorCount++; }
+                else successCount++;
             }
 
             summaryDiv.innerHTML = `
@@ -693,10 +695,7 @@ async function handleImport() {
             `;
 
             if (successCount > 0) {
-                setTimeout(async () => {
-                    closeModal('importModal');
-                    await loadStudents();
-                }, 2500);
+                setTimeout(async () => { closeModal('importModal'); await loadStudents(); }, 2500);
             }
 
         } catch (err) {
@@ -721,17 +720,14 @@ function loadScript(src) {
 // 9. REPORT MODAL
 // ══════════════════════════════════════════════════════════
 async function buildReportRows() {
-    // Enrich students with enrollment + attendance counts
     const enriched = [];
     for (const s of allStudents) {
-        // enrolled subjects count
         const { count: enrolled } = await supabaseClient
             .from('schedule_enrollments')
             .select('enrollment_id', { count: 'exact', head: true })
             .eq('student_id', s.student_id)
             .eq('status', 'enrolled');
 
-        // total attendances count
         const { count: attendances } = await supabaseClient
             .from('lab_attendance')
             .select('attendance_id', { count: 'exact', head: true })
@@ -742,33 +738,31 @@ async function buildReportRows() {
             : '-';
 
         enriched.push({
-            id_number:        s.id_number,
-            first_name:       s.first_name,
-            middle_name:      s.middle_name || '—',
-            last_name:        s.last_name,
-            course:           s.course || '—',
-            year_level:       s.year_level || '—',
-            section:          s.section || '—',
-            email:            s.email || '—',
-            face_status:      s.facial_dataset_path ? 'Registered' : 'Not Registered',
-            status:           s.status || 'active',
+            id_number:         formatStudentId(s.id_number), // formatted for display
+            first_name:        s.first_name,
+            middle_name:       s.middle_name || '—',
+            last_name:         s.last_name,
+            course:            s.course || '—',
+            year_level:        s.year_level || '—',
+            section:           s.section || '—',
+            email:             s.email || '—',
+            face_status:       s.facial_dataset_path ? 'Registered' : 'Not Registered',
+            status:            s.status || 'active',
             enrolled_subjects: enrolled || 0,
             total_attendances: attendances || 0,
-            date_registered:  dateReg,
+            date_registered:   dateReg,
         });
     }
     reportRows = enriched;
 }
 
 function openReportModal() {
-    // Update chips
     document.getElementById('rmGenDate').innerHTML =
         `Generated ${META.date} &nbsp;·&nbsp; <span id="rmTotal">${META.total}</span> students`;
     document.getElementById('rmChipTotal').textContent      = META.total;
     document.getElementById('rmChipRegistered').textContent = META.registered;
     document.getElementById('rmChipPending').textContent    = META.pending;
 
-    // Render table
     const tbody = document.getElementById('rmTableBody');
     if (!reportRows.length) {
         tbody.innerHTML = `<tr><td colspan="14" style="text-align:center;padding:40px;color:#9ca3af">No data available.</td></tr>`;
@@ -800,7 +794,7 @@ function closeReportModal() {
 
 // ── Print ──────────────────────────────────────────────────
 function printReport() {
-    const now = new Date();
+    const now     = new Date();
     const dateStr = now.toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' });
     const timeStr = now.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' });
 
@@ -884,14 +878,14 @@ function printReport() {
 // ── PDF ────────────────────────────────────────────────────
 function downloadPDF() {
     const { jsPDF } = window.jspdf;
-    const doc = new jsPDF({ orientation: 'landscape', unit: 'mm', format: 'a4' });
-    const now = new Date();
+    const doc     = new jsPDF({ orientation: 'landscape', unit: 'mm', format: 'a4' });
+    const now     = new Date();
     const dateStr = now.toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' });
     const timeStr = now.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' });
-    const pageW = doc.internal.pageSize.width;
-    const pageH = doc.internal.pageSize.height;
-    const margin = 10;
-    const cx = pageW / 2;
+    const pageW   = doc.internal.pageSize.width;
+    const pageH   = doc.internal.pageSize.height;
+    const margin  = 10;
+    const cx      = pageW / 2;
     const headerH = 32;
 
     doc.setFillColor(20, 83, 45);
@@ -1010,6 +1004,11 @@ function closeModal(id) {
             document.getElementById('searchResult').classList.remove('active');
         }
         if (id === 'addStudentModal') {
+            document.querySelector('#addStudentModal .modal-header h2').innerHTML =
+                '<i class="fa-solid fa-user-plus"></i> Add Student';
+            document.getElementById('addStudentBtn').innerHTML =
+                '<i class="fa-solid fa-save"></i> Save Student';
+            delete document.getElementById('addStudentForm').dataset.editId;
             document.getElementById('addStudentForm').reset();
             clearAddStudentDups();
         }
@@ -1033,6 +1032,27 @@ document.addEventListener('keydown', e => {
 // ══════════════════════════════════════════════════════════
 // 11. UTILITIES
 // ══════════════════════════════════════════════════════════
+
+/**
+ * formatStudentId — converts raw digits to display format
+ * "2300221" → "23-00221"
+ */
+function formatStudentId(raw) {
+    if (!raw) return '';
+    const digits = String(raw).replace(/\D/g, '').slice(0, 7);
+    if (digits.length <= 2) return digits;
+    return digits.slice(0, 2) + '-' + digits.slice(2);
+}
+
+/**
+ * rawStudentId — strips dash for DB storage/queries
+ * "23-00221" → "2300221"
+ */
+function rawStudentId(formatted) {
+    if (!formatted) return '';
+    return String(formatted).replace(/-/g, '');
+}
+
 function showToast(msg, showLink) {
     const t = document.getElementById('toast');
     document.getElementById('toastMsg').textContent = msg;
