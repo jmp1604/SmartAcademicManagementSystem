@@ -1,5 +1,7 @@
 let allSubmissions = [];
 let currentSubmissionId = null;
+let currentFileUrl = null;
+let currentFileName = null;
 
 document.addEventListener('DOMContentLoaded', function () {
     if (!isAdmin()) {
@@ -357,11 +359,18 @@ function showReviewModal(submissionId) {
 
     let fileName = 'document.pdf';
     let fileSize = 0;
+    let fileUrl = '';
+    
     if (submission.submission_files && submission.submission_files.length > 0) {
         const file = submission.submission_files[0];
         fileName = file.file_name || fileName;
         fileSize = file.file_size || 0;
+        fileUrl = file.file_url || '';
     }
+
+    // Store current file info for button actions
+    currentFileUrl = fileUrl;
+    currentFileName = fileName;
 
     const facultyName  = professor.first_name
         ? `${professor.first_name} ${professor.last_name}`
@@ -377,6 +386,20 @@ function showReviewModal(submissionId) {
     document.getElementById('modalUploadDate').textContent  = formatDate(submission.submitted_at);
     document.getElementById('modalSize').textContent        = formatFileSize(fileSize);
     document.getElementById('adminRemarks').value           = submission.remarks || '';
+
+    // Display file preview
+    displayFilePreview(fileUrl, fileName);
+
+    // Set up file action buttons
+    const viewBtn = document.getElementById('viewFileBtn');
+    const downloadBtn = document.getElementById('downloadFileBtn');
+    
+    if (viewBtn) {
+        viewBtn.onclick = () => viewFile(fileUrl, fileName);
+    }
+    if (downloadBtn) {
+        downloadBtn.onclick = () => downloadFile(fileUrl, fileName);
+    }
 
     // Hide approve/reject buttons for already-reviewed submissions
     const approveBtn = document.getElementById('approveSubmissionBtn');
@@ -509,4 +532,84 @@ function formatDate(dateString) {
 function showPlaceholderData() {
     updateStatistics();
     renderSubmissions();
+}
+
+function displayFilePreview(fileUrl, fileName) {
+    const container = document.getElementById('filePreviewContainer');
+    if (!container) return;
+    
+    if (!fileUrl) {
+        container.innerHTML = `
+            <div class="file-icon-large">
+                <svg viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
+            </div>
+        `;
+        container.classList.remove('has-preview');
+        return;
+    }
+
+    // Extract file extension
+    const ext = fileName.split('.').pop().toLowerCase();
+    const imageExts = ['jpg', 'jpeg', 'png', 'gif', 'webp', 'svg'];
+    const pdfExts = ['pdf'];
+
+    // Show appropriate preview
+    if (imageExts.includes(ext)) {
+        container.innerHTML = `<img src="${fileUrl}" alt="${fileName}" />`;
+        container.classList.add('has-preview');
+    } else if (pdfExts.includes(ext)) {
+        container.innerHTML = `
+            <div style="width: 100%; height: 100%; display: flex; flex-direction: column; align-items: center; justify-content: center; background: #f5f5f5; color: #666;">
+                <svg viewBox="0 0 24 24" style="width: 48px; height: 48px; margin-bottom: 1rem; opacity: 0.5; stroke: currentColor; fill: none; stroke-width: 1.5;">
+                    <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/>
+                </svg>
+                <p style="margin: 0; font-size: 0.9rem; font-weight: 500;">PDF Preview</p>
+                <p style="margin: 0.25rem 0 0 0; font-size: 0.8rem; opacity: 0.7;">Click View to open in new window</p>
+            </div>
+        `;
+        container.classList.add('has-preview');
+    } else {
+        container.innerHTML = `
+            <div class="file-icon-large">
+                <svg viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
+            </div>
+        `;
+        container.classList.remove('has-preview');
+    }
+}
+
+function viewFile(fileUrl, fileName) {
+    if (!fileUrl) {
+        alert('File URL not available.');
+        return;
+    }
+    
+    // Open file in new tab
+    const ext = fileName.split('.').pop().toLowerCase();
+    
+    if (['pdf', 'jpg', 'jpeg', 'png', 'gif', 'webp'].includes(ext)) {
+        window.open(fileUrl, '_blank');
+    } else {
+        // For other file types, just try to open it
+        window.open(fileUrl, '_blank');
+    }
+}
+
+function downloadFile(fileUrl, fileName) {
+    if (!fileUrl) {
+        alert('File URL not available.');
+        return;
+    }
+    
+    // Create a temporary anchor element to trigger download
+    const link = document.createElement('a');
+    link.href = fileUrl;
+    link.download = fileName;
+    link.style.display = 'none';
+    
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    
+    console.log('✓ Download initiated for:', fileName);
 }

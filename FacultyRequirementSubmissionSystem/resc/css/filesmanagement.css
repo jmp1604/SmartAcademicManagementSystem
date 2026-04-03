@@ -250,6 +250,32 @@
     margin-bottom: 1.5rem;
 }
 
+.file-preview-container {
+    width: 100%;
+    height: 280px;
+    border: 2px dashed var(--border);
+    border-radius: var(--radius);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    margin-bottom: 1.5rem;
+    background: #fafbfa;
+    position: relative;
+    overflow: hidden;
+}
+
+.file-preview-container.has-preview {
+    border: none;
+    background: transparent;
+}
+
+.file-preview-container img,
+.file-preview-container iframe {
+    max-width: 100%;
+    max-height: 100%;
+    object-fit: contain;
+}
+
 .file-icon-large {
     width: 80px;
     height: 80px;
@@ -267,6 +293,48 @@
     height: 40px;
     stroke: white;
     fill: none;
+}
+
+/* File action buttons */
+.file-actions {
+    display: flex;
+    gap: 0.75rem;
+    justify-content: center;
+    margin-bottom: 1rem;
+}
+
+.btn-file-action {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 0.56rem 1.1rem;
+    background: white;
+    border: 1.5px solid var(--border);
+    border-radius: 0.55rem;
+    font-size: 0.9rem;
+    font-weight: 600;
+    color: var(--text-main);
+    cursor: pointer;
+    transition: all 0.2s;
+    white-space: nowrap;
+}
+
+.btn-file-action:hover {
+    border-color: var(--green-btn);
+    background: #f0f8f2;
+    color: var(--green-btn);
+}
+
+.btn-file-action:active {
+    transform: scale(0.98);
+}
+
+.btn-file-action svg {
+    width: 18px;
+    height: 18px;
+    stroke: currentColor;
+    fill: none;
+    stroke-width: 2;
 }
 
 #modalFileName {
@@ -499,6 +567,15 @@
     .modal-body .row > div {
         margin-bottom: 1.5rem;
     }
+    
+    .file-actions {
+        flex-direction: column;
+    }
+    
+    .btn-file-action {
+        width: 100%;
+        justify-content: center;
+    }
 }
 
 @media (max-width: 480px) {
@@ -535,5 +612,20 @@
     
     .file-details-section {
         padding: 1rem;
+    }
+    
+    .file-actions {
+        flex-direction: column;
+        gap: 0.5rem;
+    }
+    
+    .btn-file-action {
+        width: 100%;
+        padding: 0.5rem 1rem;
+        font-size: 0.85rem;
+    }
+    
+    .file-preview-container {
+        height: 200px;
     }
 }
