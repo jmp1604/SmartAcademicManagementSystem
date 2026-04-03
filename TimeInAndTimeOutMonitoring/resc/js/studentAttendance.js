@@ -7,18 +7,39 @@ let allAttendance = [];
 let filteredAttendance = [];
 let META = {};
 
+
+// ────────────────────────────────────────────
+// UTILITY
+// ────────────────────────────────────────────
+function escapeHtml(str) {
+    if (!str) return '';
+    return String(str)
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#39;');
+}
+
+function showToast(msg) {
+    const toast = document.getElementById('toast-r');
+    document.getElementById('toastMsg-r').textContent = msg;
+    toast.classList.add('on');
+    setTimeout(() => toast.classList.remove('on'), 4000);
+}
+
 document.addEventListener('DOMContentLoaded', async () => {
     if (!supabaseClient) {
         console.error('Supabase client not initialized.');
         return;
     }
     
-    // Set default date filter to today
-    const today = new Date();
-    // Adjust to local timezone format (YYYY-MM-DD)
-    const offset = today.getTimezoneOffset() * 60000;
-    const localISOTime = (new Date(today - offset)).toISOString().slice(0, -1);
-    document.getElementById('filterDate').value = localISOTime.split('T')[0];
+   const today = new Date();
+// Format date correctly as YYYY-MM-DD in local timezone
+const yyyy = today.getFullYear();
+const mm   = String(today.getMonth() + 1).padStart(2, '0');
+const dd   = String(today.getDate()).padStart(2, '0');
+document.getElementById('filterDate').value = `${yyyy}-${mm}-${dd}`;
 
     META.genDate = today.toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric', hour: '2-digit', minute: '2-digit' });
 
@@ -99,7 +120,15 @@ async function loadAttendanceData() {
     
     try {
         const { data, error } = await query;
-        if (error) throw error;
+        if (error) {
+    console.error('Supabase error details:', error); // ← already there
+    console.error('Error code:', error.code);
+    console.error('Error message:', error.message);
+    console.error('Error details:', error.details);
+    console.error('Error hint:', error.hint);
+    throw error;
+}
+        
 
         // Flatten data for easier handling and apply client-side filters
         allAttendance = data.filter(d => d.lab_sessions && d.students && d.lab_sessions.lab_schedules).map(d => {

@@ -1,7 +1,7 @@
 import sys, io
 sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding='utf-8')
 
-import os, signal, warnings, datetime, queue, threading, json  # ← signal added
+import os, signal, warnings, datetime, queue, threading, json
 import numpy as np
 import cv2
 import face_recognition
@@ -38,27 +38,32 @@ thread_pool = ThreadPoolExecutor(max_workers=3)
 
 # ─────────────────────────────────────────────
 # Timezone-safe datetime parser
-# FIX: Supabase returns timestamptz as "2024-01-15T08:30:00+00:00"
-# datetime.fromisoformat() in Python < 3.11 cannot parse the "+HH:MM"
-# offset form reliably, so we normalize it first.
+# Supabase returns timestamptz as "2024-01-15T08:30:00+00:00"
+# We convert it to local Philippine time (naive) for duration math.
 # ─────────────────────────────────────────────
 def parse_dt(value) -> datetime.datetime:
-    """Parse a Supabase timestamptz string into a naive local datetime."""
+    """Parse a Supabase timestamptz string into a naive LOCAL datetime."""
     if value is None:
         return None
-    s = str(value)
-    # Normalize Z → +00:00 for compatibility
-    s = s.replace('Z', '+00:00')
+    s = str(value).replace('Z', '+00:00')
     try:
         dt = datetime.datetime.fromisoformat(s)
     except ValueError:
-        # Last-resort fallback: strip timezone and treat as-is
         dt = datetime.datetime.fromisoformat(s[:19])
         return dt
-    # Convert to local time and strip timezone info
     if dt.tzinfo is not None:
         dt = dt.astimezone().replace(tzinfo=None)
     return dt
+
+# ─────────────────────────────────────────────
+# now_store / now_local helpers
+# now_store → UTC-aware  → stored correctly in Supabase timestamptz
+# now_local → naive local → used for duration math (matches parse_dt output)
+# ─────────────────────────────────────────────
+def get_now():
+    now_store = datetime.datetime.now(datetime.timezone.utc)   # for DB writes
+    now_local = datetime.datetime.now()                        # for duration calc
+    return now_store, now_local
 
 # ─────────────────────────────────────────────
 # Face loading from Supabase Storage
@@ -89,7 +94,8 @@ def load_encodings_from_storage(cloud_folder, meta):
                 if img is None:
                     continue
                 rgb_img = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
-                encs    = face_recognition.face_encodings(rgb_img, num_jitters=1)
+                # Change num_jitters=1 to 0
+                encs = face_recognition.face_encodings(rgb_img)
                 if encs:
                     known_encodings.append(encs[0])
                     known_meta.append(meta)
@@ -130,6 +136,7 @@ def load_all_faces():
         .select("professor_id, employee_id, first_name, middle_name, last_name, facial_dataset_path")\
         .not_.is_("facial_dataset_path", "null")\
         .neq("facial_dataset_path", "")\
+        .eq("status", "active")\
         .execute()
 
     rows = result.data or []
@@ -157,14 +164,11 @@ load_all_faces()
 
 # ─────────────────────────────────────────────
 # Time helper
-# Handles both datetime.timedelta (rare) and "HH:MM:SS" strings
-# returned by Supabase for "time without time zone" columns
 # ─────────────────────────────────────────────
 def td_to_secs(td):
     if isinstance(td, datetime.timedelta):
         return int(td.total_seconds())
     if isinstance(td, str):
-        # Strip microseconds if present — e.g. "15:49:32.87412" → "15:49:32"
         td = td.split('.')[0]
         parts = td.split(':')
         return int(parts[0])*3600 + int(parts[1])*60 + int(parts[2]) if len(parts) == 3 else 0
@@ -209,7 +213,7 @@ def find_professor_schedule(professor_id, today):
 
     return output
 
-    
+
 def find_student_schedule(student_id, today):
     day_name = today.strftime("%A")
     print(f"  [find_student_schedule] student_id={student_id} day={day_name} date={today}")
@@ -222,7 +226,7 @@ def find_student_schedule(student_id, today):
 
     enrolled_ids = [e["schedule_id"] for e in (enroll_result.data or [])]
     print(f"  [find_student_schedule] enrolled_ids={enrolled_ids}")
-    
+
     if not enrolled_ids:
         print(f"  [find_student_schedule] → NO ENROLLMENTS FOUND")
         return None
@@ -237,7 +241,7 @@ def find_student_schedule(student_id, today):
 
     schedules = sched_result.data or []
     print(f"  [find_student_schedule] schedules matching today+active={schedules}")
-    
+
     if not schedules:
         print(f"  [find_student_schedule] → NO ACTIVE SCHEDULES FOR TODAY")
         return None
@@ -252,8 +256,8 @@ def find_student_schedule(student_id, today):
     sessions_by_schedule = {s["schedule_id"]: s for s in (sess_result.data or [])}
     print(f"  [find_student_schedule] sessions_today={sessions_by_schedule}")
 
-    best, priority = None, 99
-    cancelled_fallback = None  # track cancelled sessions as last resort
+    best, priority     = None, 99
+    cancelled_fallback = None
 
     for sch in schedules:
         sess           = sessions_by_schedule.get(sch["schedule_id"])
@@ -263,8 +267,6 @@ def find_student_schedule(student_id, today):
         print(f"  [find_student_schedule] checking schedule={sch['schedule_id']} session_status={session_status}")
 
         if session_status == "cancelled":
-            # Don't skip entirely — save as fallback so student gets
-            # "Session Cancelled" instead of "Not Enrolled"
             if cancelled_fallback is None:
                 cancelled_fallback = (sch["schedule_id"], sch["start_time"], sch["end_time"],
                                       session_id, "cancelled")
@@ -279,8 +281,6 @@ def find_student_schedule(student_id, today):
         if priority == 1:
             break
 
-    # If all sessions were cancelled and nothing else was found,
-    # return the cancelled one so _handle_student can show the right message
     if best is None and cancelled_fallback is not None:
         best = cancelled_fallback
 
@@ -298,11 +298,12 @@ def get_or_create_session(schedule_id, today):
     if result.data:
         return result.data[0]["session_id"], result.data[0]["status"]
 
+    now_store, _ = get_now()
     insert_result = supabase.table("lab_sessions").insert({
         "schedule_id":  schedule_id,
         "session_date": str(today),
         "status":       "scheduled",
-        "created_at":   datetime.datetime.now().isoformat()
+        "created_at":   now_store.isoformat()
     }).execute()
 
     return insert_result.data[0]["session_id"], "scheduled"
@@ -328,10 +329,12 @@ def recognition_worker():
             frame = latest_frame.copy()
 
         skip += 1
-        if skip % 5 != 0:
+        if skip % 2 != 0:
+
             continue
 
-        small = cv2.resize(frame, (0, 0), fx=0.25, fy=0.25)
+        # Change 0.25 to 0.2 — less pixels = faster detection
+        small = cv2.resize(frame, (0, 0), fx=0.2, fy=0.2)
         rgb   = cv2.cvtColor(small, cv2.COLOR_BGR2RGB)
         locs  = face_recognition.face_locations(rgb, model="hog")
 
@@ -344,7 +347,7 @@ def recognition_worker():
         new_locs, new_labels, new_colors = [], [], []
 
         for (top, right, bottom, left), enc in zip(locs, encs):
-            top *= 4; right *= 4; bottom *= 4; left *= 4
+            top *= 5; right *= 5; bottom *= 5; left *= 5
 
             if known_encodings_np is None or len(known_encodings_np) == 0:
                 new_locs.append((top, right, bottom, left))
@@ -365,6 +368,13 @@ def recognition_worker():
 
                 if not last or (datetime.datetime.now() - last).total_seconds() >= COOLDOWN_SECS:
                     recently_seen[key] = datetime.datetime.now()
+                        # ── Push instant popup IMMEDIATELY before any DB queries ──
+                    _push({
+                       "role":   meta["role"],
+                       "name":   meta["name"],
+                       "action": "LOADING",
+                       "timestamp": datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+                    })   
                     thread_pool.submit(handle_recognized, meta,
                                        datetime.date.today(), datetime.datetime.now())
             else:
@@ -447,11 +457,12 @@ def _handle_professor(meta, today, now):
 
         # Create session if not yet created
         if not session_id:
+            now_store, _ = get_now()
             insert_result = supabase.table("lab_sessions").insert({
                 "schedule_id":  schedule_id,
                 "session_date": str(today),
                 "status":       "scheduled",
-                "created_at":   datetime.datetime.now().isoformat()
+                "created_at":   now_store.isoformat()
             }).execute()
             session_id     = insert_result.data[0]["session_id"]
             session_status = "scheduled"
@@ -459,10 +470,11 @@ def _handle_professor(meta, today, now):
         # Auto-void if past start window
         if session_status == "scheduled" and now > void_cutoff:
             print(f"     → AUTO-VOID (past {PROFESSOR_START_WINDOW}-min window)")
+            now_store, _ = get_now()
             supabase.table("lab_sessions").update({
                 "status":     "cancelled",
                 "notes":      f"Auto-voided: professor did not start within {PROFESSOR_START_WINDOW} minutes",
-                "updated_at": datetime.datetime.now().isoformat()
+                "updated_at": now_store.isoformat()
             }).eq("session_id", session_id).execute()
             print(f"     → Voided session {session_id}, continuing...")
             continue
@@ -495,7 +507,6 @@ def _handle_professor(meta, today, now):
                        "name":name,"action":action,"session_id":session_id,"schedule":sched,
                        "timestamp":now.strftime("%Y-%m-%d %H:%M:%S")})
 
-    # No valid schedule in current window
     print(f"  → No valid schedule in current window")
     if closest_future_schedule:
         window_open = closest_future_time - datetime.timedelta(minutes=30)
@@ -509,6 +520,7 @@ def _handle_professor(meta, today, now):
                    "name":name,"action":"NO_VALID_SCHEDULE","session_id":None,
                    "error":"No valid schedule available. All classes have ended or been voided.",
                    "timestamp":now.strftime("%Y-%m-%d %H:%M:%S")})
+
 # ─────────────────────────────────────────────
 # Student flow
 # ─────────────────────────────────────────────
@@ -524,7 +536,6 @@ def _handle_student(meta, today, now):
                        "error":"You are not enrolled in any subject with a schedule today.",
                        "timestamp":now.strftime("%Y-%m-%d %H:%M:%S")})
 
-    # Unpack all 5 values
     schedule_id, start_td, end_td, session_id, status = row
 
     s = datetime.datetime.combine(today, datetime.time()) + datetime.timedelta(seconds=td_to_secs(start_td))
@@ -532,28 +543,24 @@ def _handle_student(meta, today, now):
     print(f"  → Schedule {s:%I:%M %p}–{e:%I:%M %p}")
     print(f"  → session_id={session_id} status={status}")
 
-    # Session was voided — professor did not start within the time window
     if status == "cancelled":
         return _push({"role":"student","student_id":sid,"id_number":id_num,
                        "name":name,"action":"SESSION_CANCELLED","session_id":None,
                        "error":"The session was voided — professor did not start within the required time.",
                        "timestamp":now.strftime("%Y-%m-%d %H:%M:%S")})
 
-    # Session not yet started — professor hasn't scanned in yet
     if status in ("not_created", "scheduled", None) or session_id is None:
         return _push({"role":"student","student_id":sid,"id_number":id_num,
                        "name":name,"action":"SESSION_NOT_STARTED","session_id":None,
                        "error":f"Professor has not started the session yet. Class starts at {s:%I:%M %p}.",
                        "timestamp":now.strftime("%Y-%m-%d %H:%M:%S")})
 
-    # Session already ended
     if status == "completed":
         return _push({"role":"student","student_id":sid,"id_number":id_num,
                        "name":name,"action":"SESSION_ENDED","session_id":session_id,
                        "error":"The session has already ended.",
                        "timestamp":now.strftime("%Y-%m-%d %H:%M:%S")})
 
-    # Only reach here if status is 'ongoing' or 'dismissing'
     # Late detection
     sess_result = supabase.table("lab_sessions")\
         .select("actual_start_time")\
@@ -574,7 +581,6 @@ def _handle_student(meta, today, now):
         else:
             print(f"  → ON TIME (grace cutoff {grace_cutoff:%I:%M %p})")
 
-    # Check attendance record
     att_result = supabase.table("lab_attendance")\
         .select("attendance_id, time_in, time_out")\
         .eq("session_id", session_id)\
@@ -600,6 +606,7 @@ def _handle_student(meta, today, now):
            "name":name,"action":action,"session_id":session_id,
            "is_late":is_late,"late_minutes":late_minutes,
            "timestamp":now.strftime("%Y-%m-%d %H:%M:%S")})
+
 # ─────────────────────────────────────────────
 # Camera + frame generator
 # ─────────────────────────────────────────────
@@ -638,7 +645,11 @@ def confirm_attendance():
     student_id = data.get("student_id")
     session_id = data.get("session_id")
     action     = data.get("action")
-    now        = datetime.datetime.now()
+
+    # ── FIX: two separate now values ──
+    # now_store → UTC-aware, stored correctly in Supabase timestamptz
+    # now_local → naive local time, used for duration math with parse_dt()
+    now_store, now_local = get_now()
 
     no_db = {"NO_SCHEDULE","NOT_ENROLLED","SESSION_NOT_STARTED","SESSION_ENDED",
              "CANNOT_TIME_OUT","SESSION_CANCELLED","COMPLETED"}
@@ -666,30 +677,30 @@ def confirm_attendance():
         rec = att_result.data[0] if att_result.data else None
 
         if rec is None:
+            # TIME IN — store UTC timestamp
             is_late      = data.get("is_late", False)
             late_minutes = int(data.get("late_minutes", 0))
             time_status  = "late" if is_late else "on-time"
             supabase.table("lab_attendance").insert({
                 "session_id":                     session_id,
                 "student_id":                     student_id,
-                "time_in":                        now.isoformat(),
+                "time_in":                        now_store.isoformat(),  # ← UTC
                 "time_in_status":                 time_status,
                 "late_minutes":                   late_minutes,
                 "verified_by_facial_recognition": True,
-                "created_at":                     now.isoformat()
+                "created_at":                     now_store.isoformat()   # ← UTC
             }).execute()
             msg = f"Time IN recorded ✅ — {'⚠ LATE by '+str(late_minutes)+' min' if is_late else 'On Time'}"
             return jsonify({"success": True, "message": msg})
 
         if rec["time_in"] and not rec["time_out"]:
-            # FIX: use parse_dt() instead of fromisoformat() directly
-            # to safely handle Supabase timestamptz strings on all Python versions
-            time_in_dt = parse_dt(rec["time_in"])
-            duration   = int((now - time_in_dt).total_seconds() / 60)
+            # TIME OUT — parse stored UTC time to local, compute duration with local now
+            time_in_dt = parse_dt(rec["time_in"])           # → local naive
+            duration   = int((now_local - time_in_dt).total_seconds() / 60)  # both local
             supabase.table("lab_attendance").update({
-                "time_out":         now.isoformat(),
-                "duration_minutes": duration,
-                "updated_at":       now.isoformat()
+                "time_out":         now_store.isoformat(),  # ← UTC
+                "duration_minutes": duration,               # ← positive ✓
+                "updated_at":       now_store.isoformat()   # ← UTC
             }).eq("attendance_id", rec["attendance_id"]).execute()
             return jsonify({"success": True, "message": "Time OUT recorded ✅"})
 
@@ -706,7 +717,9 @@ def confirm_session():
     data       = request.get_json()
     session_id = data.get("session_id")
     action     = data.get("action")
-    now        = datetime.datetime.now()
+
+    # ── FIX: two separate now values ──
+    now_store, now_local = get_now()
 
     no_db = {"NO_SCHEDULE","TOO_EARLY","SCHEDULE_ENDED","SESSION_VOIDED",
              "SESSION_ALREADY_ENDED","NO_VALID_SCHEDULE"}
@@ -719,8 +732,8 @@ def confirm_session():
         if action == "START":
             supabase.table("lab_sessions").update({
                 "status":            "ongoing",
-                "actual_start_time": now.time().isoformat(),
-                "updated_at":        now.isoformat()
+                "actual_start_time": now_local.time().isoformat(),  # ← local time string (HH:MM:SS)
+                "updated_at":        now_store.isoformat()          # ← UTC timestamp
             }).eq("session_id", session_id).execute()
             return jsonify({"success": True,
                             "message": f"✅ Session started — Students have {STUDENT_GRACE_MINUTES} min grace period"})
@@ -728,8 +741,8 @@ def confirm_session():
         if action == "DISMISS":
             supabase.table("lab_sessions").update({
                 "status":              "dismissing",
-                "actual_dismiss_time": now.time().isoformat(),
-                "updated_at":          now.isoformat()
+                "actual_dismiss_time": now_local.time().isoformat(),  # ← local time string
+                "updated_at":          now_store.isoformat()          # ← UTC timestamp
             }).eq("session_id", session_id).execute()
             return jsonify({"success": True,
                             "message": "✅ Dismissal mode ON — Students may now time out"})
@@ -737,8 +750,8 @@ def confirm_session():
         if action == "END":
             supabase.table("lab_sessions").update({
                 "status":          "completed",
-                "actual_end_time": now.time().isoformat(),
-                "updated_at":      now.isoformat()
+                "actual_end_time": now_local.time().isoformat(),  # ← local time string
+                "updated_at":      now_store.isoformat()          # ← UTC timestamp
             }).eq("session_id", session_id).execute()
 
             # Auto time-out remaining students
@@ -750,13 +763,12 @@ def confirm_session():
                 .execute()
 
             for att in (att_result.data or []):
-                # FIX: use parse_dt() for safe timestamptz handling
-                time_in_dt = parse_dt(att["time_in"])
-                duration   = int((now - time_in_dt).total_seconds() / 60)
+                time_in_dt = parse_dt(att["time_in"])           # → local naive
+                duration   = int((now_local - time_in_dt).total_seconds() / 60)  # both local
                 supabase.table("lab_attendance").update({
-                    "time_out":         now.isoformat(),
-                    "duration_minutes": duration,
-                    "updated_at":       now.isoformat()
+                    "time_out":         now_store.isoformat(),  # ← UTC
+                    "duration_minutes": duration,               # ← positive ✓
+                    "updated_at":       now_store.isoformat()   # ← UTC
                 }).eq("attendance_id", att["attendance_id"]).execute()
 
             return jsonify({"success": True,
@@ -783,22 +795,15 @@ def video_feed():
 
 # ─────────────────────────────────────────────
 # /shutdown
-# Mirrors face_capture.py pattern.
-# Called by takeAttendance.js stopEngine() and the Stop Engine button.
 # ─────────────────────────────────────────────
 @app.route('/shutdown', methods=['POST'])
 def shutdown():
     print("--- Shutdown request received: Cleaning up ---")
     try:
-        # 1. Release the camera so other apps (or the next session) can use it
         if camera.isOpened():
             camera.release()
             print("✓ Camera hardware released")
-        
-        # 2. Kill the thread pool
         thread_pool.shutdown(wait=False)
-        
-        # 3. Kill the process
         print("✓ Terminating process...")
         os.kill(os.getpid(), signal.SIGTERM)
         return jsonify({"success": True})
@@ -807,7 +812,7 @@ def shutdown():
         return jsonify({"success": False, "error": str(e)})
 
 # ─────────────────────────────────────────────
-# Scanner UI (unchanged)
+# Scanner UI
 # ─────────────────────────────────────────────
 SCANNER_HTML = r"""<!DOCTYPE html>
 <html>
@@ -890,45 +895,40 @@ let payload=null,timer=null,cd=null,remaining=0;
 const ERR_ACTIONS=new Set(['NO_SCHEDULE','NOT_ENROLLED','SESSION_NOT_STARTED','SESSION_ENDED',
   'TOO_EARLY','SCHEDULE_ENDED','COMPLETED','SESSION_VOIDED',
   'SESSION_ALREADY_ENDED','NO_VALID_SCHEDULE','CANNOT_TIME_OUT','SESSION_CANCELLED']);
-const es=new EventSource('/attendee_stream');
-es.onmessage=e=>show(JSON.parse(e.data));
-function show(data){
-  clearInterval(cd);clearTimeout(timer);
-  payload=data;
-  const action=data.action||'',role=data.role||'student',isErr=ERR_ACTIONS.has(action);
-  const av=document.getElementById('av');
-  if(action==='DISMISS'){av.className='avatar av-dismiss';av.textContent='🚪';}
-  else if(action==='END'){av.className='avatar av-err';av.textContent='⏹';}
-  else if(isErr&&action==='SESSION_NOT_STARTED'){av.className='avatar av-warn';av.textContent='⏳';}
-  else if(isErr&&action==='CANNOT_TIME_OUT'){av.className='avatar av-warn';av.textContent='🚫';}
-  else if(isErr){av.className='avatar av-err';av.textContent='⚠️';}
-  else{av.className='avatar '+(role==='professor'?'av-prof':'av-student');
-       av.textContent=role==='professor'?'👨‍🏫':'🎓';}
-  document.getElementById('cardName').textContent=data.name||'';
-  document.getElementById('cardRole').textContent=role==='professor'?'Professor':'Student';
-  const card=document.getElementById('card');
-  if(action==='DISMISS')card.className='orange';
-  else if(action==='END')card.className='amber';
-  else if(action==='SESSION_NOT_STARTED'||action==='CANNOT_TIME_OUT')card.className='amber';
-  else if(isErr)card.className='red';
-  else card.className='green';
-  const msgEl=document.getElementById('cardMsg');
-  card.dataset.isLate=data.is_late?'1':'0';
-  card.dataset.lateMinutes=data.late_minutes||0;
-  const{txt,cls}=resolveMsg(data,isErr);
-  msgEl.textContent=txt;msgEl.className=cls;
-  const ok=document.getElementById('btnOk');
-  if(isErr){ok.style.display='none';}
-  else{ok.style.display='inline-block';ok.textContent=label(action);
-       ok.className='btn'+(action==='DISMISS'?' dismiss-btn':action==='END'?' end-btn':'');}
-  document.getElementById('overlay').classList.add('on');
-  remaining=15;updateCD();
-  cd=setInterval(()=>{remaining--;updateCD();if(remaining<=0)dismiss();},1000);
-  timer=setTimeout(dismiss,15000);
+function connectSSE(){
+    const es=new EventSource('/attendee_stream');
+    es.onmessage=e=>show(JSON.parse(e.data));
+    es.onerror=()=>{ es.close(); setTimeout(connectSSE,500); };
 }
+connectSSE();
+
+function show(data) {
+  clearInterval(cd); clearTimeout(timer);
+  payload = data;
+  const action = data.action || '', role = data.role || 'student', isErr = ERR_ACTIONS.has(action);
+
+  // ── LOADING: show popup instantly while DB queries run ──
+  if (action === 'LOADING') {
+    const av = document.getElementById('av');
+    av.className = 'avatar ' + (role === 'professor' ? 'av-prof' : 'av-student');
+    av.textContent = role === 'professor' ? '👨‍🏫' : '🎓';
+    document.getElementById('cardName').textContent = data.name || '';
+    document.getElementById('cardRole').textContent = role === 'professor' ? 'Professor' : 'Student';
+    document.getElementById('card').className = 'blue';
+    const msgEl = document.getElementById('cardMsg');
+    msgEl.textContent = 'Checking schedule...';
+    msgEl.className = 'mi';
+    document.getElementById('btnOk').style.display = 'none';
+    document.getElementById('overlay').classList.add('on');
+    return; // wait for the real action to arrive
+}
+
+} // ← this closing brace was missing — closes the show() function
+
 function updateCD(){
   document.getElementById('countdown').textContent=remaining>0?`Auto-dismiss in ${remaining}s`:'';
 }
+
 function resolveMsg(d,isErr){
   d.is_late=d.is_late||(document.getElementById('card').dataset.isLate==='1');
   d.late_minutes=d.late_minutes||document.getElementById('card').dataset.lateMinutes||0;
@@ -943,6 +943,7 @@ function resolveMsg(d,isErr){
     END:{txt:'⏹ End the session completely. Remaining students will be auto timed-out.',cls:'mw'},
     COMPLETED:{txt:'Attendance already complete for this session.',cls:'mi'},
   };
+
   return map[d.action]||{txt:d.action,cls:'mi'};
 }
 function label(a){
