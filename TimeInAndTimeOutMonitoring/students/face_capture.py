@@ -8,18 +8,28 @@ from supabase import create_client, Client
 import threading
 import sys
 import signal
+from dotenv import load_dotenv # <-- Add this
+
+# Load the hidden variables from the .env file
+load_dotenv()
 
 # ==========================================
 # CONFIGURATION
 # ==========================================
-SUPABASE_URL = "https://wjyoruvcyjnwsimeqrgl.supabase.co"
+# Fetch the keys securely from the environment
+SUPABASE_URL = os.getenv("SUPABASE_URL")
+SUPABASE_KEY = os.getenv("SUPABASE_KEY")
 
+if not SUPABASE_URL or not SUPABASE_KEY:
+    raise ValueError("Missing Supabase credentials! Please check your .env file.")
 
-supabase: Client = create_client(SUPABASE_URL, )
+supabase: Client = create_client(SUPABASE_URL, SUPABASE_KEY)
 BUCKET_NAME = "facial_data"
 
 app = Flask(__name__)
 CORS(app)
+
+# ... the rest of your code remains exactly the same ...
 
 cap = cv2.VideoCapture(0)
 cap.set(cv2.CAP_PROP_BUFFERSIZE, 1)
