@@ -12,10 +12,13 @@
     box-shadow: var(--shadow-sm);
     border-top: 3.5px solid transparent;
     position: relative;
-    transition: box-shadow .2s;
+    transition: box-shadow .2s, transform .2s;
 }
 
-.stat-card:hover { box-shadow: var(--shadow-md); }
+.stat-card:hover {
+    box-shadow: var(--shadow-md);
+    transform: translateY(-2px);
+}
 
 .stat-card.green  { border-top-color: #1a6b36; }
 .stat-card.blue   { border-top-color: #2563eb; }
@@ -142,6 +145,395 @@
     fill: none;
 }
 
-@media (max-width: 900px) {
-    .stat-cards { grid-template-columns: repeat(2, 1fr); }
+/* Filter select styling */
+.filter-select {
+    padding: 0.48rem 1rem;
+    border: 1.5px solid var(--border);
+    border-radius: 0.55rem;
+    font-size: 0.83rem;
+    background: #f7faf8;
+    color: var(--text-main);
+    transition: border-color 0.2s, box-shadow 0.2s;
+    font-family: 'Source Sans 3', sans-serif;
+    cursor: pointer;
+}
+
+.filter-select:hover {
+    border-color: var(--green-mid);
+}
+
+.filter-select:focus {
+    outline: none;
+    border-color: var(--green-btn);
+    box-shadow: 0 0 0 3px rgba(26, 107, 54, 0.1);
+}
+
+/* Enhanced search box */
+.search-input {
+    padding: 0.48rem 1rem;
+    border: 1.5px solid var(--border);
+    border-radius: 0.55rem;
+    font-size: 0.83rem;
+    color: var(--text-main);
+    background: #f7faf8;
+    width: 200px;
+    transition: border-color 0.2s, width 0.3s, box-shadow 0.2s;
+    font-family: 'Source Sans 3', sans-serif;
+}
+
+.search-input:focus {
+    outline: none;
+    border-color: var(--green-mid);
+    width: 240px;
+    box-shadow: 0 0 0 3px rgba(20, 90, 46, 0.1);
+}
+
+.search-input::placeholder {
+    color: var(--text-muted);
+}
+
+/* Enhanced table row hover */
+.data-table tbody tr {
+    transition: background-color 0.2s;
+}
+
+.data-table tbody tr:hover td {
+    background: #f0f8f2;
+}
+
+/* Enhanced action buttons */
+.btn-icon {
+    transition: all 0.2s;
+}
+
+.btn-icon:active {
+    transform: scale(0.95);
+}
+
+/* Modal enhancements */
+.modal-content {
+    border: none;
+    border-radius: var(--radius);
+    box-shadow: var(--shadow-md);
+}
+
+.modal-header {
+    background: linear-gradient(135deg, var(--green-mid) 0%, #145a2e 100%);
+    color: #fff;
+    border: none;
+    padding: 1.25rem 1.5rem;
+}
+
+.modal-title {
+    font-weight: 700;
+    font-family: 'Merriweather', serif;
+    font-size: 1.15rem;
+}
+
+.modal-body {
+    padding: 1.75rem;
+}
+
+.modal-footer {
+    background: #f7faf8;
+    border-top: 1px solid var(--border);
+    padding: 1.25rem 1.5rem;
+    gap: 0.75rem;
+}
+
+/* File preview section styling */
+.file-preview-section {
+    text-align: center;
+    padding: 2rem;
+    background: var(--bg-secondary);
+    border-radius: var(--radius);
+    margin-bottom: 1.5rem;
+}
+
+.file-icon-large {
+    width: 80px;
+    height: 80px;
+    margin: 0 auto 1rem;
+    background: linear-gradient(135deg, var(--green-btn) 0%, #145a2e 100%);
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    box-shadow: 0 4px 15px rgba(26, 107, 54, 0.2);
+}
+
+.file-icon-large svg {
+    width: 40px;
+    height: 40px;
+    stroke: white;
+    fill: none;
+}
+
+#modalFileName {
+    margin-bottom: 0.5rem;
+    font-family: 'Merriweather', serif;
+    font-weight: 700;
+    color: var(--text-main);
+}
+
+#modalFileCategory {
+    color: var(--text-muted);
+    font-size: 0.9rem;
+}
+
+/* File details section */
+.file-details-section {
+    background: var(--bg-secondary);
+    padding: 1.5rem;
+    border-radius: var(--radius);
+}
+
+.file-details-section h6 {
+    margin-bottom: 1rem;
+    font-weight: 700;
+    color: var(--text-main);
+    font-family: 'Merriweather', serif;
+}
+
+.detail-row {
+    display: flex;
+    justify-content: space-between;
+    padding: 0.75rem 0;
+    border-bottom: 1px solid var(--border);
+}
+
+.detail-row:last-child {
+    border-bottom: none;
+}
+
+.detail-label {
+    font-weight: 600;
+    color: var(--text-muted);
+    font-size: 0.9rem;
+}
+
+.detail-value {
+    font-weight: 500;
+    color: var(--text-main);
+}
+
+/* Review section */
+.review-section {
+    margin-bottom: 1rem;
+}
+
+.review-section label {
+    font-weight: 700;
+    color: var(--text-main);
+    margin-bottom: 0.75rem;
+    display: block;
+    font-family: 'Merriweather', serif;
+}
+
+.review-section textarea {
+    border: 1.5px solid var(--border);
+    border-radius: var(--radius);
+    padding: 0.75rem 1rem;
+    font-family: 'Source Sans 3', sans-serif;
+    font-size: 0.9rem;
+    resize: vertical;
+    transition: border-color 0.2s, box-shadow 0.2s;
+}
+
+.review-section textarea:focus {
+    outline: none;
+    border-color: var(--green-mid);
+    box-shadow: 0 0 0 3px rgba(20, 90, 46, 0.1);
+}
+
+.review-section small {
+    display: block;
+    margin-top: 0.5rem;
+    color: var(--text-muted);
+}
+
+/* Modal alert styling */
+.modal-body .alert {
+    margin-top: 1rem;
+    font-size: 0.9rem;
+    border: 1px solid #3b82f6;
+    background: #eff6ff;
+    color: #1e40af;
+    padding: 0.875rem 1rem;
+    border-radius: var(--radius);
+    margin-bottom: 0;
+}
+
+.modal-body .alert svg {
+    width: 16px;
+    height: 16px;
+    display: inline;
+    vertical-align: middle;
+    margin-right: 0.5rem;
+    stroke: currentColor;
+    fill: none;
+    stroke-width: 2;
+}
+
+.modal-body .alert strong {
+    font-weight: 700;
+}
+
+/* Modal buttons */
+.modal-footer .btn {
+    padding: 0.56rem 1.5rem;
+    font-weight: 600;
+    border-radius: 0.55rem;
+    transition: all 0.2s;
+    border: none;
+}
+
+.modal-footer .btn-secondary {
+    background: var(--border);
+    color: var(--text-main);
+}
+
+.modal-footer .btn-secondary:hover {
+    background: #d1dcd5;
+    color: var(--text-main);
+}
+
+.modal-footer .btn-danger {
+    background: #dc2626;
+    color: white;
+}
+
+.modal-footer .btn-danger:hover {
+    background: #b91c1c;
+}
+
+.modal-footer .btn-success {
+    background: #059669;
+    color: white;
+}
+
+.modal-footer .btn-success:hover {
+    background: #047857;
+}
+
+.modal-footer .btn svg {
+    width: 16px;
+    height: 16px;
+    margin-right: 0.5rem;
+    display: inline;
+    vertical-align: middle;
+}
+
+/* Disabled button states */
+.modal-footer .btn:disabled {
+    opacity: 0.6;
+    cursor: not-allowed;
+    pointer-events: none;
+}
+
+.modal-footer .btn-danger:disabled {
+    background: #b91c1c;
+}
+
+.modal-footer .btn-success:disabled {
+    background: #047857;
+}
+
+/* Responsive design */
+@media (max-width: 1024px) {
+    .toolbar-right {
+        flex-wrap: wrap;
+        gap: 0.5rem;
+    }
+    
+    .search-input {
+        width: 150px;
+    }
+    
+    .search-input:focus {
+        width: 200px;
+    }
+}
+
+@media (max-width: 768px) {
+    .stat-cards {
+        grid-template-columns: repeat(2, 1fr);
+    }
+    
+    .toolbar {
+        flex-direction: column;
+        align-items: flex-start;
+    }
+    
+    .toolbar-right {
+        width: 100%;
+        flex-wrap: wrap;
+    }
+    
+    .filter-select {
+        flex: 1;
+        min-width: 120px;
+    }
+    
+    .search-box {
+        width: 100%;
+    }
+    
+    .search-input {
+        width: 100%;
+    }
+    
+    .data-table {
+        font-size: 0.8rem;
+    }
+    
+    .data-table td,
+    .data-table th {
+        padding: 0.6rem 0.5rem;
+    }
+    
+    .modal-dialog.modal-xl {
+        max-width: 95vw;
+    }
+    
+    .modal-body .row > div {
+        margin-bottom: 1.5rem;
+    }
+}
+
+@media (max-width: 480px) {
+    .stat-cards {
+        grid-template-columns: 1fr;
+    }
+    
+    .toolbar-title {
+        width: 100%;
+        margin-bottom: 0.75rem;
+    }
+    
+    .data-table {
+        font-size: 0.75rem;
+    }
+    
+    .action-buttons {
+        gap: 0.25rem;
+    }
+    
+    .btn-icon svg {
+        width: 16px;
+        height: 16px;
+    }
+    
+    .modal-body {
+        padding: 1rem;
+    }
+    
+    .file-preview-section {
+        padding: 1.5rem 1rem;
+        margin-bottom: 1rem;
+    }
+    
+    .file-details-section {
+        padding: 1rem;
+    }
 }

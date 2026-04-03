@@ -42,6 +42,21 @@ document.addEventListener('DOMContentLoaded', function () {
 });
 
 function showAdminCardIfNeeded() {
+    const user = getCurrentUser();
+    if (!user) return;
+
+    const cards = document.querySelectorAll('.system-card');
+    
+    if (user.userType === 'student' || user.role === 'student') {   
+        cards.forEach(card => {
+            const href = card.getAttribute('href') || card.querySelector('a')?.getAttribute('href') || '';
+            if (href.includes('FacultyRequirementSubmissionSystem')) {
+                card.style.display = 'none';
+            } else {
+                card.style.display = 'block';
+            }
+        });
+    }
 }
 
 function checkUserSession() {
@@ -49,6 +64,19 @@ function checkUserSession() {
     if (!user) {
         window.location.href = '../auth/login.html';
     }
+}
+
+function getCurrentUser() {
+    const userStr = sessionStorage.getItem('user');
+    if (userStr) {
+        try {
+            return JSON.parse(userStr);
+        } catch (e) {
+            console.error('Error parsing user:', e);
+            return null;
+        }
+    }
+    return null;
 }
 
 function loadDepartmentLogoAndInfo() {
