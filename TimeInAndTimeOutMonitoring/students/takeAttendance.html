@@ -1,0 +1,121 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1.0">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
+<link href="https://fonts.googleapis.com/css2?family=Syne:wght@600;700;800&family=DM+Sans:wght@300;400;500;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="../resc/css/takeAttendance.css">
+<title>Take Attendance | Time In & Time Out Monitoring System</title>
+</head>
+<body>
+
+<!-- TOP BAR -->
+<!-- stopEngineBtn mirrors the same button in accountRegistration.html -->
+<div class="topbar">
+  <a href="accountRegistration.html" class="back-btn">
+    <i class="fa-solid fa-arrow-left"></i> Back
+  </a>
+  <div class="date-chip" id="timestamp"></div>
+  <button id="stopEngineBtn"
+          onclick="stopEngine()"
+          style="display:none; background:#c0392b; color:#fff; border:none;
+                 padding:8px 16px; border-radius:8px; cursor:pointer;
+                 font-family:'DM Sans',sans-serif; font-size:14px; font-weight:500;
+                 gap:6px; align-items:center;">
+    <i class="fa-solid fa-power-off"></i> Stop Engine
+  </button>
+</div>
+
+<!-- PAGE HEADER -->
+<div class="page-header">
+  <div class="header-icon"><i class="fa-solid fa-user-check"></i></div>
+  <h1>Take Attendance</h1>
+  <p>Facial recognition-powered attendance session</p>
+</div>
+
+<!-- CARD -->
+<div class="card">
+  <div class="card-strip">
+    <div class="strip-dots">
+      <div class="s-dot r"></div>
+      <div class="s-dot y"></div>
+      <div class="s-dot g"></div>
+    </div>
+    <span class="strip-label">Attendance System</span>
+    <div class="strip-status" id="stripStatus"><div class="pulse"></div>Ready</div>
+  </div>
+
+  <div class="card-body">
+    <div class="tiles">
+      <div class="tile">
+        <div class="tile-label">Mode</div>
+        <div class="tile-value"><i class="fa-solid fa-camera"></i> Facial AI</div>
+      </div>
+      <div class="tile">
+        <div class="tile-label">Session</div>
+        <div class="tile-value"><i class="fa-solid fa-circle-dot"></i> <span id="sessionState">Idle</span></div>
+      </div>
+      <div class="tile">
+        <div class="tile-label">Stream</div>
+        <div class="tile-value"><i class="fa-solid fa-wifi"></i> Local Feed</div>
+      </div>
+    </div>
+
+    <div class="divider"></div>
+
+    <div class="instruction">
+      <p>
+        Click <strong>Start Session</strong> to connect to the live camera feed and begin
+        capturing attendance via facial recognition.<br>
+        <span style="font-size:13px;color:#888;">
+          <i class="fa-solid fa-circle-info"></i>
+          Make sure <strong>START_ENGINE.bat</strong> is running before clicking Start.
+        </span>
+      </p>
+    </div>
+
+    <div class="btn-wrap">
+      <button class="btn btn-start" id="startBtn">
+        <i class="fa-solid fa-play"></i> Start Session
+      </button>
+      <button class="btn btn-stop" id="stopBtn" style="display:none">
+        <i class="fa-solid fa-stop"></i> Stop Session
+      </button>
+    </div>
+
+    <div class="output-box" id="outputBox">
+      <i class="fa-solid fa-circle-info"></i>
+      <span id="outputText"></span>
+    </div>
+
+    <div class="video-wrap" id="videoWrap" style="display:none">
+      <div class="video-hdr">
+        <div class="video-live-dot"></div>
+        <span class="video-lbl">Live Camera Feed — Face Recognition Active</span>
+      </div>
+      <img id="videoStream" src="" alt="Loading video stream…">
+    </div>
+  </div>
+</div>
+
+<!-- NOTIFICATION OVERLAY -->
+<div id="notifOverlay">
+  <div id="notifBox">
+    <div id="notifIcon"></div>
+    <div id="notifTitle"></div>
+    <div id="notifMsg"></div>
+    <div id="lateBadge"></div>
+    <div id="dismissInfo"></div>
+    <div id="cannotTimeOutInfo"></div>
+    <div id="notifBtns"></div>
+    <div id="notifCountdown"></div>
+  </div>
+</div>
+
+<!-- TOAST -->
+<div id="toast"></div>
+
+<script src="../resc/js/takeAttendance.js"></script>
+</body>
+</html>

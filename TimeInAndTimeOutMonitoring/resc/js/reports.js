@@ -26,7 +26,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     }
     await loadReportsData();
     await loadDropdownDataForGenerator();
-    initFilters();
+   
 });
 
 // ────────────────────────────────────────────

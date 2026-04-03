@@ -171,10 +171,10 @@
                 <span class="rm-chip red"   id="chipMaintenance" style="display:none"><i class="fa-solid fa-wrench"></i> — Maintenance</span>
                 <span class="rm-chip blue"  id="chipCapacity"><i class="fa-solid fa-users"></i> — Seats</span>
                 <div class="rm-tb-right">
-                    <button class="rm-btn save"  onclick="saveReport()"><i class="fa-solid fa-floppy-disk"></i> Save to Reports</button>
-                    <button class="rm-btn print" onclick="printReport()"><i class="fa-solid fa-print"></i> Print</button>
-                    <button class="rm-btn pdf"   onclick="downloadPDF()"><i class="fa-solid fa-file-pdf"></i> PDF</button>
-                    <button class="rm-btn excel" onclick="exportCSV()"><i class="fa-solid fa-file-excel"></i> Excel / CSV</button>
+                  <button class="rm-btn print" onclick="printReport()"><i class="fa-solid fa-print"></i> Print  </button>
+                  <button class="rm-btn pdf" onclick="downloadPDF()"><i class="fa-solid fa-file-pdf"></i> PDF</button>
+                  <button class="rm-btn excel" onclick="exportExcel()"> <i class="fa-solid fa-file-excel"></i> Excel</button>
+                  <button class="rm-btn csv" onclick="exportCSV()"> <i class="fa-solid fa-file-csv"></i> CSV</button>
                 </div>
             </div>
             <div class="rm-body">
@@ -216,6 +216,7 @@
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <script src="../../config/.env.js"></script>
     <script src="../../config/config.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 
     <!-- Shared header + sidebar loader -->
     <script src="../includes/sidebar.js"></script>
