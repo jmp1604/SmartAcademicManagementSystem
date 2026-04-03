@@ -26,15 +26,15 @@
     <div class="stat-cards anim anim-2">
         <div class="stat-card green">
             <div class="stat-label">Total Files</div>
-            <div class="stat-value" style="color:var(--text-main);" id="totalFilesCount">0</div>
+            <div class="stat-value" id="totalFilesCount">0</div>
         </div>
         <div class="stat-card blue">
             <div class="stat-label">Total Storage</div>
             <div class="stat-value" id="totalStorage">0 MB</div>
         </div>
-        <div class="stat-card purple" style="--purple:#059669;">
+        <div class="stat-card green" style="border-top-color: #059669;">
             <div class="stat-label">Approved</div>
-            <div class="stat-value" style="color:#059669;" id="approvedCount">0</div>
+            <div class="stat-value" style="color: #059669;" id="approvedCount">0</div>
         </div>
         <div class="stat-card orange">
             <div class="stat-label">Pending</div>
@@ -99,69 +99,133 @@
 </main>
 <div class="modal fade" id="reviewModal" tabindex="-1">
     <div class="modal-dialog modal-xl modal-dialog-centered">
-        <div class="modal-content">
-            <div class="modal-header">
-                <h5 class="modal-title">Review Submission</h5>
-                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
-            </div>
-            <div class="modal-body">
-                <div class="row">
-                    <div class="col-md-6">
-                        <div class="file-preview-section" style="text-align: center; padding: 2rem; background: var(--bg-secondary); border-radius: 0.5rem; margin-bottom: 1rem;">
-                            <div class="file-icon-large" style="width: 80px; height: 80px; margin: 0 auto 1rem; background: var(--primary); border-radius: 50%; display: flex; align-items: center; justify-content: center;">
-                                <svg viewBox="0 0 24 24" style="width: 40px; height: 40px; stroke: white; fill: none;"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
-                            </div>
-                            <h4 id="modalFileName" style="margin-bottom: 0.5rem;">filename.pdf</h4>
-                            <p id="modalFileCategory" style="color: var(--text-muted); font-size: .9rem;"></p>
-                        </div>
+        <div class="modal-content rm-content">
 
-                        <div class="file-details-section" style="background: var(--bg-secondary); padding: 1.5rem; border-radius: 0.5rem;">
-                            <h6 style="margin-bottom: 1rem; font-weight: 600;">Submission Details</h6>
-                            <div class="detail-row" style="display: flex; justify-content: space-between; padding: 0.5rem 0; border-bottom: 1px solid var(--border-color);">
-                                <span class="detail-label" style="font-weight: 500;">Uploaded by:</span>
-                                <span class="detail-value" id="modalUploader"></span>
-                            </div>
-                            <div class="detail-row" style="display: flex; justify-content: space-between; padding: 0.5rem 0; border-bottom: 1px solid var(--border-color);">
-                                <span class="detail-label" style="font-weight: 500;">Department:</span>
-                                <span class="detail-value" id="modalDepartment"></span>
-                            </div>
-                            <div class="detail-row" style="display: flex; justify-content: space-between; padding: 0.5rem 0; border-bottom: 1px solid var(--border-color);">
-                                <span class="detail-label" style="font-weight: 500;">Upload Date:</span>
-                                <span class="detail-value" id="modalUploadDate"></span>
-                            </div>
-                            <div class="detail-row" style="display: flex; justify-content: space-between; padding: 0.5rem 0;">
-                                <span class="detail-label" style="font-weight: 500;">File Size:</span>
-                                <span class="detail-value" id="modalSize"></span>
-                            </div>
-                        </div>
+            <!-- Header -->
+            <div class="rm-header">
+                <div class="rm-header-left">
+                    <div class="rm-header-icon">
+                        <svg viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
                     </div>
-
-                    <div class="col-md-6">
-                        <div class="review-section">
-                            <label for="adminRemarks" class="form-label" style="font-weight: 600; margin-bottom: 0.5rem;">Admin Remarks</label>
-                            <textarea class="form-control" id="adminRemarks" rows="6" placeholder="Add your review comments, feedback, or reason for rejection..." style="resize: vertical;"></textarea>
-                            <small class="text-muted" style="display: block; margin-top: 0.5rem;">
-                                <strong>Note:</strong> Remarks are required for rejections. The faculty member will receive notification of your decision.
-                            </small>
-                        </div>
-
-                        <div class="alert alert-info" style="margin-top: 1rem; font-size: 0.9rem;">
-                            <strong><svg viewBox="0 0 24 24" style="width: 16px; height: 16px; display: inline; vertical-align: middle; margin-right: 4px;"><circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/></svg> Admin Review</strong><br>
-                            Your action will be final. Approved submissions cannot be reverted. Rejected submissions may be re-uploaded by faculty.
-                        </div>
+                    <div>
+                        <h5 class="rm-title">Review Submission</h5>
+                        <p class="rm-subtitle">Carefully review the file before approving or rejecting</p>
                     </div>
                 </div>
+                <button type="button" class="rm-close" data-bs-dismiss="modal" aria-label="Close">
+                    <svg viewBox="0 0 24 24"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+                </button>
             </div>
-            <div class="modal-footer">
-                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
-                <button type="button" class="btn btn-danger" id="rejectSubmissionBtn">
-                    <svg viewBox="0 0 24 24" style="width: 16px; height: 16px; margin-right: 4px;"><circle cx="12" cy="12" r="10"/><line x1="15" y1="9" x2="9" y2="15"/><line x1="9" y1="9" x2="15" y2="15"/></svg>
-                    Reject Submission
-                </button>
-                <button type="button" class="btn btn-success" id="approveSubmissionBtn">
-                    <svg viewBox="0 0 24 24" style="width: 16px; height: 16px; margin-right: 4px;"><polyline points="20 6 9 17 4 12"/></svg>
-                    Approve Submission
-                </button>
+
+            <!-- Body: two columns -->
+            <div class="rm-body">
+
+                <!-- LEFT: file preview + metadata -->
+                <div class="rm-left">
+
+                    <!-- Preview box -->
+                    <div class="rm-preview-box">
+                        <div id="filePreviewContainer" class="rm-preview-inner">
+                            <iframe id="filePreviewIframe" style="display:none; width:100%; height:100%; border:none; background:#fff;"></iframe>
+                            <div id="previewLoading" class="rm-file-placeholder" style="display:flex;">
+                                <svg viewBox="0 0 24 24" style="animation: spin 1s linear infinite;"><circle cx="12" cy="12" r="10" fill="none" stroke="currentColor" stroke-width="2"/><path d="M12 2a10 10 0 0 1 10 10" fill="none" stroke="currentColor" stroke-width="2"/></svg>
+                            </div>
+                            <div id="previewError" class="rm-file-placeholder" style="display:none;">
+                                <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+                                <p style="font-size:0.85rem;margin:0;">Preview unavailable</p>
+                            </div>
+                        </div>
+                        <!-- File name + category overlay -->
+                        <div class="rm-preview-meta">
+                            <span class="rm-file-name" id="modalFileName">filename.pdf</span>
+                            <span class="rm-file-cat" id="modalFileCategory"></span>
+                        </div>
+                    </div>
+
+                    <!-- View / Download buttons -->
+                    <div class="rm-file-actions">
+                        <button type="button" class="rm-action-btn rm-action-view" id="viewFileBtn">
+                            <svg viewBox="0 0 24 24"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
+                            View File
+                        </button>
+                        <button type="button" class="rm-action-btn rm-action-download" id="downloadFileBtn">
+                            <svg viewBox="0 0 24 24"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+                            Download
+                        </button>
+                    </div>
+
+                    <!-- Submission details -->
+                    <div class="rm-details-card">
+                        <div class="rm-details-heading">
+                            <svg viewBox="0 0 24 24"><circle cx="12" cy="8" r="4"/><path d="M4 20c0-4 3.6-7 8-7s8 3 8 7"/></svg>
+                            Submission Details
+                        </div>
+                        <div class="rm-detail-row">
+                            <span class="rm-detail-label">Uploaded by</span>
+                            <span class="rm-detail-value" id="modalUploader">—</span>
+                        </div>
+                        <div class="rm-detail-row">
+                            <span class="rm-detail-label">Department</span>
+                            <span class="rm-detail-value" id="modalDepartment">—</span>
+                        </div>
+                        <div class="rm-detail-row">
+                            <span class="rm-detail-label">Upload Date</span>
+                            <span class="rm-detail-value" id="modalUploadDate">—</span>
+                        </div>
+                        <div class="rm-detail-row" style="border-bottom:none;">
+                            <span class="rm-detail-label">File Size</span>
+                            <span class="rm-detail-value" id="modalSize">—</span>
+                        </div>
+                    </div>
+
+                </div>
+
+                <!-- RIGHT: review panel -->
+                <div class="rm-right">
+
+                    <div class="rm-review-label">
+                        <svg viewBox="0 0 24 24"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
+                        Admin Remarks
+                    </div>
+                    <textarea
+                        id="adminRemarks"
+                        class="rm-textarea"
+                        rows="7"
+                        placeholder="Write your review comments, feedback, or reason for rejection here…"
+                    ></textarea>
+                    <p class="rm-remarks-hint">
+                        <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12.01" y2="8"/><line x1="12" y1="12" x2="12" y2="16"/></svg>
+                        Remarks are <strong>required</strong> when rejecting. The faculty member will be notified of your decision.
+                    </p>
+
+                    <div class="rm-notice">
+                        <div class="rm-notice-icon">
+                            <svg viewBox="0 0 24 24"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
+                        </div>
+                        <div class="rm-notice-text">
+                            <strong>This action is final.</strong> Approved submissions cannot be reverted. Rejected submissions may be re-uploaded by the faculty member.
+                        </div>
+                    </div>
+
+                    <!-- Spacer pushes buttons to bottom -->
+                    <div style="flex:1;"></div>
+
+                    <!-- Decision buttons -->
+                    <div class="rm-decision-row">
+                        <button type="button" class="rm-btn rm-btn-cancel" data-bs-dismiss="modal">
+                            Cancel
+                        </button>
+                        <button type="button" class="rm-btn rm-btn-reject" id="rejectSubmissionBtn">
+                            <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><line x1="15" y1="9" x2="9" y2="15"/><line x1="9" y1="9" x2="15" y2="15"/></svg>
+                            Reject
+                        </button>
+                        <button type="button" class="rm-btn rm-btn-approve" id="approveSubmissionBtn">
+                            <svg viewBox="0 0 24 24"><polyline points="20 6 9 17 4 12"/></svg>
+                            Approve
+                        </button>
+                    </div>
+                </div>
+
             </div>
         </div>
     </div>

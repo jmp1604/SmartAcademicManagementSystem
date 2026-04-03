@@ -36,12 +36,13 @@ async function loginUser(username, password) {
     let userData = null;
     let tableName = '';
     let userRole = '';
+    const isStudentId = /^\d{2}-?\d{5}$|^\d{7}$/.test(username.replace(/\s/g, ''));
+    const isEmployeeId = /^[A-Za-z0-9]{3,10}$/.test(username.replace(/\s/g, '')) && !/^\d+$/.test(username.replace(/\s/g, ''));
 
     let adminQuery = supabaseClient
         .from('admins')
         .select('*')
         .eq('password', password);
-    const isEmployeeId = /^[A-Za-z0-9]{3,10}$/.test(username.replace(/\s/g, ''));
 
     if (isEmployeeId) {
         adminQuery = adminQuery.eq('employee_id', username);
@@ -86,8 +87,6 @@ async function loginUser(username, password) {
                 .from('students')
                 .select('*')
                 .eq('password', password);
-
-            const isStudentId = /^\d{2}-?\d{5}$|^\d{7}$/.test(username.replace(/\s/g, ''));
 
             if (isStudentId) {
                 const normalizedId = username.replace(/\D/g, '');
