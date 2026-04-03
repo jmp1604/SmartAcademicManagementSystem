@@ -8,16 +8,6 @@ document.addEventListener('DOMContentLoaded', function () {
     showAdminCardIfNeeded();
     setFacultyRequirementLink();
 
-    const logoutBtn = document.querySelector('.btn-logout');
-    if (logoutBtn) {
-        logoutBtn.addEventListener('click', function () {
-            if (confirm('Are you sure you want to log out?')) {
-                sessionStorage.removeItem('user');
-                window.location.href = '../auth/login.html';
-            }
-        });
-    }
-
     const helpBtn = document.querySelector('.help-btn');
     if (helpBtn) {
         helpBtn.addEventListener('click', function () {

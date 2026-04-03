@@ -11,7 +11,7 @@ document.addEventListener('DOMContentLoaded', function() {
         const password = passwordInput.value;
         
         if (!username || !password) {
-            alert('Please enter both email and password');
+            alert('Please enter both email/ID and password');
             return;
         }
         submitBtn.disabled = true;
@@ -28,7 +28,7 @@ document.addEventListener('DOMContentLoaded', function() {
     });
 });
 
-async function loginUser(email, password) {
+async function loginUser(username, password) {
     if (!supabaseClient) {
         throw new Error('Database connection not available. Please check configuration.');
     }
@@ -37,12 +37,19 @@ async function loginUser(email, password) {
     let tableName = '';
     let userRole = '';
 
-    const { data: adminData, error: adminError } = await supabaseClient
+    let adminQuery = supabaseClient
         .from('admins')
         .select('*')
-        .eq('email', email)
-        .eq('password', password)
-        .single();
+        .eq('password', password);
+    const isEmployeeId = /^[A-Za-z0-9]{3,10}$/.test(username.replace(/\s/g, ''));
+
+    if (isEmployeeId) {
+        adminQuery = adminQuery.eq('employee_id', username);
+    } else {
+        adminQuery = adminQuery.eq('email', username);
+    }
+
+    const { data: adminData, error: adminError } = await adminQuery.single();
 
     if (adminError && adminError.code !== 'PGRST116') { 
         throw adminError;
@@ -53,12 +60,18 @@ async function loginUser(email, password) {
         tableName = 'admins';
         userRole = adminData.admin_level || 'admin';
     } else {
-        const { data: profData, error: profError } = await supabaseClient
+        let profQuery = supabaseClient
             .from('professors')
             .select('*')
-            .eq('email', email)
-            .eq('password', password)
-            .single();
+            .eq('password', password);
+
+        if (isEmployeeId) {
+            profQuery = profQuery.eq('employee_id', username);
+        } else {
+            profQuery = profQuery.eq('email', username);
+        }
+
+        const { data: profData, error: profError } = await profQuery.single();
 
         if (profError && profError.code !== 'PGRST116') {
             throw profError;
@@ -68,36 +81,63 @@ async function loginUser(email, password) {
             userData = profData;
             tableName = 'professors';
             userRole = profData.role || 'faculty'; 
+        } else {
+            let studentQuery = supabaseClient
+                .from('students')
+                .select('*')
+                .eq('password', password);
+
+            const isStudentId = /^\d{2}-?\d{5}$|^\d{7}$/.test(username.replace(/\s/g, ''));
+
+            if (isStudentId) {
+                const normalizedId = username.replace(/\D/g, '');
+                studentQuery = studentQuery.eq('id_number', normalizedId);
+            } else {
+                studentQuery = studentQuery.eq('email', username);
+            }
+
+            const { data: studentData, error: studentError } = await studentQuery.single();
+
+            if (studentError && studentError.code !== 'PGRST116') {
+                throw studentError;
+            }
+
+            if (studentData) {
+                userData = studentData;
+                tableName = 'students';
+                userRole = 'student';
+            }
         }
     }
 
     if (!userData) {
-        throw new Error('Invalid email or password');
+        throw new Error('Invalid credentials. Please check your email, ID, and password.');
     }
 
     if (userData.status !== 'active') {
         throw new Error('Your account is not active. Please contact the administrator.');
     }
 
-    const { error: authSignInError } = await supabaseClient.auth.signInWithPassword({
-        email: email,
-        password: password
-    });
-
-    if (authSignInError) {
-        console.warn('Supabase Auth sign-in failed, attempting sign-up:', authSignInError.message);
-        const { error: signUpError } = await supabaseClient.auth.signUp({
-            email: email,
+    if (tableName !== 'students') {
+        const { error: authSignInError } = await supabaseClient.auth.signInWithPassword({
+            email: userData.email,
             password: password
         });
-        if (signUpError) {
-            console.warn('Supabase Auth sign-up also failed:', signUpError.message);
-        } else {
-            await supabaseClient.auth.signInWithPassword({ email, password });
+
+        if (authSignInError) {
+            console.warn('Supabase Auth sign-in failed, attempting sign-up:', authSignInError.message);
+            const { error: signUpError } = await supabaseClient.auth.signUp({
+                email: userData.email,
+                password: password
+            });
+            if (signUpError) {
+                console.warn('Supabase Auth sign-up also failed:', signUpError.message);
+            } else {
+                await supabaseClient.auth.signInWithPassword({ email: userData.email, password });
+            }
         }
     }
 
-    // Fetch department info for professors and department-assigned admins
     let departmentInfo = null;
     if (userData.department_id) {
         try {
@@ -116,14 +156,18 @@ async function loginUser(email, password) {
     }
 
     sessionStorage.setItem('user', JSON.stringify({
-        id: userData.professor_id || userData.admin_id,
-        employeeId: userData.employee_id,
+        id: userData.student_id || userData.professor_id || userData.admin_id,
+        studentId: userData.id_number || null,
+        employeeId: userData.employee_id || null,
         firstName: userData.first_name,
-        middleName: userData.middle_name,
+        middleName: userData.middle_name || null,
         lastName: userData.last_name,
         email: userData.email,
+        course: userData.course || null,
+        year_level: userData.year_level || null,
+        section: userData.section || null,
         role: userRole,
-        userType: tableName === 'admins' ? 'admin' : 'professor',
+        userType: tableName === 'admins' ? 'admin' : (tableName === 'professors' ? 'professor' : 'student'),
         adminLevel: tableName === 'admins' ? (userData.admin_level || 'admin') : null, 
         departmentId: userData.department_id || null,
         department: departmentInfo ? departmentInfo.department_name : (userData.department || null),
@@ -133,9 +177,10 @@ async function loginUser(email, password) {
     }));
 
     console.log('Login successful - User data saved to session:');
-    console.log('- userType:', tableName === 'admins' ? 'admin' : 'professor');
+    console.log('- userType:', tableName === 'admins' ? 'admin' : (tableName === 'professors' ? 'professor' : 'student'));
     console.log('- role:', userRole);
     console.log('- email:', userData.email);
+    console.log('- studentId:', userData.id_number || 'N/A');
     console.log('- department:', departmentInfo ? departmentInfo.department_name : 'N/A');
 
     if (tableName === 'admins' && userData.admin_level === 'super_admin') {

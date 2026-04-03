@@ -1,0 +1,226 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8"/>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+    <title>Student Import — Smart Academic Management System</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet"/>
+    <link href="https://fonts.googleapis.com/css2?family=Merriweather:wght@400;700&family=Source+Sans+3:wght@400;500;600&display=swap" rel="stylesheet"/>
+    <link rel="stylesheet" href="../shared/global.css"/>
+    <link rel="stylesheet" href="admin-specific.css"/>
+    <link rel="stylesheet" href="student-import.css"/>
+</head>
+<body>
+
+<div id="header-container"></div>
+<div id="sidebar-container"></div>
+
+<main class="main-content">
+
+    <!-- Page Header -->
+    <div class="page-header anim anim-1" style="display:flex;align-items:flex-start;justify-content:space-between;flex-wrap:wrap;gap:1rem;">
+        <div>
+            <h1>Student Import</h1>
+            <p>Bulk import student accounts via Excel or CSV file</p>
+        </div>
+        <a href="student-import-template.xlsx" class="btn-download-template" id="downloadTemplateBtn" download>
+            <svg viewBox="0 0 24 24"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+            Download Template
+        </a>
+    </div>
+
+    <!-- Step 1: Department + File Upload -->
+    <div class="import-card anim anim-2" id="stepUpload">
+        <div class="step-badge">Step 1 of 3</div>
+        <h2 class="step-title">Select Department & Upload File</h2>
+        <p class="step-desc">Choose the department these students belong to, then upload your filled Excel or CSV template.</p>
+
+        <div class="row g-4 mt-1">
+            <div class="col-md-5">
+                <label class="form-label-custom" for="departmentSelect">
+                    <svg viewBox="0 0 24 24"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>
+                    Department <span class="required">*</span>
+                </label>
+                <select class="form-select-custom" id="departmentSelect">
+                    <option value="">Loading departments...</option>
+                </select>
+            </div>
+
+            <div class="col-md-7">
+                <label class="form-label-custom">
+                    <svg viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
+                    Upload File <span class="required">*</span>
+                </label>
+                <div class="file-drop-zone" id="fileDropZone">
+                    <input type="file" id="fileInput" accept=".xlsx,.xls,.csv" hidden/>
+                    <div class="drop-icon">
+                        <svg viewBox="0 0 24 24"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+                    </div>
+                    <p class="drop-text">Drag & drop your file here, or <span class="drop-link">browse</span></p>
+                    <p class="drop-hint">Supports .xlsx, .xls, .csv — Max 10MB</p>
+                    <div class="file-selected" id="fileSelected" style="display:none;">
+                        <svg viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
+                        <span id="fileSelectedName"></span>
+                        <button class="file-remove" id="fileRemoveBtn" title="Remove">
+                            <svg viewBox="0 0 24 24"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="step-footer">
+            <div></div>
+            <button class="btn-next" id="parseFileBtn" disabled>
+                Parse & Preview
+                <svg viewBox="0 0 24 24"><line x1="5" y1="12" x2="19" y2="12"/><polyline points="12 5 19 12 12 19"/></svg>
+            </button>
+        </div>
+    </div>
+
+    <!-- Step 2: Preview -->
+    <div class="import-card anim anim-3" id="stepPreview" style="display:none;">
+        <div class="step-badge">Step 2 of 3</div>
+        <h2 class="step-title">Review Import Data</h2>
+        <p class="step-desc">Verify the data below before importing. Rows with errors are highlighted — fix them in your file and re-upload if needed.</p>
+
+        <!-- Summary Bar -->
+        <div class="preview-summary" id="previewSummary">
+            <div class="summary-item valid">
+                <span class="summary-count" id="validCount">0</span>
+                <span class="summary-label">Ready to Import</span>
+            </div>
+            <div class="summary-item warning">
+                <span class="summary-count" id="warningCount">0</span>
+                <span class="summary-label">Warnings</span>
+            </div>
+            <div class="summary-item error">
+                <span class="summary-count" id="errorCount">0</span>
+                <span class="summary-label">Errors</span>
+            </div>
+            <div class="summary-item total">
+                <span class="summary-count" id="totalCount">0</span>
+                <span class="summary-label">Total Rows</span>
+            </div>
+        </div>
+
+        <!-- Preview Table -->
+        <div class="preview-table-wrap">
+            <table class="preview-table">
+                <thead>
+                    <tr>
+                        <th>#</th>
+                        <th>Student ID</th>
+                        <th>First Name</th>
+                        <th>Middle Name</th>
+                        <th>Last Name</th>
+                        <th>Course</th>
+                        <th>Year Level</th>
+                        <th>Section</th>
+                        <th>Email</th>
+                        <th>Status</th>
+                    </tr>
+                </thead>
+                <tbody id="previewTableBody"></tbody>
+            </table>
+        </div>
+
+        <div class="step-footer">
+            <button class="btn-back" id="backToUploadBtn">
+                <svg viewBox="0 0 24 24"><line x1="19" y1="12" x2="5" y2="12"/><polyline points="12 19 5 12 12 5"/></svg>
+                Back
+            </button>
+            <button class="btn-next" id="proceedImportBtn">
+                Proceed to Import
+                <svg viewBox="0 0 24 24"><line x1="5" y1="12" x2="19" y2="12"/><polyline points="12 5 19 12 12 19"/></svg>
+            </button>
+        </div>
+    </div>
+
+    <!-- Step 3: Import Progress -->
+    <div class="import-card anim anim-2" id="stepImport" style="display:none;">
+        <div class="step-badge">Step 3 of 3</div>
+        <h2 class="step-title">Importing Students</h2>
+        <p class="step-desc">Please do not close this page while the import is in progress.</p>
+
+        <div class="progress-wrap">
+            <div class="progress-bar-track">
+                <div class="progress-bar-fill" id="progressBarFill" style="width:0%"></div>
+            </div>
+            <div class="progress-labels">
+                <span id="progressText">0 of 0 students imported</span>
+                <span id="progressPct">0%</span>
+            </div>
+        </div>
+
+        <div class="import-log" id="importLog"></div>
+
+        <div class="step-footer" id="importFooter" style="display:none;">
+            <button class="btn-back" id="importAnotherBtn">
+                <svg viewBox="0 0 24 24"><line x1="19" y1="12" x2="5" y2="12"/><polyline points="12 19 5 12 12 5"/></svg>
+                Import Another File
+            </button>
+            <a href="usermanagement.html" class="btn-next" style="text-decoration:none;">
+                Go to User Management
+                <svg viewBox="0 0 24 24"><line x1="5" y1="12" x2="19" y2="12"/><polyline points="12 5 19 12 12 19"/></svg>
+            </a>
+        </div>
+    </div>
+
+    <!-- Info Card -->
+    <div class="info-card anim anim-4">
+        <div class="info-card-header">
+            <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+            Template & Format Guide
+        </div>
+        <div class="info-grid">
+            <div class="info-col">
+                <h4>Required Columns</h4>
+                <ul>
+                    <li><strong>Student ID</strong> — Unique 7-digit school ID (e.g. <code>2300221</code>). Also used as default password.</li>
+                    <li><strong>First Name</strong> — Student's first name</li>
+                    <li><strong>Last Name</strong> — Student's last name</li>
+                </ul>
+            </div>
+            <div class="info-col">
+                <h4>Optional Columns</h4>
+                <ul>
+                    <li><strong>Middle Name</strong> — May be left blank</li>
+                    <li><strong>Course</strong> — e.g. Computer Science</li>
+                    <li><strong>Year Level</strong> — Number from 1–5</li>
+                    <li><strong>Section</strong> — e.g. CS3A</li>
+                    <li><strong>Email</strong> — Auto-generated if blank: <code>lastname_firstname@plpasig.edu.ph</code></li>
+                </ul>
+            </div>
+            <div class="info-col">
+                <h4>Notes</h4>
+                <ul>
+                    <li>Default password = Student ID (e.g. <code>2300221</code>)</li>
+                    <li>Duplicate Student IDs will <strong>update</strong> the existing record</li>
+                    <li>Do not delete the header row</li>
+                    <li>Remove sample data before importing</li>
+                </ul>
+            </div>
+        </div>
+    </div>
+
+</main>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="../config/.env.js"></script>
+<script src="../config/config.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
+<!-- SheetJS for Excel parsing -->
+<script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+<script src="../shared/global.js"></script>
+<script src="admin-specific.js"></script>
+<script src="student-import.js"></script>
+
+<script>
+    requireSuperAdmin();
+    loadHeader();
+    loadSidebar('student-import');
+</script>
+
+</body>
+</html>

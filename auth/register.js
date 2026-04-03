@@ -294,7 +294,8 @@ async function loadDepartmentsForRegistration() {
         console.error('Error loading departments for registration:', error);
     }
 }
-// Check if departments are loaded for professors
+
+async function submitRegistration() {
     const userType = document.getElementById('userType').value;
     if (userType === 'professor' && !departmentsLoaded) {
         alert('Please wait for departments to load before submitting. Try again in a moment.');
@@ -321,9 +322,7 @@ async function loadDepartmentsForRegistration() {
         submitBtn.disabled = false;
         submitBtn.textContent = 'Complete Registration';
         return;
-    }lue : 'admin'; 
-    const email = document.getElementById('email').value.trim();
-    const password = document.getElementById('password').value;
+    }
 
     console.log('Registration data:', { userType, adminLevel, email, department }); 
 
