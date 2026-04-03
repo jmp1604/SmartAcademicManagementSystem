@@ -7,6 +7,7 @@ from flask_cors import CORS
 from supabase import create_client, Client
 import threading
 import sys
+import signal
 
 # ==========================================
 # CONFIGURATION
@@ -187,6 +188,13 @@ def status():
 @app.route('/video_feed')
 def video_feed():
     return Response(generate_frames(), mimetype='multipart/x-mixed-replace; boundary=frame')
+
+
+@app.route('/shutdown', methods=['POST'])
+def shutdown():
+    print("--- Engine shutting down ---")
+    os.kill(os.getpid(), signal.SIGTERM)
+    return jsonify({"status": "shutting down"})
 
 if __name__ == "__main__":
     app.run(host='0.0.0.0', port=5000, threaded=True)

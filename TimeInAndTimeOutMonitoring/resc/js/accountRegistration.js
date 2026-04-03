@@ -340,6 +340,38 @@ function fillProfessorFields(data) {
     }
 }
 
+
+// Poll every 3 seconds instead of just once on load
+setInterval(async () => {
+    try {
+        const res = await fetch('http://localhost:5000/status');
+        document.getElementById('stopEngineBtn').style.display = res.ok ? 'inline-flex' : 'none';
+    } catch (_) {
+        document.getElementById('stopEngineBtn').style.display = 'none';
+    }
+}, 3000);
+
+// Check engine status on page load
+checkEngineStatus();
+
+async function stopEngine() {
+    const confirmed = confirm("Are you sure you want to stop the camera engine?");
+    if (!confirmed) return;
+
+    try {
+        const res = await fetch('http://localhost:5000/shutdown', { method: 'POST' });
+        if (res.ok) {
+            document.getElementById('stopEngineBtn').style.display = 'none';
+            alert("✅ Engine stopped successfully.");
+        }
+    } catch (_) {
+        // Fetch error IS expected when server shuts down mid-response
+        document.getElementById('stopEngineBtn').style.display = 'none';
+        alert("✅ Engine stopped successfully.");
+    }
+}
+
+
 professorScanBtn.addEventListener('click', async () => {
     if (!professorData) return;
     const btn = document.getElementById('professorScanBtn');
