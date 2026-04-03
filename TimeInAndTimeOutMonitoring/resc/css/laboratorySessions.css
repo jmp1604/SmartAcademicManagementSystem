@@ -3,7 +3,7 @@
    Path: TimeInAndTimeOutMonitoring/resc/css/laboratorySessions.css
    ============================================================ */
 
-/* ── Design Tokens (matches dashboard.css) ── */
+/* ── Design Tokens ── */
 :root {
     --green-dark:   #1a4731;
     --green-mid:    #2d6a4f;
@@ -39,10 +39,7 @@ body {
 }
 
 /* ══════════════════════════════════════════════════════════
-   LAYOUT SHELL — mirrors dashboard.css exactly
-   Pushes content below fixed header (68px) and to the
-   right of the collapsed sidebar (64px).
-   sidebar.js toggles .sidebar-open on hover/expand.
+   LAYOUT SHELL
 ══════════════════════════════════════════════════════════ */
 .main-content {
     margin-left: var(--sidebar-collapsed, 64px);
@@ -251,7 +248,7 @@ hr {
     background: linear-gradient(135deg, rgba(249, 115, 22, .05), var(--white));
 }
 
-.card.scheduled  { border-left-color: var(--green-mid); }
+.card.scheduled { border-left-color: var(--green-mid); }
 
 .card.completed {
     border-left-color: #6b7280;
@@ -429,11 +426,246 @@ hr {
     color: #666;
 }
 
-/* ── Responsive ── */
+/* ══════════════════════════════════════════════════════════
+   REPORT MODAL
+══════════════════════════════════════════════════════════ */
+.rm-overlay {
+    display: none;
+    position: fixed;
+    inset: 0;
+    background: rgba(0, 0, 0, .45);
+    z-index: 1000;
+    justify-content: center;
+    align-items: flex-start;
+    padding: 40px 20px;
+    overflow-y: auto;
+}
+
+.rm-overlay.on { display: flex; }
+
+.rm-modal {
+    background: var(--white);
+    border-radius: var(--radius-lg);
+    width: 100%;
+    max-width: 1100px;
+    box-shadow: 0 20px 60px rgba(0, 0, 0, .25);
+    overflow: hidden;
+    animation: slideDown .3s ease;
+}
+
+@keyframes slideDown {
+    from { opacity: 0; transform: translateY(-20px); }
+    to   { opacity: 1; transform: translateY(0); }
+}
+
+/* ── Report Modal Header ── */
+.rm-header {
+    background: linear-gradient(135deg, var(--green-dark), var(--green-mid));
+    padding: 24px 28px;
+    color: var(--white);
+    position: relative;
+}
+
+.rm-header h2 {
+    font-family: 'Nunito', sans-serif;
+    font-size: 20px;
+    font-weight: 800;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin-bottom: 4px;
+}
+
+.rm-header p {
+    font-size: 13px;
+    opacity: .75;
+}
+
+.rm-close {
+    position: absolute;
+    top: 16px;
+    right: 16px;
+    background: rgba(255, 255, 255, .15);
+    border: none;
+    color: var(--white);
+    width: 32px;
+    height: 32px;
+    border-radius: 50%;
+    cursor: pointer;
+    font-size: 16px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: background .2s;
+}
+
+.rm-close:hover { background: rgba(255, 255, 255, .3); }
+
+/* ── Report Modal Chips ── */
+.rm-chips {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    padding: 16px 28px;
+    border-bottom: 1px solid var(--border);
+    background: var(--surface);
+    align-items: center;
+}
+
+.rm-chip {
+    padding: 5px 14px;
+    border-radius: 99px;
+    font-size: 12.5px;
+    font-weight: 700;
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    font-family: 'Nunito', sans-serif;
+}
+
+.rm-chip.total       { background: #e8f5e9; color: var(--green-dark); border: 1px solid #a5d6a7; }
+.rm-chip.available   { background: #dcfce7; color: #166534;           border: 1px solid #86efac; }
+.rm-chip.maintenance { background: #fee2e2; color: #991b1b;           border: 1px solid #fca5a5; }
+.rm-chip.capacity    { background: #eff6ff; color: #1d4ed8;           border: 1px solid #bfdbfe; }
+
+/* ── Report Modal Action Buttons ── */
+.rm-actions {
+    display: flex;
+    gap: 8px;
+    flex-wrap: wrap;
+    margin-left: auto;
+}
+
+.rm-btn {
+    padding: 7px 16px;
+    border: none;
+    border-radius: var(--radius);
+    font-size: 13px;
+    font-weight: 700;
+    cursor: pointer;
+    display: inline-flex;
+    align-items: center;
+    gap: 7px;
+    transition: all .2s;
+    font-family: 'Nunito', sans-serif;
+}
+
+.rm-btn:hover { transform: translateY(-2px); opacity: .92; }
+
+.rm-btn.save {
+    background: var(--green-dark);
+    color: var(--white);
+    box-shadow: 0 2px 8px rgba(26, 71, 49, .25);
+}
+
+.rm-btn.print {
+    background: #f1f5f9;
+    color: var(--text-dark);
+    border: 1.5px solid var(--border);
+}
+
+.rm-btn.print:hover { background: var(--border); }
+
+.rm-btn.pdf {
+    background: #fee2e2;
+    color: #b91c1c;
+    border: 1.5px solid #fca5a5;
+}
+
+.rm-btn.pdf:hover { background: #fecaca; }
+
+.rm-btn.excel {
+    background: #dcfce7;
+    color: #166534;
+    border: 1.5px solid #86efac;
+}
+
+.rm-btn.excel:hover { background: #bbf7d0; }
+
+.rm-btn.csv {
+    background: #fefce8;
+    color: #854d0e;
+    border: 1.5px solid #fde68a;
+}
+
+.rm-btn.csv:hover { background: #fef08a; }
+
+/* ── Report Table ── */
+.rm-body {
+    padding: 24px 28px;
+    overflow-x: auto;
+}
+
+.rm-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 13.5px;
+}
+
+.rm-table thead th {
+    background: var(--green-dark);
+    color: var(--white);
+    padding: 10px 12px;
+    text-align: left;
+    font-size: 11px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: .5px;
+    font-family: 'Nunito', sans-serif;
+    white-space: nowrap;
+}
+
+.rm-table tbody tr { transition: background .15s; }
+.rm-table tbody tr:nth-child(even) { background: var(--surface); }
+.rm-table tbody tr:hover           { background: var(--hover-bg); }
+
+.rm-table tbody td {
+    padding: 10px 12px;
+    border-bottom: 1px solid var(--border);
+    color: var(--text-body);
+    vertical-align: middle;
+}
+
+/* ── Report Status Badges ── */
+.rm-badge {
+    padding: 3px 10px;
+    border-radius: 99px;
+    font-size: 11px;
+    font-weight: 700;
+    text-transform: capitalize;
+    font-family: 'Nunito', sans-serif;
+}
+
+.rm-badge.available   { background: #dcfce7; color: #166534; }
+.rm-badge.maintenance { background: #fee2e2; color: #991b1b; }
+.rm-badge.inactive    { background: #f1f5f9; color: #64748b; }
+
+/* ── Report Modal Footer ── */
+.rm-footer {
+    padding: 14px 28px;
+    background: var(--surface);
+    border-top: 1px solid var(--border);
+    font-size: 12px;
+    color: var(--text-muted);
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+}
+
+/* ══════════════════════════════════════════════════════════
+   RESPONSIVE
+══════════════════════════════════════════════════════════ */
 @media (max-width: 768px) {
     .main-content { margin-left: 0; margin-top: 0; }
     .container    { padding: 20px 16px 40px; }
     .grid         { grid-template-columns: 1fr; }
     .stats        { gap: 8px; }
     .btn-history  { margin-left: 0; }
+
+    .rm-overlay  { padding: 0; align-items: flex-end; }
+    .rm-modal    { border-radius: var(--radius-lg) var(--radius-lg) 0 0; max-height: 90vh; overflow-y: auto; }
+    .rm-chips    { padding: 12px 16px; }
+    .rm-actions  { margin-left: 0; width: 100%; justify-content: flex-start; }
+    .rm-btn      { font-size: 12px; padding: 6px 12px; }
+    .rm-body     { padding: 16px; }
 }

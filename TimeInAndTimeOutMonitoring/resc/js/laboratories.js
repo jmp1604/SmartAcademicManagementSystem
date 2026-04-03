@@ -343,27 +343,68 @@ function closeReportModal() {
 }
 
 // ── Save to Reports (attendance_reports table) ────────────────
+// ── Save to Reports (las_reports table) ────────────────
 async function saveReport() {
-    const { data: { user } } = await supabaseClient.auth.getUser();
-
-    const { error } = await supabaseClient
-        .from('attendance_reports')
-        .insert({
-            report_type:  'laboratories',
-            generated_by: user?.id || null,
-            filters:      {},
-            status:       'generated',
-        });
-
-    if (error) {
-        showToast('Error saving report: ' + error.message, true);
-        return;
+    const btn = document.querySelector('.rm-btn[onclick="saveReport()"]');
+    if (btn) {
+        btn.disabled = true;
+        btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Saving...';
     }
-    showToast('Report saved!');
+
+    // Generate a clean name for the report
+    const dateStr = new Date().toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' });
+    const reportName = `Laboratory Rooms Report — ${dateStr}`;
+
+    const payload = {
+        report_type: 'laboratories',
+        report_name: reportName,
+        filters: JSON.stringify({}), // Save empty filters as a JSON string
+        report_data: JSON.stringify(REPORT) // Save the actual table data so it can be exported later!
+    };
+
+    try {
+        const { error } = await supabaseClient
+            .from('las_reports')
+            .insert([payload]);
+
+        if (error) throw error;
+
+        showToast('Report saved successfully!');
+    } catch (err) {
+        console.error('Error saving report:', err);
+        showToast('Error saving report: ' + err.message, true);
+    } finally {
+        if (btn) {
+            btn.disabled = false;
+            btn.innerHTML = '<i class="fa-solid fa-floppy-disk"></i> Save to Reports';
+        }
+    }
+}
+
+// ── Auto-save helper ──────────────────────────────────────────
+async function autoSaveReport(exportType) {
+    const dateStr    = new Date().toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' });
+    const reportName = `Laboratory Rooms Report — ${dateStr} (${exportType})`;
+
+    const payload = {
+        report_type: 'laboratories',
+        report_name: reportName,
+        filters:     JSON.stringify({}),
+        report_data: JSON.stringify(REPORT)
+    };
+
+    try {
+        const { error } = await supabaseClient.from('las_reports').insert([payload]);
+        if (error) throw error;
+        showToast(`${exportType} downloaded & report saved!`);
+    } catch (err) {
+        console.error('Auto-save error:', err);
+        showToast('Export done but failed to save report: ' + err.message, true);
+    }
 }
 
 // ── Print ─────────────────────────────────────────────────────
-function printReport() {
+async function printReport() {
     const cols = ['#','Lab Code','Lab Name','Building','Floor','Capacity','Status',
                   'Active Schedules','Sessions Done','Equipment','Date Added'];
     const nowStr = new Date().toLocaleString();
@@ -437,6 +478,9 @@ function printReport() {
     <script>window.onload=()=>setTimeout(()=>window.print(),400)<\/script>
     </body></html>`);
     w.document.close();
+
+    // Auto-save after opening print window
+    await autoSaveReport('Print');
 }
 
 // ── PDF ───────────────────────────────────────────────────────
@@ -464,9 +508,8 @@ function downloadPDF() {
     Promise.all([
         loadImage('../../auth/assets/plplogo.png'),
         loadImage('../../auth/assets/ccslogo.png')
-    ]).then(([plpData, ccsData]) => {
+    ]).then(async ([plpData, ccsData]) => {
 
-        // Title left
         doc.setFontSize(16); doc.setTextColor(26, 71, 49); doc.setFont('helvetica', 'bold');
         doc.text('Laboratory Rooms Report', 14, 14);
         doc.setFontSize(8); doc.setTextColor(90, 114, 101); doc.setFont('helvetica', 'normal');
@@ -474,7 +517,6 @@ function downloadPDF() {
         doc.setFontSize(7.5); doc.setTextColor(22, 101, 52);
         doc.text(`Total: ${META.total}   Available: ${META.available}   Maintenance: ${META.maintenance}   Total Seats: ${META.capacity}`, 14, 27);
 
-        // Logos right
         const logoSize = 16, logoGap = 4, rightEdge = pageW - 14;
         if (ccsData) doc.addImage(ccsData, 'PNG', rightEdge - logoSize, 4, logoSize, logoSize);
         if (plpData) doc.addImage(plpData, 'PNG', rightEdge - logoSize * 2 - logoGap, 4, logoSize, logoSize);
@@ -483,11 +525,9 @@ function downloadPDF() {
         doc.setFont('helvetica', 'normal'); doc.setTextColor(90, 114, 101);
         doc.text('College of Computer Studies', rightEdge - logoSize * 2 - logoGap, 26, { maxWidth: logoSize * 2 + logoGap });
 
-        // Divider
         doc.setDrawColor(212, 230, 217); doc.setLineWidth(0.5);
         doc.line(14, 31, pageW - 14, 31);
 
-        // Table
         doc.autoTable({
             head: [['#','Lab Code','Lab Name','Building','Floor','Capacity','Status','Schedules','Sessions','Equipment','Date Added']],
             body: REPORT.map((r, i) => [
@@ -515,19 +555,22 @@ function downloadPDF() {
             }
         });
 
-        // Footer
         const pages = doc.internal.getNumberOfPages();
         for (let i = 1; i <= pages; i++) {
             doc.setPage(i); doc.setFontSize(7); doc.setTextColor(156, 163, 175);
             doc.text(`Laboratory Attendance System  ·  Page ${i} of ${pages}  ·  ${nowStr}`,
                 pageW / 2, doc.internal.pageSize.height - 8, { align: 'center' });
         }
+
         doc.save(`Laboratory_Report_${new Date().toISOString().split('T')[0]}.pdf`);
+
+        // Auto-save after PDF is downloaded
+        await autoSaveReport('PDF');
     });
 }
 
 // ── CSV ───────────────────────────────────────────────────────
-function exportCSV() {
+async function exportCSV() {
     const cols = ['#','Lab Code','Lab Name','Building','Floor','Capacity','Status',
                   'Active Schedules','Sessions Done','Equipment','Date Added'];
     const lines = [
@@ -551,7 +594,73 @@ function exportCSV() {
     a.download = `Laboratory_Report_${new Date().toISOString().split('T')[0]}.csv`;
     a.click();
     URL.revokeObjectURL(a.href);
-    showToast('CSV exported!');
+
+    // Auto-save after CSV is downloaded
+    await autoSaveReport('Excel/CSV');
+}
+
+// ── Excel ─────────────────────────────────────────────────────
+async function exportExcel() {
+    const wb = XLSX.utils.book_new();
+
+    // ── Summary sheet ──
+    const summaryData = [
+        ['Laboratory Rooms Report'],
+        ['Generated', new Date().toLocaleString()],
+        [''],
+        ['Total Labs',        META.total],
+        ['Available',         META.available],
+        ['Under Maintenance', META.maintenance],
+        ['Total Seats',       META.capacity],
+    ];
+    const summarySheet = XLSX.utils.aoa_to_sheet(summaryData);
+    summarySheet['!cols'] = [{ wch: 22 }, { wch: 30 }];
+    XLSX.utils.book_append_sheet(wb, summarySheet, 'Summary');
+
+    // ── Data sheet ──
+    const headers = [
+        '#', 'Lab Code', 'Lab Name', 'Building', 'Floor',
+        'Capacity', 'Status', 'Active Schedules', 'Sessions Completed',
+        'Equipment', 'Date Added'
+    ];
+    const rows = REPORT.map((r, i) => [
+        i + 1,
+        r.lab_code,
+        r.lab_name,
+        r.building,
+        r.floor,
+        r.capacity,
+        r.status.charAt(0).toUpperCase() + r.status.slice(1),
+        r.active_schedules,
+        r.sessions_done,
+        r.equipment,
+        r.date_added
+    ]);
+
+    const dataSheet = XLSX.utils.aoa_to_sheet([headers, ...rows]);
+
+    // Column widths
+    dataSheet['!cols'] = [
+        { wch: 5  },   // #
+        { wch: 12 },   // Lab Code
+        { wch: 20 },   // Lab Name
+        { wch: 18 },   // Building
+        { wch: 12 },   // Floor
+        { wch: 12 },   // Capacity
+        { wch: 14 },   // Status
+        { wch: 18 },   // Active Schedules
+        { wch: 22 },   // Sessions Completed
+        { wch: 30 },   // Equipment
+        { wch: 16 },   // Date Added
+    ];
+
+    XLSX.utils.book_append_sheet(wb, dataSheet, 'Laboratories');
+
+    // Download
+    XLSX.writeFile(wb, `Laboratory_Report_${new Date().toISOString().split('T')[0]}.xlsx`);
+
+    // Auto-save to reports page
+    await autoSaveReport('Excel');
 }
 
 // ── Keyboard close ────────────────────────────────────────────
