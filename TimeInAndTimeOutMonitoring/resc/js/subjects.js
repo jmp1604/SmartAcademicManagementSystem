@@ -12,6 +12,9 @@ let reportRows   = [];   // processed rows for the report modal
 // Cached summary stats
 let metaStats = { total: 0, schedules: 0, units: 0 };
 
+// ── Report state (mirrors laboratories.js) ─────────────────
+let existingReportsToday = []; // stores objects: { name, dataString }
+
 // ── Init ───────────────────────────────────────────────────
 document.addEventListener('DOMContentLoaded', () => {
     if (!supabaseClient) {
@@ -26,18 +29,6 @@ document.addEventListener('DOMContentLoaded', () => {
 // DATA LOADING
 // ══════════════════════════════════════════════════════════
 
-/**
- * Load subjects with schedule + student counts from Supabase.
- *
- * Supabase RLS policies must allow SELECT on:
- *   - subjects
- *   - lab_schedules  (joined via subject_id)
- *   - schedule_enrollments (joined via schedule_id)
- *   - lab_sessions   (joined via schedule_id)
- *
- * We fetch each table separately and aggregate in JS to avoid
- * complex PostgREST embedded resource limits.
- */
 async function loadSubjects() {
     setTableLoading(true);
 
@@ -74,8 +65,7 @@ async function loadSubjects() {
         if (sesErr) throw sesErr;
 
         // ── Aggregate ──
-        // Build a map: subject_id → { schedule_count, enrolled_students, sessions_done }
-        const schedulesBySubject = {};   // subject_id → Set<schedule_id>
+        const schedulesBySubject = {};
         const activeScheduleIds  = new Set();
 
         (schedules || []).forEach(s => {
@@ -86,8 +76,7 @@ async function loadSubjects() {
             activeScheduleIds.add(s.schedule_id);
         });
 
-        // enrolled students per schedule
-        const enrolledPerSchedule = {};  // schedule_id → Set<student_id>
+        const enrolledPerSchedule = {};
         (enrollments || []).forEach(e => {
             if (!enrolledPerSchedule[e.schedule_id]) {
                 enrolledPerSchedule[e.schedule_id] = new Set();
@@ -95,25 +84,21 @@ async function loadSubjects() {
             enrolledPerSchedule[e.schedule_id].add(e.student_id);
         });
 
-        // completed sessions per schedule
-        const completedPerSchedule = {}; // schedule_id → count
+        const completedPerSchedule = {};
         (sessions || []).filter(s => s.status === 'completed').forEach(s => {
             completedPerSchedule[s.schedule_id] = (completedPerSchedule[s.schedule_id] || 0) + 1;
         });
 
-        // Merge into subject rows
         allSubjects = (subjects || []).map(sub => {
             const subjectSchedules = schedulesBySubject[sub.subject_id] || new Set();
             const scheduleCount    = subjectSchedules.size;
 
-            // unique enrolled students across all schedules for this subject
             const studentSet = new Set();
             subjectSchedules.forEach(schId => {
                 (enrolledPerSchedule[schId] || new Set()).forEach(stId => studentSet.add(stId));
             });
             const enrolledStudents = studentSet.size;
 
-            // total completed sessions for this subject
             let sessionsDone = 0;
             subjectSchedules.forEach(schId => {
                 sessionsDone += (completedPerSchedule[schId] || 0);
@@ -127,8 +112,7 @@ async function loadSubjects() {
             };
         });
 
-        // ── Summary stats ──
-        const totalUnits     = allSubjects.reduce((sum, s) => sum + (parseFloat(s.units) || 0), 0);
+        const totalUnits      = allSubjects.reduce((sum, s) => sum + (parseFloat(s.units) || 0), 0);
         const activeSchedules = schedules ? schedules.length : 0;
 
         metaStats = {
@@ -137,18 +121,16 @@ async function loadSubjects() {
             units:     totalUnits,
         };
 
-        // ── Build report rows ──
         reportRows = allSubjects.map(s => ({
-            subject_code:     s.subject_code,
-            subject_name:     s.subject_name,
-            description:      s.description || '',
-            units:            s.units || 0,
-            active_schedules: s.schedule_count,
+            subject_code:      s.subject_code,
+            subject_name:      s.subject_name,
+            description:       s.description || '',
+            units:             s.units || 0,
+            active_schedules:  s.schedule_count,
             enrolled_students: s.enrolled_students,
-            sessions_done:    s.sessions_done,
+            sessions_done:     s.sessions_done,
         }));
 
-        // ── Render ──
         updateBadges();
         renderTable(allSubjects);
 
@@ -163,14 +145,13 @@ async function loadSubjects() {
 // ══════════════════════════════════════════════════════════
 
 function updateBadges() {
-    setText('badgeTotalSubjects',  metaStats.total);
+    setText('badgeTotalSubjects',   metaStats.total);
     setText('badgeActiveSchedules', metaStats.schedules);
-    setText('badgeTotalUnits',     metaStats.units);
+    setText('badgeTotalUnits',      metaStats.units);
 
-    // Report modal chips
-    setText('rmTotalSubjects',  metaStats.total);
+    setText('rmTotalSubjects',   metaStats.total);
     setText('rmActiveSchedules', metaStats.schedules);
-    setText('rmTotalUnits',     metaStats.units);
+    setText('rmTotalUnits',      metaStats.units);
 
     const now = new Date();
     setText('rmGenDate', `Generated: ${now.toLocaleDateString('en-US', { month:'long', day:'numeric', year:'numeric' })}`);
@@ -259,7 +240,6 @@ function renderReportTable() {
 // CRUD OPERATIONS (Supabase)
 // ══════════════════════════════════════════════════════════
 
-// ── Add / Update (form submit) ──
 document.getElementById('subjectForm').addEventListener('submit', async function (e) {
     e.preventDefault();
 
@@ -270,7 +250,6 @@ document.getElementById('subjectForm').addEventListener('submit', async function
     const description = document.getElementById('description').value.trim();
     const isEdit      = subjectId !== '';
 
-    // ── Client-side validation ──
     if (!subjectCode || subjectCode.length < 3) {
         return showValidationError('Subject Code must be at least 3 characters.');
     }
@@ -303,7 +282,6 @@ document.getElementById('subjectForm').addEventListener('submit', async function
     btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Checking duplicates…';
 
     try {
-        // ── Duplicate check via Supabase ──
         let dupQuery = supabaseClient
             .from('subjects')
             .select('subject_id, subject_code, subject_name')
@@ -329,7 +307,6 @@ document.getElementById('subjectForm').addEventListener('submit', async function
             return;
         }
 
-        // ── Upsert ──
         btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Saving…';
 
         const payload = {
@@ -358,7 +335,7 @@ document.getElementById('subjectForm').addEventListener('submit', async function
 
         showToast(isEdit ? 'Subject updated successfully!' : 'Subject added successfully!');
         closeModal();
-        await loadSubjects(); // refresh table
+        await loadSubjects();
 
     } catch (err) {
         console.error('Save subject error:', err);
@@ -368,13 +345,11 @@ document.getElementById('subjectForm').addEventListener('submit', async function
     }
 });
 
-// ── Delete ──
 async function deleteSubject(subjectId, subjectCode) {
     const confirmed = confirm(`Delete subject "${subjectCode}"?\n\nThis may affect associated schedules and enrollments.`);
     if (!confirmed) return;
 
     try {
-        // Check if subject has active schedules
         const { data: linked, error: chkErr } = await supabaseClient
             .from('lab_schedules')
             .select('schedule_id')
@@ -442,27 +417,120 @@ function closeModal() {
 }
 
 // ══════════════════════════════════════════════════════════
-// REPORT MODAL
+// REPORT MODAL & EXPORT (WITH DUPLICATE PREVENTION & GREEN BANNER)
 // ══════════════════════════════════════════════════════════
 
-function openReportModal() {
+// ── LOGO STRINGS (Base64 bypasses CORS/Local path issues for PDF) ──
+const PLP_LOGO_B64 = "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNkYAAAAAYAAjCB0C8AAAAASUVORK5CYII="; 
+const CCS_LOGO_B64 = "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNkYAAAAAYAAjCB0C8AAAAASUVORK5CYII=";
+
+async function openReportModal() {
     document.getElementById('rmOverlay').classList.add('on');
     renderReportTable();
+
+    // ── PRE-FETCH TODAY'S REPORTS TO PREVENT EXACT DUPLICATES ──
+    const dateStr = new Date().toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' });
+    try {
+        const { data } = await supabaseClient
+            .from('las_reports')
+            .select('report_name, report_data')
+            .eq('report_type', 'subjects')
+            .like('report_name', `%${dateStr}%`);
+
+        if (data) {
+            existingReportsToday = data.map(d => ({
+                name:       d.report_name,
+                dataString: typeof d.report_data === 'string' ? d.report_data : JSON.stringify(d.report_data)
+            }));
+        } else {
+            existingReportsToday = [];
+        }
+    } catch (e) {
+        existingReportsToday = [];
+    }
 }
 
 function closeReportModal() {
     document.getElementById('rmOverlay').classList.remove('on');
 }
 
-// ── Print ──
-function printReport() {
+// ── Smart Duplicate Check Helper ──────────────────────────
+function checkDuplicateWarning(exportType) {
+    const dateStr    = new Date().toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' });
+    const reportName = `Subjects Report — ${dateStr} (${exportType})`;
+    const currentDataString = JSON.stringify(reportRows);
+
+    const isExactDuplicate = existingReportsToday.some(r =>
+        r.name === reportName && r.dataString === currentDataString
+    );
+
+    if (isExactDuplicate) {
+        return confirm(`A ${exportType} report with this EXACT data has already been saved today.\n\nAre you sure you want to generate a duplicate?`);
+    }
+    return true;
+}
+
+// ── Save to Reports (Manual Button) ──────────────────────
+async function saveReport() {
+    if (!checkDuplicateWarning('Manual Save')) return;
+
+    const btn = document.querySelector('.rm-btn[onclick="saveReport()"]');
+    if (btn) {
+        btn.disabled = true;
+        btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Saving...';
+    }
+
+    await autoSaveReport('Manual Save');
+
+    if (btn) {
+        btn.disabled = false;
+        btn.innerHTML = '<i class="fa-solid fa-floppy-disk"></i> Save to Reports';
+    }
+}
+
+// ── Auto-save helper ──────────────────────────────────────
+async function autoSaveReport(exportType) {
+    const dateStr    = new Date().toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' });
+    const reportName = `Subjects Report — ${dateStr} (${exportType})`;
+
+    const payload = {
+        report_type: 'subjects',
+        report_name: reportName,
+        filters:     JSON.stringify({}),
+        report_data: JSON.stringify(reportRows),
+    };
+
+    try {
+        const { error } = await supabaseClient.from('las_reports').insert([payload]);
+        if (error) throw error;
+
+        if (exportType === 'Manual Save') {
+            showToast('Report saved successfully!');
+        } else {
+            showToast(`${exportType} downloaded & report saved!`);
+        }
+
+        // Add to local memory to prevent immediate repeated clicks
+        existingReportsToday.push({
+            name:       payload.report_name,
+            dataString: payload.report_data,
+        });
+
+    } catch (err) {
+        console.error('Auto-save error:', err);
+        showToast('Action complete but failed to save report: ' + err.message, true);
+    }
+}
+
+// ── Print ─────────────────────────────────────────────────
+async function printReport() {
+    if (!checkDuplicateWarning('Print')) return;
+
     const cols = ['#', 'Subject Code', 'Subject Name', 'Units', 'Active Schedules', 'Enrolled Students', 'Sessions Done', 'Description'];
-    const now  = new Date();
-    const dateStr = now.toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' });
-    const timeStr = now.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' });
+    const nowStr = new Date().toLocaleString();
 
     const rows = reportRows.map((r, i) => `
-        <tr class="${i % 2 === 1 ? 'even' : ''}">
+        <tr>
             <td>${i + 1}</td>
             <td><strong>${escHtml(r.subject_code)}</strong></td>
             <td>${escHtml(r.subject_name)}</td>
@@ -470,179 +538,208 @@ function printReport() {
             <td style="text-align:center">${r.active_schedules}</td>
             <td style="text-align:center">${r.enrolled_students}</td>
             <td style="text-align:center">${r.sessions_done}</td>
-            <td style="font-size:9px">${escHtml(r.description.substring(0, 70))}</td>
+            <td style="font-size:10px">${escHtml(r.description.substring(0, 70))}</td>
         </tr>`).join('');
 
     const w = window.open('', '_blank');
-    w.document.write(`<!DOCTYPE html>
-<html><head><meta charset="UTF-8"><title>Subjects Report</title>
-<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
-<style>
-*{margin:0;padding:0;box-sizing:border-box}
-body{font-family:'Inter',Arial,sans-serif;background:#fff;color:#1a2e1f;font-size:10px;line-height:1.5}
-.page-header{background:linear-gradient(135deg,#14532d 0%,#166534 60%,#15803d 100%);color:#fff;padding:16px 24px}
-.header-inner{display:flex;align-items:center;justify-content:center;gap:16px}
-.header-center{text-align:center}
-.school-label{font-size:7.5px;font-weight:600;letter-spacing:1.8px;text-transform:uppercase;color:rgba(255,255,255,0.65);margin-bottom:4px}
-.report-title{font-size:16px;font-weight:700;color:#fff;line-height:1.25;margin-bottom:3px}
-.report-sub{font-size:8.5px;color:rgba(255,255,255,0.6)}
-.meta-bar{display:flex;align-items:stretch;background:#f0fdf4;border-bottom:2px solid #bbf7d0;padding:0 24px}
-.meta-item{display:flex;flex-direction:column;align-items:center;justify-content:center;padding:7px 14px;font-size:9px}
-.meta-item .lbl{color:#6b7280;font-weight:400;font-size:8px}
-.meta-item strong{color:#166534;font-size:9px}
-.meta-item+.meta-item{border-left:1px solid #bbf7d0}
-.table-wrap{padding:14px 24px 0}
-table{width:100%;border-collapse:collapse;font-size:9px}
-thead tr{background:linear-gradient(90deg,#14532d,#166534)}
-th{padding:8px 10px;text-align:left;font-size:8px;font-weight:700;letter-spacing:0.7px;text-transform:uppercase;color:#fff;white-space:nowrap}
-tbody tr{border-bottom:1px solid #e9f5ee}
-tbody tr.even{background:#f7fdf9}
-td{padding:6px 10px;color:#1a2e1f;vertical-align:middle}
-.page-footer{margin-top:16px;border-top:2px solid #e9f5ee;padding:8px 24px;display:flex;justify-content:space-between;align-items:center;font-size:8px;color:#9ca3af}
-@page{size:A4 landscape;margin:8mm}
-@media print{thead tr,tbody tr.even{-webkit-print-color-adjust:exact;print-color-adjust:exact}}
-</style></head><body>
-<div class="page-header">
-  <div class="header-inner">
-    <div class="header-center">
-      <div class="school-label">Pamantasan ng Lungsod ng Pasig &middot; Laboratory Attendance System</div>
-      <div class="report-title">Subjects Report</div>
-      <div class="report-sub">Official Report Document &nbsp;&middot;&nbsp; Generated: ${dateStr} at ${timeStr}</div>
-    </div>
-  </div>
-</div>
-<div class="meta-bar">
-  <div class="meta-item"><span class="lbl">Date</span><strong>${dateStr}</strong></div>
-  <div class="meta-item"><span class="lbl">Time</span><strong>${timeStr}</strong></div>
-  <div class="meta-item"><span class="lbl">Total Subjects</span><strong>${metaStats.total}</strong></div>
-  <div class="meta-item"><span class="lbl">Active Schedules</span><strong>${metaStats.schedules}</strong></div>
-  <div class="meta-item"><span class="lbl">Total Units</span><strong>${metaStats.units}</strong></div>
-</div>
-<div class="table-wrap">
-  <table>
-    <thead><tr>${cols.map(c => `<th>${c}</th>`).join('')}</tr></thead>
-    <tbody>${rows}</tbody>
-  </table>
-</div>
-<div class="page-footer">
-  <span>&copy; ${now.getFullYear()} Laboratory Attendance System &nbsp;&middot;&nbsp; Pamantasan ng Lungsod ng Pasig</span>
-  <span>Generated: ${dateStr} at ${timeStr}</span>
-</div>
-<script>window.onload=()=>setTimeout(()=>window.print(),500)<\/script>
-</body></html>`);
-    w.document.close();
-}
-
-// ── Download PDF ──
-function downloadPDF() {
-    const { jsPDF } = window.jspdf;
-    const doc = new jsPDF({ orientation: 'landscape', unit: 'mm', format: 'a4' });
-    const now = new Date();
-    const dateStr = now.toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' });
-    const timeStr = now.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' });
-
-    const pageW  = doc.internal.pageSize.width;
-    const pageH  = doc.internal.pageSize.height;
-    const margin = 10;
-    const cx     = pageW / 2;
-    const headerH = 36;
-
-    // Header background
-    doc.setFillColor(20, 83, 45);
-    doc.rect(0, 0, pageW, headerH, 'F');
-
-    // School label
-    doc.setFontSize(6.5); doc.setFont('helvetica', 'normal'); doc.setTextColor(180, 220, 180);
-    doc.text('PAMANTASAN NG LUNGSOD NG PASIG  ·  LABORATORY ATTENDANCE SYSTEM', cx, 11, { align: 'center' });
-
-    // Title
-    doc.setFontSize(16); doc.setFont('helvetica', 'bold'); doc.setTextColor(255, 255, 255);
-    doc.text('Subjects Report', cx, 21, { align: 'center' });
-
-    // Subtitle
-    doc.setFontSize(7); doc.setFont('helvetica', 'normal'); doc.setTextColor(180, 220, 180);
-    doc.text('Official Report Document', cx, 29, { align: 'center' });
-
-    // Meta bar
-    const metaY = headerH;
-    const metaH = 12;
-    doc.setFillColor(240, 253, 244);
-    doc.rect(0, metaY, pageW, metaH, 'F');
-    doc.setDrawColor(187, 247, 208); doc.setLineWidth(0.4);
-    doc.line(0, metaY + metaH, pageW, metaY + metaH);
-
-    const metaItems = [
-        ['Date',            dateStr],
-        ['Time',            timeStr],
-        ['Total Subjects',  `${metaStats.total}`],
-        ['Active Schedules', `${metaStats.schedules}`],
-        ['Total Units',     `${metaStats.units}`],
-    ];
-    const slotW = pageW / metaItems.length;
-    metaItems.forEach(([lbl, val], i) => {
-        const mx = i * slotW + slotW / 2;
-        doc.setFontSize(6); doc.setFont('helvetica', 'normal'); doc.setTextColor(107, 114, 128);
-        doc.text(lbl, mx, metaY + 4.5, { align: 'center' });
-        doc.setFontSize(7.5); doc.setFont('helvetica', 'bold'); doc.setTextColor(22, 101, 52);
-        doc.text(val, mx, metaY + 9.5, { align: 'center' });
-        if (i > 0) {
-            doc.setDrawColor(187, 247, 208); doc.setLineWidth(0.3);
-            doc.line(i * slotW, metaY + 1, i * slotW, metaY + metaH - 1);
+    w.document.write(`<!DOCTYPE html><html><head><title>Subjects Report</title>
+    <style>
+        *{margin:0;padding:0;box-sizing:border-box}
+        body{font-family:Arial,sans-serif;padding:20px;font-size:11px;color:#111}
+        
+        /* ── GREEN BANNER HEADER STYLE ── */
+        .header-container { 
+            background-color: #166534; 
+            color: white;
+            text-align: center; 
+            margin-bottom: 20px; 
+            padding: 20px 15px; 
+            border-radius: 8px;
+            -webkit-print-color-adjust: exact; 
+            print-color-adjust: exact; 
         }
-    });
+        .logos-text-wrapper { display: flex; justify-content: center; align-items: center; gap: 25px; margin-bottom: 10px; }
+        .logo-img { height: 50px; width: auto; object-fit: contain; }
+        .univ-title { font-size: 18px; font-weight: bold; color: white; line-height: 1.2; letter-spacing: 0.5px;}
+        .college-title { font-size: 11px; color: #bbf7d0; letter-spacing: 1px; text-transform: uppercase;}
+        .report-title { font-size: 16px; font-weight: bold; color: white; margin-top: 12px; text-transform: uppercase; letter-spacing: 1px;}
+        .report-meta { font-size: 11px; color: #bbf7d0; margin-top: 5px; }
+        
+        table{width:100%;border-collapse:collapse; margin-top: 10px;}
+        th{background:#166534;color:#fff;padding:8px 10px;text-align:center;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.5px; -webkit-print-color-adjust: exact; print-color-adjust: exact;}
+        td{padding:8px 10px;border-bottom:1px solid #e5e7eb;font-size:11px; text-align:center;}
+        td:nth-child(2), td:nth-child(3), td:nth-child(8) {text-align:left;} /* Left align specific columns */
+        tr:nth-child(even){background:#f9fafb; -webkit-print-color-adjust: exact; print-color-adjust: exact;}
+        .footer{margin-top:20px;text-align:center;font-size:10px;color:#9ca3af;border-top:1px solid #e5e7eb;padding-top:10px}
+        @media print{body{padding:0px}}
+    </style></head><body>
+    
+    <div class="header-container">
+        <div class="logos-text-wrapper">
+            <img src="../../auth/assets/plplogo.png" class="logo-img" alt="PLP Logo">
+            <div>
+                <div class="univ-title">PAMANTASAN NG LUNGSOD NG PASIG</div>
+                <div class="college-title">College of Computer Studies</div>
+            </div>
+            <img src="../../auth/assets/ccslogo.png" class="logo-img" alt="CCS Logo">
+        </div>
+        <div class="report-title">Subjects Report</div>
+        <div class="report-meta">Generated: ${nowStr} &nbsp;&middot;&nbsp; Total Subjects: ${metaStats.total} &nbsp;&middot;&nbsp; Active Schedules: ${metaStats.schedules} &nbsp;&middot;&nbsp; Total Units: ${metaStats.units}</div>
+    </div>
 
-    // Table
-    const head = [['#', 'Subject Code', 'Subject Name', 'Units', 'Active Schedules', 'Enrolled Students', 'Sessions Done', 'Description']];
-    const body = reportRows.map((r, i) => [
-        i + 1,
-        r.subject_code,
-        r.subject_name,
-        r.units + (r.units == 1 ? ' unit' : ' units'),
-        r.active_schedules,
-        r.enrolled_students,
-        r.sessions_done,
-        r.description.substring(0, 50),
-    ]);
+    <table>
+        <thead><tr>${cols.map(c => `<th>${c}</th>`).join('')}</tr></thead>
+        <tbody>${rows}</tbody>
+    </table>
+    <div class="footer">Laboratory Attendance System &nbsp;&middot;&nbsp; ${nowStr}</div>
+    <script>window.onload=()=>setTimeout(()=>window.print(),500)<\/script>
+    </body></html>`);
+    w.document.close();
 
-    doc.autoTable({
-        head, body,
-        startY: metaY + metaH + 3,
-        margin: { left: margin, right: margin },
-        theme: 'striped',
-        headStyles: { fillColor: [20, 83, 45], fontSize: 7, fontStyle: 'bold', textColor: [255, 255, 255], cellPadding: { top: 4, bottom: 4, left: 4, right: 4 } },
-        alternateRowStyles: { fillColor: [247, 253, 249] },
-        styles: { fontSize: 7.5, cellPadding: { top: 3, bottom: 3, left: 4, right: 4 }, textColor: [26, 46, 31], lineColor: [233, 245, 238], lineWidth: 0.2 },
-        columnStyles: {
-            0: { cellWidth: 8, fontStyle: 'bold' },
-            1: { cellWidth: 24 },
-            2: { cellWidth: 50 },
-            3: { cellWidth: 18 },
-            4: { cellWidth: 18 },
-            5: { cellWidth: 18 },
-            6: { cellWidth: 18 },
-            7: { cellWidth: 'auto' },
-        },
-    });
+    await autoSaveReport('Print');
+}
+// ── Download PDF ──────────────────────────────────────────
+async function downloadPDF() {
+    if (!checkDuplicateWarning('PDF')) return;
 
-    // Footer on each page
-    const pages = doc.internal.getNumberOfPages();
-    for (let i = 1; i <= pages; i++) {
-        doc.setPage(i);
-        const footY = pageH - 7;
-        doc.setFillColor(249, 250, 251);
-        doc.rect(0, footY - 4, pageW, 11, 'F');
-        doc.setDrawColor(233, 245, 238); doc.setLineWidth(0.3);
-        doc.line(0, footY - 4, pageW, footY - 4);
-        doc.setFontSize(6.5); doc.setFont('helvetica', 'normal'); doc.setTextColor(156, 163, 175);
-        doc.text(`© ${now.getFullYear()} Laboratory Attendance System  ·  Pamantasan ng Lungsod ng Pasig`, margin, footY);
-        doc.text(`Generated: ${dateStr} at ${timeStr}  ·  Page ${i} of ${pages}`, pageW - margin, footY, { align: 'right' });
+    if (!window.jspdf) {
+        showToast('PDF library not loaded yet. Please try again.', true);
+        return;
     }
 
-    doc.save(`Subjects_Report_${now.toISOString().split('T')[0]}.pdf`);
-}
+    try {
+        const { jsPDF } = window.jspdf;
+        const doc = new jsPDF({ orientation:'landscape', unit:'mm', format:'a4' });
+        const pageW = doc.internal.pageSize.width;
+        const nowStr = new Date().toLocaleString();
 
-// ── Export CSV ──
-function exportCSV() {
+        // Helper to safely load the logos without breaking if an image fails
+        function loadImage(src) {
+            return new Promise((resolve) => {
+                const img = new Image();
+                img.crossOrigin = 'anonymous';
+                img.onload = () => {
+                    try {
+                        const canvas = document.createElement('canvas');
+                        canvas.width = img.width; canvas.height = img.height;
+                        canvas.getContext('2d').drawImage(img, 0, 0);
+                        resolve(canvas.toDataURL('image/png'));
+                    } catch(e) {
+                        resolve(null); // Fallback safely if canvas gets tainted
+                    }
+                };
+                img.onerror = () => resolve(null);
+                img.src = src;
+            });
+        }
+
+        // FIX 1: Used the correct paths to your resc/assets folder!
+        const [plpData, ccsData] = await Promise.all([
+            loadImage('../resc/assets/plp_logo.png'),
+            loadImage('../resc/assets/ccs_logo.png')
+        ]);
+
+        const centerX = pageW / 2;
+        const headerHeight = 45; // Height of the green banner
+        
+        // ── DRAW SOLID GREEN BANNER ──
+        doc.setFillColor(22, 101, 52); 
+        doc.rect(0, 0, pageW, headerHeight, 'F');
+        
+        // ── LOGOS ──
+        const logoSize = 18;
+        if (plpData) doc.addImage(plpData, 'PNG', centerX - 85, 8, logoSize, logoSize);
+        if (ccsData) doc.addImage(ccsData, 'PNG', centerX + 67, 8, logoSize, logoSize);
+
+        // ── CENTERED HEADER TEXT ──
+        doc.setFontSize(16); 
+        doc.setTextColor(255, 255, 255); 
+        doc.setFont('helvetica', 'bold');
+        doc.text('PAMANTASAN NG LUNGSOD NG PASIG', centerX, 15, { align: 'center' });
+        
+        doc.setFontSize(9); 
+        doc.setTextColor(187, 247, 208); 
+        doc.setFont('helvetica', 'normal');
+        doc.text('COLLEGE OF COMPUTER STUDIES', centerX, 20, { align: 'center' });
+        
+        doc.setFontSize(14); 
+        doc.setTextColor(255, 255, 255); 
+        doc.setFont('helvetica', 'bold');
+        doc.text('SUBJECTS REPORT', centerX, 30, { align: 'center' });
+        
+        doc.setFontSize(8); 
+        doc.setTextColor(187, 247, 208); 
+        doc.setFont('helvetica', 'normal');
+        
+        // FIX 2: Used 'metaStats' instead of 'META'
+        doc.text(`Generated: ${nowStr}  ·  Total Subjects: ${metaStats.total}  ·  Active Schedules: ${metaStats.schedules}  ·  Total Units: ${metaStats.units}`, centerX, 36, { align: 'center' });
+
+        // ── AUTO-EXPANDING CLEAN TABLE ──
+        doc.autoTable({
+            head: [['#', 'Subject Code', 'Subject Name', 'Units', 'Active\nSchedules', 'Enrolled\nStudents', 'Sessions\nDone', 'Description']],
+            
+            // FIX 3: Used 'reportRows' instead of 'ROWS'
+            body: reportRows.map((r, i) => {
+                const desc = r.description ? String(r.description) : '—';
+                return [
+                    i + 1,
+                    r.subject_code,
+                    r.subject_name,
+                    r.units + (r.units == 1 ? ' unit' : ' units'),
+                    r.active_schedules,
+                    r.enrolled_students,
+                    r.sessions_done,
+                    desc.length > 50 ? desc.substring(0, 50) + '...' : desc,
+                ];
+            }),
+            startY: headerHeight + 8, 
+            margin: { left: 14, right: 14 }, 
+            theme: 'striped',
+            headStyles: {
+                fillColor: [22, 101, 52],
+                fontSize: 7.5,
+                fontStyle: 'bold',
+                textColor: [255, 255, 255],
+                halign: 'center',
+                valign: 'middle',
+            },
+            styles: {
+                fontSize: 7.5,
+                cellPadding: 3,
+                valign: 'middle',
+            },
+            columnStyles: {
+                0: { cellWidth: 10,   halign: 'center' },
+                1: { cellWidth: 24,   halign: 'center', fontStyle: 'bold' },
+                2: { cellWidth: 40,   halign: 'left', fontStyle: 'bold' },
+                3: { cellWidth: 16,   halign: 'center' },
+                4: { cellWidth: 20,   halign: 'center' },
+                5: { cellWidth: 20,   halign: 'center' },
+                6: { cellWidth: 20,   halign: 'center' },
+                7: { cellWidth: 'auto', halign: 'left' },
+            },
+        });
+
+        const pages = doc.internal.getNumberOfPages();
+        for (let i = 1; i <= pages; i++) {
+            doc.setPage(i); doc.setFontSize(7); doc.setTextColor(156, 163, 175);
+            doc.text(`Laboratory Attendance System  ·  Page ${i} of ${pages}  ·  ${nowStr}`,
+                pageW / 2, doc.internal.pageSize.height - 8, { align: 'center' });
+        }
+
+        doc.save(`Subjects_Report_${new Date().toISOString().split('T')[0]}.pdf`);
+
+        autoSaveReport('PDF'); 
+
+    } catch (err) {
+        console.error('PDF generation error:', err);
+        showToast('There was an error generating the PDF. Check the console.', true);
+    }
+}
+// ── Export CSV ────────────────────────────────────────────
+async function exportCSV() {
+    if (!checkDuplicateWarning('CSV')) return;
+
     const cols = ['#', 'Subject Code', 'Subject Name', 'Units', 'Active Schedules', 'Enrolled Students', 'Sessions Done', 'Description'];
     const lines = [
         cols.join(','),
@@ -663,7 +760,62 @@ function exportCSV() {
     a.download = `Subjects_Report_${new Date().toISOString().split('T')[0]}.csv`;
     a.click();
     URL.revokeObjectURL(a.href);
-    showToast('CSV exported!');
+
+    await autoSaveReport('CSV');
+}
+
+// ── Export Excel ──────────────────────────────────────────
+async function exportExcel() {
+    if (!checkDuplicateWarning('Excel')) return;
+
+    if (!window.XLSX) {
+        return exportCSV(); // Fallback if SheetJS not loaded
+    }
+
+    const wb = XLSX.utils.book_new();
+
+    // ── Summary sheet ──
+    const summaryData = [
+        ['Subjects Report'],
+        ['Generated', new Date().toLocaleString()],
+        [''],
+        ['Total Subjects',    metaStats.total],
+        ['Active Schedules',  metaStats.schedules],
+        ['Total Units',       metaStats.units],
+    ];
+    const summarySheet = XLSX.utils.aoa_to_sheet(summaryData);
+    summarySheet['!cols'] = [{ wch: 22 }, { wch: 30 }];
+    XLSX.utils.book_append_sheet(wb, summarySheet, 'Summary');
+
+    // ── Data sheet ──
+    const headers = ['#', 'Subject Code', 'Subject Name', 'Units', 'Active Schedules', 'Enrolled Students', 'Sessions Done', 'Description'];
+    const rows = reportRows.map((r, i) => [
+        i + 1,
+        r.subject_code,
+        r.subject_name,
+        r.units,
+        r.active_schedules,
+        r.enrolled_students,
+        r.sessions_done,
+        r.description,
+    ]);
+
+    const dataSheet = XLSX.utils.aoa_to_sheet([headers, ...rows]);
+    dataSheet['!cols'] = [
+        { wch: 5  },  // #
+        { wch: 16 },  // Subject Code
+        { wch: 40 },  // Subject Name
+        { wch: 8  },  // Units
+        { wch: 18 },  // Active Schedules
+        { wch: 20 },  // Enrolled Students
+        { wch: 16 },  // Sessions Done
+        { wch: 50 },  // Description
+    ];
+    XLSX.utils.book_append_sheet(wb, dataSheet, 'Subjects');
+
+    XLSX.writeFile(wb, `Subjects_Report_${new Date().toISOString().split('T')[0]}.xlsx`);
+
+    await autoSaveReport('Excel');
 }
 
 // ══════════════════════════════════════════════════════════
@@ -671,7 +823,6 @@ function exportCSV() {
 // ══════════════════════════════════════════════════════════
 
 function bindEvents() {
-    // Subject Code — uppercase + alphanum only, live format
     document.getElementById('subjectCode').addEventListener('input', function () {
         this.value = this.value.toUpperCase().replace(/[^A-Z0-9]/g, '');
         removeFieldError(this);
@@ -682,7 +833,6 @@ function bindEvents() {
         }
     });
 
-    // Subject Name
     document.getElementById('subjectName').addEventListener('input', function () {
         removeFieldError(this);
         if (this.value.trim().length > 0 && this.value.trim().length < 5) {
@@ -692,7 +842,6 @@ function bindEvents() {
         }
     });
 
-    // Units
     document.getElementById('units').addEventListener('input', function () {
         removeFieldError(this);
         const v = parseFloat(this.value);
@@ -708,7 +857,6 @@ function bindEvents() {
         }
     });
 
-    // Description — character counter
     document.getElementById('description').addEventListener('input', function () {
         const max = 500;
         let counter = this.parentElement.querySelector('.char-counter');
@@ -729,7 +877,6 @@ function bindEvents() {
         }
     });
 
-    // Search
     document.getElementById('searchInput').addEventListener('input', function () {
         const q = this.value.toLowerCase();
         document.querySelectorAll('#subjectsTableBody tr').forEach(row => {
@@ -737,18 +884,15 @@ function bindEvents() {
         });
     });
 
-    // Clear filters
     document.getElementById('clearFilters').addEventListener('click', function () {
         document.getElementById('searchInput').value = '';
         document.querySelectorAll('#subjectsTableBody tr').forEach(row => row.style.display = '');
     });
 
-    // Close modal on backdrop click
     document.getElementById('subjectModal').addEventListener('click', function (e) {
         if (e.target === this) closeModal();
     });
 
-    // ESC key
     document.addEventListener('keydown', e => {
         if (e.key === 'Escape') { closeModal(); closeReportModal(); }
     });
@@ -811,11 +955,11 @@ function clearAllValidation() {
     });
 }
 
-function showToast(msg) {
+function showToast(msg, isError = false) {
     const toast = document.getElementById('toast');
     document.getElementById('toastMsg').textContent = msg;
-    toast.classList.add('on');
-    setTimeout(() => toast.classList.remove('on'), 4000);
+    toast.className = 'toast on' + (isError ? ' error' : '');
+    setTimeout(() => toast.className = 'toast', 4000);
 }
 
 function setText(id, value) {
@@ -823,7 +967,6 @@ function setText(id, value) {
     if (el) el.textContent = value;
 }
 
-/** Safe HTML escape */
 function escHtml(str) {
     if (!str) return '';
     return String(str)

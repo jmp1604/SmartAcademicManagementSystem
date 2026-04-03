@@ -755,8 +755,9 @@ async function buildReportRows() {
     }
     reportRows = enriched;
 }
+let existingReportsToday = []; // Tracks reports to prevent exact duplicates
 
-function openReportModal() {
+async function openReportModal() {
     document.getElementById('rmGenDate').innerHTML =
         `Generated ${META.date} &nbsp;·&nbsp; <span id="rmTotal">${META.total}</span> students`;
     document.getElementById('rmChipTotal').textContent      = META.total;
@@ -786,181 +787,336 @@ function openReportModal() {
     }
 
     document.getElementById('rmOverlay').classList.add('on');
+
+    // ── PRE-FETCH TODAY'S REPORTS TO PREVENT EXACT DUPLICATES ──
+    const dateStr = new Date().toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' });
+    try {
+        const { data } = await supabaseClient
+            .from('las_reports')
+            .select('report_name, report_data')
+            .eq('report_type', 'students')
+            .like('report_name', `%${dateStr}%`); 
+            
+        if (data) {
+            existingReportsToday = data.map(d => ({
+                name: d.report_name,
+                dataString: typeof d.report_data === 'string' ? d.report_data : JSON.stringify(d.report_data)
+            }));
+        } else {
+            existingReportsToday = [];
+        }
+    } catch (e) {
+        existingReportsToday = [];
+    }
 }
 
 function closeReportModal() {
     document.getElementById('rmOverlay').classList.remove('on');
 }
 
+// ── Smart Duplicate Check Helper ──
+function checkDuplicateWarning(exportType) {
+    const dateStr = new Date().toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' });
+    const reportName = `Students Report — ${dateStr} (${exportType})`;
+    const currentDataString = JSON.stringify(reportRows);
+    
+    const isExactDuplicate = existingReportsToday.some(r => 
+        r.name === reportName && r.dataString === currentDataString
+    );
+    
+    if (isExactDuplicate) {
+        return confirm(`A ${exportType} report with this EXACT data has already been saved today.\n\nAre you sure you want to generate a duplicate?`);
+    }
+    return true; 
+}
+
+// ── Save to Reports (Manual Button) ───────────────────────────
+async function saveReport() {
+    if (!checkDuplicateWarning('Manual Save')) return;
+
+    const btn = document.querySelector('.rm-btn[onclick="saveReport()"]');
+    if (btn) {
+        btn.disabled = true;
+        btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Saving...';
+    }
+
+    await autoSaveReport('Manual Save');
+
+    if (btn) {
+        btn.disabled = false;
+        btn.innerHTML = '<i class="fa-solid fa-floppy-disk"></i> Save to Reports';
+    }
+}
+
+// ── Auto-save helper ──────────────────────────────────────────
+async function autoSaveReport(exportType) {
+    const dateStr    = new Date().toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' });
+    const reportName = `Students Report — ${dateStr} (${exportType})`;
+
+    const payload = {
+        report_type: 'students',
+        report_name: reportName,
+        filters:     JSON.stringify({}),
+        report_data: JSON.stringify(reportRows)
+    };
+
+    try {
+        const { error } = await supabaseClient.from('las_reports').insert([payload]);
+        if (error) throw error;
+        
+        if (exportType === 'Manual Save') {
+            showToast('Report saved successfully!', true);
+        } else {
+            console.log(`[Auto-Save] ${exportType} report securely archived.`);
+        }
+        
+        existingReportsToday.push({
+            name: payload.report_name,
+            dataString: payload.report_data
+        }); 
+        
+    } catch (err) {
+        console.error('Auto-save error:', err);
+    }
+}
+
 // ── Print ──────────────────────────────────────────────────
-function printReport() {
+async function printReport() {
+    if (!checkDuplicateWarning('Print')) return;
+
     const now     = new Date();
     const dateStr = now.toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' });
     const timeStr = now.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' });
-
-    const rows = reportRows.map((r, i) => `<tr class="${i % 2 === 1 ? 'even' : ''}">
-        <td>${i + 1}</td>
-        <td><strong>${r.id_number}</strong></td>
-        <td><strong>${r.last_name}</strong></td>
-        <td>${r.first_name}</td>
-        <td>${r.middle_name}</td>
-        <td>${r.course}</td>
-        <td style="text-align:center">${r.year_level}</td>
-        <td style="text-align:center">${r.section}</td>
-        <td><span class="badge ${r.face_status.toLowerCase() === 'registered' ? 'b-green' : 'b-amber'}">${r.face_status}</span></td>
-        <td><span class="badge ${r.status.toLowerCase() === 'active' ? 'b-green' : r.status.toLowerCase() === 'inactive' ? 'b-red' : 'b-blue'}">${r.status}</span></td>
-        <td style="text-align:center">${r.enrolled_subjects}</td>
-        <td style="text-align:center">${r.total_attendances}</td>
-        <td style="font-size:9px">${r.email}</td>
-        <td>${r.date_registered}</td>
-    </tr>`).join('');
+    const nowStr  = `${dateStr} at ${timeStr}`;
 
     const cols = ['#','Student ID','Last Name','First Name','Middle Name','Course','Year','Section','Face Status','Status','Subjects','Attendances','Email','Date Registered'];
 
+    const rows = reportRows.map((r, i) => {
+        let faceColor = r.face_status.toLowerCase() === 'registered' ? '#166534' : '#d97706';
+        let statusColor = r.status.toLowerCase() === 'active' ? '#166534' : (r.status.toLowerCase() === 'inactive' ? '#dc2626' : '#2563eb');
+        
+        return `<tr class="${i % 2 === 1 ? 'even' : ''}">
+            <td>${i + 1}</td>
+            <td><strong>${r.id_number}</strong></td>
+            <td><strong>${r.last_name}</strong></td>
+            <td>${r.first_name}</td>
+            <td>${r.middle_name}</td>
+            <td>${r.course}</td>
+            <td style="text-align:center">${r.year_level}</td>
+            <td style="text-align:center">${r.section}</td>
+            <td><span style="color: ${faceColor}; font-weight: bold;">${r.face_status.toUpperCase()}</span></td>
+            <td><span style="color: ${statusColor}; font-weight: bold;">${r.status.toUpperCase()}</span></td>
+            <td style="text-align:center">${r.enrolled_subjects}</td>
+            <td style="text-align:center">${r.total_attendances}</td>
+            <td style="font-size:9px">${r.email}</td>
+            <td>${r.date_registered}</td>
+        </tr>`;
+    }).join('');
+
     const w = window.open('', '_blank');
     w.document.write(`<!DOCTYPE html><html><head><meta charset="UTF-8"><title>Students List Report</title>
-    <link href="https://fonts.googleapis.com/css2?family=Nunito:wght@400;600;700;800&family=Nunito+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
     <style>
-    *{margin:0;padding:0;box-sizing:border-box}
-    body{font-family:'Nunito Sans',Arial,sans-serif;background:#fff;color:#1a2e1f;font-size:10px;line-height:1.5}
-    .page-header{background:linear-gradient(135deg,#14532d 0%,#166534 60%,#15803d 100%);color:#fff;padding:16px 24px}
-    .header-inner{display:flex;align-items:center;justify-content:center;gap:16px}
-    .header-center{text-align:center}
-    .school-label{font-size:7.5px;font-weight:600;letter-spacing:1.8px;text-transform:uppercase;color:rgba(255,255,255,0.65);margin-bottom:4px}
-    .report-title{font-size:16px;font-weight:800;font-family:'Nunito',sans-serif;color:#fff;margin-bottom:3px}
-    .report-sub{font-size:8.5px;color:rgba(255,255,255,0.6)}
-    .meta-bar{display:flex;align-items:stretch;background:#f0fdf4;border-bottom:2px solid #bbf7d0;padding:0 24px}
-    .meta-item{display:flex;flex-direction:column;align-items:center;justify-content:center;padding:7px 14px;font-size:9px}
-    .meta-item+.meta-item{border-left:1px solid #bbf7d0}
-    .meta-item .lbl{color:#6b7280;font-weight:400;font-size:8px}
-    .meta-item strong{color:#166534;font-size:9px}
-    .table-wrap{padding:14px 24px 0}
-    table{width:100%;border-collapse:collapse;font-size:9px}
-    thead tr{background:linear-gradient(90deg,#14532d,#166534)}
-    th{padding:8px 10px;text-align:left;font-size:8px;font-weight:700;letter-spacing:0.7px;text-transform:uppercase;color:#fff;white-space:nowrap}
-    tbody tr{border-bottom:1px solid #e9f5ee}
-    tbody tr.even{background:#f7fdf9}
-    td{padding:6px 10px;color:#1a2e1f;vertical-align:middle}
-    .badge{display:inline-block;padding:2px 7px;border-radius:20px;font-size:7.5px;font-weight:700}
-    .b-green{background:#dcfce7;color:#166534;border:1px solid #bbf7d0}
-    .b-red{background:#fee2e2;color:#dc2626;border:1px solid #fecaca}
-    .b-amber{background:#fef3c7;color:#92400e;border:1px solid #fde68a}
-    .b-blue{background:#dbeafe;color:#1d4ed8;border:1px solid #bfdbfe}
-    .page-footer{margin-top:16px;border-top:2px solid #e9f5ee;padding:8px 24px;display:flex;justify-content:space-between;align-items:center;font-size:8px;color:#9ca3af}
-    @page{size:A4 landscape;margin:8mm}
-    @media print{thead tr,tbody tr.even,.badge{-webkit-print-color-adjust:exact;print-color-adjust:exact}}
+        *{margin:0;padding:0;box-sizing:border-box}
+        body{font-family:Arial,sans-serif;padding:20px;font-size:11px;color:#111}
+        
+        /* ── GREEN BANNER HEADER STYLE ── */
+        .header-container { 
+            background-color: #166534; 
+            color: white;
+            text-align: center; 
+            margin-bottom: 20px; 
+            padding: 20px 15px; 
+            border-radius: 8px;
+            -webkit-print-color-adjust: exact; 
+            print-color-adjust: exact; 
+        }
+        .logos-text-wrapper { display: flex; justify-content: center; align-items: center; gap: 25px; margin-bottom: 10px; }
+        .logo-img { height: 50px; width: auto; object-fit: contain; }
+        .univ-title { font-size: 18px; font-weight: bold; color: white; line-height: 1.2; letter-spacing: 0.5px;}
+        .college-title { font-size: 11px; color: #bbf7d0; letter-spacing: 1px; text-transform: uppercase;}
+        .report-title { font-size: 16px; font-weight: bold; color: white; margin-top: 12px; text-transform: uppercase; letter-spacing: 1px;}
+        .report-meta { font-size: 11px; color: #bbf7d0; margin-top: 5px; }
+        
+        table{width:100%;border-collapse:collapse; margin-top: 10px;}
+        th{background:#166534;color:#fff;padding:8px 10px;text-align:center;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.5px; -webkit-print-color-adjust: exact; print-color-adjust: exact;}
+        td{padding:8px 10px;border-bottom:1px solid #e5e7eb;font-size:11px; text-align:center;}
+        td:nth-child(2), td:nth-child(3), td:nth-child(4), td:nth-child(5) {text-align:left;} /* Left align Names */
+        tr:nth-child(even){background:#f9fafb; -webkit-print-color-adjust: exact; print-color-adjust: exact;}
+        .footer{margin-top:20px;text-align:center;font-size:10px;color:#9ca3af;border-top:1px solid #e5e7eb;padding-top:10px}
+        @media print{body{padding:0px}}
     </style></head><body>
-    <div class="page-header"><div class="header-inner"><div class="header-center">
-        <div class="school-label">Pamantasan ng Lungsod ng Pasig &middot; College of Computer Studies</div>
+    
+    <div class="header-container">
+        <div class="logos-text-wrapper">
+            <img src="../resc/assets/plp_logo.png" class="logo-img" alt="PLP Logo">
+            <div>
+                <div class="univ-title">PAMANTASAN NG LUNGSOD NG PASIG</div>
+                <div class="college-title">College of Computer Studies</div>
+            </div>
+            <img src="../resc/assets/ccs_logo.png" class="logo-img" alt="CCS Logo">
+        </div>
         <div class="report-title">Students List Report</div>
-        <div class="report-sub">Laboratory Attendance System &middot; Official Report Document</div>
-    </div></div></div>
-    <div class="meta-bar">
-        <div class="meta-item"><span class="lbl">Date</span><strong>${dateStr}</strong></div>
-        <div class="meta-item"><span class="lbl">Time</span><strong>${timeStr}</strong></div>
-        <div class="meta-item"><span class="lbl">Total Students</span><strong>${META.total}</strong></div>
-        <div class="meta-item"><span class="lbl">Face Registered</span><strong>${META.registered}</strong></div>
-        <div class="meta-item"><span class="lbl">Pending Face</span><strong>${META.pending}</strong></div>
+        <div class="report-meta">Generated: ${nowStr} &nbsp;&middot;&nbsp; Total Students: ${META.total} &nbsp;&middot;&nbsp; Face Registered: ${META.registered} &nbsp;&middot;&nbsp; Pending Face: ${META.pending}</div>
     </div>
-    <div class="table-wrap"><table>
+
+    <table>
         <thead><tr>${cols.map(c => `<th>${c}</th>`).join('')}</tr></thead>
         <tbody>${rows}</tbody>
-    </table></div>
-    <div class="page-footer">
-        <span>&copy; ${now.getFullYear()} Laboratory Attendance System &middot; Pamantasan ng Lungsod ng Pasig</span>
-        <span>Generated: ${dateStr} at ${timeStr}</span>
-    </div>
+    </table>
+    <div class="footer">Laboratory Attendance System &nbsp;&middot;&nbsp; ${nowStr}</div>
     <script>window.onload=()=>setTimeout(()=>window.print(),500)<\/script>
     </body></html>`);
     w.document.close();
+
+    await autoSaveReport('Print');
 }
 
 // ── PDF ────────────────────────────────────────────────────
-function downloadPDF() {
-    const { jsPDF } = window.jspdf;
-    const doc     = new jsPDF({ orientation: 'landscape', unit: 'mm', format: 'a4' });
-    const now     = new Date();
-    const dateStr = now.toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' });
-    const timeStr = now.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' });
-    const pageW   = doc.internal.pageSize.width;
-    const pageH   = doc.internal.pageSize.height;
-    const margin  = 10;
-    const cx      = pageW / 2;
-    const headerH = 32;
+async function downloadPDF() {
+    if (!checkDuplicateWarning('PDF')) return;
 
-    doc.setFillColor(20, 83, 45);
-    doc.rect(0, 0, pageW, headerH, 'F');
-    doc.setFontSize(6.5); doc.setFont('helvetica', 'normal'); doc.setTextColor(180, 220, 180);
-    doc.text('PAMANTASAN NG LUNGSOD NG PASIG  ·  COLLEGE OF COMPUTER STUDIES', cx, 10, { align: 'center' });
-    doc.setFontSize(15); doc.setFont('helvetica', 'bold'); doc.setTextColor(255, 255, 255);
-    doc.text('Students List Report', cx, 20, { align: 'center' });
-    doc.setFontSize(7); doc.setFont('helvetica', 'normal'); doc.setTextColor(180, 220, 180);
-    doc.text('Laboratory Attendance System  ·  Official Report Document', cx, 27, { align: 'center' });
-
-    const metaY = headerH;
-    const metaH = 12;
-    doc.setFillColor(240, 253, 244);
-    doc.rect(0, metaY, pageW, metaH, 'F');
-    doc.setDrawColor(187, 247, 208); doc.setLineWidth(0.4);
-    doc.line(0, metaY + metaH, pageW, metaY + metaH);
-
-    [['Date', dateStr], ['Time', timeStr], ['Total Students', String(META.total)],
-     ['Face Registered', String(META.registered)], ['Pending Face', String(META.pending)]
-    ].forEach(([lbl, val], i, arr) => {
-        const mx = i * (pageW / arr.length) + (pageW / arr.length) / 2;
-        doc.setFontSize(6); doc.setFont('helvetica', 'normal'); doc.setTextColor(107, 114, 128);
-        doc.text(lbl, mx, metaY + 4.5, { align: 'center' });
-        doc.setFontSize(7.5); doc.setFont('helvetica', 'bold'); doc.setTextColor(22, 101, 52);
-        doc.text(val, mx, metaY + 9.5, { align: 'center' });
-        if (i > 0) { doc.setDrawColor(187, 247, 208); doc.setLineWidth(0.3); doc.line(i * (pageW / arr.length), metaY + 1, i * (pageW / arr.length), metaY + metaH - 1); }
-    });
-
-    const head = [['#','Student ID','Last Name','First Name','Middle Name','Course','Year','Section','Face Status','Status','Subjects','Attendances','Email','Date Registered']];
-    const body = reportRows.map((r, i) => [
-        i + 1, r.id_number, r.last_name, r.first_name, r.middle_name,
-        r.course, r.year_level, r.section, r.face_status, capitalize(r.status),
-        r.enrolled_subjects, r.total_attendances, r.email, r.date_registered
-    ]);
-
-    doc.autoTable({
-        head, body,
-        startY: metaY + metaH + 3,
-        margin: { left: margin, right: margin },
-        theme: 'striped',
-        headStyles: { fillColor: [20, 83, 45], fontSize: 7, fontStyle: 'bold', textColor: [255, 255, 255], cellPadding: { top: 4, bottom: 4, left: 4, right: 4 } },
-        alternateRowStyles: { fillColor: [247, 253, 249] },
-        styles: { fontSize: 7.5, cellPadding: { top: 3, bottom: 3, left: 4, right: 4 }, textColor: [26, 46, 31], lineColor: [233, 245, 238], lineWidth: 0.2 },
-        didParseCell(d) {
-            if (d.column.index === 8 && d.section === 'body') {
-                const s = (d.cell.text[0] || '').toLowerCase();
-                if (s === 'registered')     { d.cell.styles.fillColor = [220, 252, 231]; d.cell.styles.textColor = [22, 101, 52]; d.cell.styles.fontStyle = 'bold'; }
-                if (s === 'not registered') { d.cell.styles.fillColor = [254, 243, 199]; d.cell.styles.textColor = [146, 64, 14]; d.cell.styles.fontStyle = 'bold'; }
-            }
-            if (d.column.index === 9 && d.section === 'body') {
-                const s = (d.cell.text[0] || '').toLowerCase();
-                if (s === 'active')    { d.cell.styles.fillColor = [220, 252, 231]; d.cell.styles.textColor = [22, 101, 52]; d.cell.styles.fontStyle = 'bold'; }
-                if (s === 'inactive')  { d.cell.styles.fillColor = [254, 226, 226]; d.cell.styles.textColor = [185, 28, 28]; d.cell.styles.fontStyle = 'bold'; }
-                if (s === 'graduated') { d.cell.styles.fillColor = [219, 234, 254]; d.cell.styles.textColor = [29, 78, 216]; d.cell.styles.fontStyle = 'bold'; }
-            }
-        }
-    });
-
-    const pages = doc.internal.getNumberOfPages();
-    for (let i = 1; i <= pages; i++) {
-        doc.setPage(i);
-        const footY = pageH - 7;
-        doc.setFillColor(249, 250, 251); doc.rect(0, footY - 4, pageW, 11, 'F');
-        doc.setDrawColor(233, 245, 238); doc.setLineWidth(0.3); doc.line(0, footY - 4, pageW, footY - 4);
-        doc.setFontSize(6.5); doc.setFont('helvetica', 'normal'); doc.setTextColor(156, 163, 175);
-        doc.text(`\u00a9 ${now.getFullYear()} Laboratory Attendance System  ·  Pamantasan ng Lungsod ng Pasig`, margin, footY);
-        doc.text(`Generated: ${dateStr} at ${timeStr}  ·  Page ${i} of ${pages}`, pageW - margin, footY, { align: 'right' });
+    if (!window.jspdf) {
+        showToast('PDF library not loaded yet. Please try again.', true);
+        return;
     }
 
-    doc.save(`Students_Report_${now.toISOString().split('T')[0]}.pdf`);
+    try {
+        const { jsPDF } = window.jspdf;
+        const doc     = new jsPDF({ orientation: 'landscape', unit: 'mm', format: 'a4' });
+        const now     = new Date();
+        const dateStr = now.toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' });
+        const timeStr = now.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' });
+        const nowStr  = `${dateStr} at ${timeStr}`;
+        const pageW   = doc.internal.pageSize.width;
+
+        // Helper to safely load the logos
+        function loadImage(src) {
+            return new Promise((resolve) => {
+                const img = new Image();
+                img.crossOrigin = 'anonymous';
+                img.onload = () => {
+                    try {
+                        const canvas = document.createElement('canvas');
+                        canvas.width = img.width; canvas.height = img.height;
+                        canvas.getContext('2d').drawImage(img, 0, 0);
+                        resolve(canvas.toDataURL('image/png'));
+                    } catch(e) {
+                        resolve(null); 
+                    }
+                };
+                img.onerror = () => resolve(null);
+                img.src = src;
+            });
+        }
+
+        const [plpData, ccsData] = await Promise.all([
+            loadImage('../resc/assets/plp_logo.png'),
+            loadImage('../resc/assets/ccs_logo.png')
+        ]);
+
+        const centerX = pageW / 2;
+        const headerHeight = 45; // Height of the green banner
+        
+        // ── DRAW SOLID GREEN BANNER ──
+        doc.setFillColor(22, 101, 52); 
+        doc.rect(0, 0, pageW, headerHeight, 'F');
+        
+        // ── LOGOS ──
+        const logoSize = 18;
+        if (plpData) doc.addImage(plpData, 'PNG', centerX - 85, 8, logoSize, logoSize);
+        if (ccsData) doc.addImage(ccsData, 'PNG', centerX + 67, 8, logoSize, logoSize);
+
+        // ── CENTERED HEADER TEXT ──
+        doc.setFontSize(16); 
+        doc.setTextColor(255, 255, 255); 
+        doc.setFont('helvetica', 'bold');
+        doc.text('PAMANTASAN NG LUNGSOD NG PASIG', centerX, 15, { align: 'center' });
+        
+        doc.setFontSize(9); 
+        doc.setTextColor(187, 247, 208); 
+        doc.setFont('helvetica', 'normal');
+        doc.text('COLLEGE OF COMPUTER STUDIES', centerX, 20, { align: 'center' });
+        
+        doc.setFontSize(14); 
+        doc.setTextColor(255, 255, 255); 
+        doc.setFont('helvetica', 'bold');
+        doc.text('STUDENTS LIST REPORT', centerX, 30, { align: 'center' });
+        
+        doc.setFontSize(8); 
+        doc.setTextColor(187, 247, 208); 
+        doc.setFont('helvetica', 'normal');
+        doc.text(`Generated: ${nowStr}  ·  Total Students: ${META.total}  ·  Face Registered: ${META.registered}  ·  Pending Face: ${META.pending}`, centerX, 36, { align: 'center' });
+
+        // ── AUTO-EXPANDING CLEAN TABLE ──
+        // Since Students has 14 columns, we need a smaller font
+        const head = [['#','Student ID','Last Name','First Name','M.I.','Course','Yr','Section','Face Status','Status','Subjects','Attended','Email','Date Reg']];
+        const body = reportRows.map((r, i) => [
+            i + 1, r.id_number, r.last_name, r.first_name, r.middle_name.substring(0,2) + '.',
+            r.course, r.year_level, r.section, r.face_status.toUpperCase(), r.status.toUpperCase(),
+            r.enrolled_subjects, r.total_attendances, r.email, r.date_registered
+        ]);
+
+        doc.autoTable({
+            head, body,
+            startY: headerHeight + 8,
+            margin: { left: 10, right: 10 },
+            theme: 'striped',
+            headStyles: { 
+                fillColor: [22, 101, 52], fontSize: 6.5, fontStyle: 'bold', textColor: 255, halign: 'center', valign: 'middle'
+            },
+            styles: { fontSize: 6.5, cellPadding: 2, valign: 'middle' },
+            columnStyles: {
+                0: { cellWidth: 7, halign: 'center' },
+                1: { cellWidth: 18, halign: 'center', fontStyle: 'bold' },
+                2: { cellWidth: 20 },
+                3: { cellWidth: 20 },
+                4: { cellWidth: 10 },
+                5: { cellWidth: 12, halign: 'center' },
+                6: { cellWidth: 8, halign: 'center' },
+                7: { cellWidth: 14, halign: 'center' },
+                8: { cellWidth: 18, halign: 'center', fontStyle: 'bold' },
+                9: { cellWidth: 15, halign: 'center', fontStyle: 'bold' },
+                10: { cellWidth: 14, halign: 'center' },
+                11: { cellWidth: 16, halign: 'center' },
+                12: { cellWidth: 'auto' }, // Email stretches to fill remaining space
+                13: { cellWidth: 18, halign: 'center' }
+            },
+            didParseCell(d) {
+                if (d.column.index === 8 && d.section === 'body') {
+                    const s = (d.cell.text[0] || '').toLowerCase();
+                    if (s === 'registered') { d.cell.styles.textColor = [22, 101, 52]; }
+                    if (s === 'not registered') { d.cell.styles.textColor = [217, 119, 6]; }
+                }
+                if (d.column.index === 9 && d.section === 'body') {
+                    const s = (d.cell.text[0] || '').toLowerCase();
+                    if (s === 'active') { d.cell.styles.textColor = [22, 101, 52]; }
+                    if (s === 'inactive') { d.cell.styles.textColor = [220, 38, 38]; }
+                    if (s === 'graduated') { d.cell.styles.textColor = [37, 99, 235]; }
+                }
+            }
+        });
+
+        const pages = doc.internal.getNumberOfPages();
+        for (let i = 1; i <= pages; i++) {
+            doc.setPage(i); doc.setFontSize(7); doc.setTextColor(156, 163, 175);
+            doc.text(`Laboratory Attendance System  ·  Page ${i} of ${pages}  ·  ${nowStr}`,
+                pageW / 2, doc.internal.pageSize.height - 8, { align: 'center' });
+        }
+
+        doc.save(`Students_Report_${now.toISOString().split('T')[0]}.pdf`);
+
+        await autoSaveReport('PDF');
+
+    } catch (err) {
+        console.error('PDF generation error:', err);
+        showToast('There was an error generating the PDF. Check the console.', true);
+    }
 }
 
 // ── CSV ────────────────────────────────────────────────────
-function exportCSV() {
+async function exportCSV() {
+    if (!checkDuplicateWarning('CSV')) return;
+
     const cols = ['#','Student ID','Last Name','First Name','Middle Name','Course','Year Level',
                   'Section','Face Status','Status','Enrolled Subjects','Total Attendances',
                   'Email','Date Registered'];
@@ -977,7 +1133,35 @@ function exportCSV() {
     a.download = `Students_Report_${new Date().toISOString().split('T')[0]}.csv`;
     a.click();
     URL.revokeObjectURL(a.href);
-    showToast('CSV exported!', false);
+    
+    await autoSaveReport('CSV');
+}
+
+// ── Excel ──────────────────────────────────────────────────
+async function exportExcel() {
+    if (!checkDuplicateWarning('Excel')) return;
+
+    if (!window.XLSX) {
+        return exportCSV(); // Fallback if library fails
+    }
+    const wb = XLSX.utils.book_new();
+
+    const headers = ['#','Student ID','Last Name','First Name','Middle Name','Course','Year Level',
+                  'Section','Face Status','Status','Enrolled Subjects','Total Attendances',
+                  'Email','Date Registered'];
+                  
+    const rows = reportRows.map((r, i) => [
+        i + 1, r.id_number, r.last_name, r.first_name, r.middle_name,
+        r.course, r.year_level, r.section, r.face_status, r.status.toUpperCase(),
+        r.enrolled_subjects, r.total_attendances, r.email, r.date_registered
+    ]);
+
+    const dataSheet = XLSX.utils.aoa_to_sheet([headers, ...rows]);
+    XLSX.utils.book_append_sheet(wb, dataSheet, 'Students');
+
+    XLSX.writeFile(wb, `Students_Report_${new Date().toISOString().split('T')[0]}.xlsx`);
+
+    await autoSaveReport('Excel');
 }
 
 // ══════════════════════════════════════════════════════════

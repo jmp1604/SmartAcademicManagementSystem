@@ -1,5 +1,6 @@
 # Environment files with sensitive credentials
 config/.env.js
+.env
 
 # Node modules (if using any build tools later)
 node_modules/
