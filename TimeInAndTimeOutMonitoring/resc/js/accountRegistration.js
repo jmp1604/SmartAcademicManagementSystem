@@ -117,6 +117,7 @@ studentScanBtn.addEventListener('click', async () => {
                 id_number:  studentData.id_number,
                 firstName:  studentData.first_name,
                 lastName:   studentData.last_name
+                
             })
         });
 
@@ -131,7 +132,11 @@ studentScanBtn.addEventListener('click', async () => {
             body: JSON.stringify({
                 id_number:  studentData.id_number,
                 firstName:  studentData.first_name,
-                lastName:   studentData.last_name
+                lastName:   studentData.last_name, 
+                role:       'student'   // ← Add this
+                
+               
+                
             })
         });
 
@@ -298,12 +303,40 @@ empIdInput.addEventListener('input', function() {
 });
 
 async function searchProfessor(id) {
-    const { data } = await supabaseClient.from('professors').select('*').eq('employee_id', id).maybeSingle();
+    const { data } = await supabaseClient
+        .from('professors')
+        .select('*, departments(department_name)')  // ← Join departments table
+        .eq('employee_id', id)
+        .maybeSingle();
+
     if (data) {
         professorData = data;
+        fillProfessorFields(data);
         professorInfoCard.classList.add('show');
         professorScanBtn.disabled = false;
-        document.getElementById('p_displayName').textContent = `${data.first_name} ${data.last_name}`;
+    }
+}
+function fillProfessorFields(data) {
+    const departmentName = data.departments?.department_name || 'N/A';  // ← Read from join
+
+    document.getElementById('p_firstName').value  = data.first_name  || '';
+    document.getElementById('p_middleName').value = data.middle_name || '';
+    document.getElementById('p_lastName').value   = data.last_name   || '';
+    document.getElementById('p_department').value = departmentName;
+    document.getElementById('p_email').value      = data.email       || '';
+
+    document.getElementById('p_displayName').textContent  = `${data.first_name} ${data.last_name}`;
+    document.getElementById('p_displayDept').textContent  = departmentName;
+    document.getElementById('p_displayEmpId').textContent = data.employee_id || 'N/A';
+    document.getElementById('p_displayEmail').textContent = data.email       || 'N/A';
+
+    const badge = document.getElementById('professorFaceBadge');
+    if (data.facial_dataset_path) {
+        badge.className = 'status-badge registered';
+        badge.textContent = '✓ Face Registered';
+    } else {
+        badge.className = 'status-badge not-registered';
+        badge.textContent = '⚠ Not Registered';
     }
 }
 
@@ -313,7 +346,8 @@ professorScanBtn.addEventListener('click', async () => {
     btn.disabled = true;
 
     try {
-        const response = await fetch('http://localhost:5000/start_registration', {
+        // STEP 1: Wake up the engine via PHP
+        await fetch('http://localhost/INTEG%20SYSTEM/SmartAcademicManagementSystem/TimeInAndTimeOutMonitoring/students/trigger_registration.php', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
@@ -323,13 +357,27 @@ professorScanBtn.addEventListener('click', async () => {
             })
         });
 
-        if (response.ok) {
-            openCameraUI();
-        } else {
-            throw new Error("Python rejected the request.");
-        }
+        // STEP 2: Wait for Flask to respond
+        await waitForFlask();
+
+        // STEP 3: Tell Flask to start registration
+        await fetch('http://localhost:5000/start_registration', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                id_number:  professorData.employee_id,
+                firstName:  professorData.first_name,
+                lastName:   professorData.last_name,
+                role:       'professor'   // ← Add this
+            })
+        });
+
+        await new Promise(resolve => setTimeout(resolve, 1000));
+
+        openCameraUI();
+
     } catch (err) {
-        alert("❌ Engine Offline: Please run the START_ENGINE.bat file first.");
+        alert("❌ Registration Error: " + err.message);
     } finally {
         btn.disabled = false;
     }
@@ -348,8 +396,16 @@ document.getElementById('studentClearBtn').addEventListener('click', () => {
 
 document.getElementById('professorClearBtn').addEventListener('click', () => {
     closeCameraUI();
-    professorInfoCard.classList.remove('show'); 
+    professorInfoCard.classList.remove('show');
     empIdInput.value = '';
     professorData = null;
     professorScanBtn.disabled = true;
+
+    // Clear all auto-filled inputs
+    ['p_firstName', 'p_middleName', 'p_lastName', 'p_department', 'p_email']
+        .forEach(id => document.getElementById(id).value = '');
+
+    // Clear display spans
+    ['p_displayName', 'p_displayDept', 'p_displayEmpId', 'p_displayEmail']
+        .forEach(id => document.getElementById(id).textContent = '');
 });

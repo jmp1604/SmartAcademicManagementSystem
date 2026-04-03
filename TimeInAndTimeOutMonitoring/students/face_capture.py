@@ -27,6 +27,7 @@ session = {
     "id_number": None,
     "first_name": "",
     "last_name": "",
+    "role": "student",   # ← Add this
     "count": 0,
     "active": False,
     "syncing": False,
@@ -38,8 +39,19 @@ session = {
 
 def upload_to_supabase():
     global session
-    print(f"--- Syncing {session['first_name']} to Supabase ---")
-    cloud_folder = f"students/student_{session['id_number']}"
+    role = session.get("role", "student")
+
+    # ← Dynamically set folder and table based on role
+    if role == "professor":
+        cloud_folder = f"professors/professor_{session['id_number']}"
+        table_name   = "professors"
+        id_column    = "employee_id"
+    else:
+        cloud_folder = f"students/student_{session['id_number']}"
+        table_name   = "students"
+        id_column    = "id_number"
+
+    print(f"--- Syncing {session['first_name']} as {role} ---")
     valid_count = 0
     current_paths = list(session["paths"])
 
@@ -53,16 +65,16 @@ def upload_to_supabase():
                     file_options={"content-type": "image/jpeg", "upsert": "true"}
                 )
             valid_count += 1
-            os.remove(p) 
+            os.remove(p)
         except Exception as e:
             print(f"Upload Error: {e}")
 
     if valid_count >= 3:
         try:
-            supabase.table("students").update({"facial_dataset_path": cloud_folder}).eq("id_number", session["id_number"]).execute()
+            supabase.table(table_name).update({"facial_dataset_path": cloud_folder}).eq(id_column, session["id_number"]).execute()
             print("--- Registration Successful ---")
             session["completed"] = True
-            session["done_t"] = time.time() # Start 3-second countdown
+            session["done_t"] = time.time()
         except Exception as e:
             print(f"DB Update Error: {e}")
 
@@ -160,6 +172,7 @@ def start_reg():
         "id_number": data['id_number'],
         "first_name": data['firstName'],
         "last_name": data['lastName'],
+        "role": data.get('role', 'student'),  # ← Add this
         "count": 0,
         "active": True,
         "paths": [],
