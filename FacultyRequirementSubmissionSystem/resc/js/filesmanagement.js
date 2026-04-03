@@ -3,6 +3,54 @@ let currentSubmissionId = null;
 let currentFileUrl = null;
 let currentFileName = null;
 
+async function resolveFileUrl(raw, fileName) {
+    if (!raw) { console.warn('No file URL for:', fileName); return null; }
+
+    let storagePath;
+
+    if (raw.startsWith('http')) {
+        const marker = '/object/public/faculty-submissions/';
+        const idx = raw.indexOf(marker);
+        if (idx !== -1) {
+            storagePath = decodeURIComponent(raw.substring(idx + marker.length));
+        } else {
+            return raw;
+        }
+    } else {
+        storagePath = raw;
+    }
+    const pathsToTry = new Set();
+    pathsToTry.add(storagePath);
+
+    const parts = storagePath.split('/');
+    if (parts.length === 2) {
+        pathsToTry.add(`${parts[0]}/${parts[0]}/${parts[1]}`);
+    }
+    if (parts.length === 3 && parts[0] === parts[1]) {
+        pathsToTry.add(`${parts[0]}/${parts[2]}`);
+    }
+
+    for (const path of [...pathsToTry]) {
+        console.log('Trying path:', path);
+        try {
+            const { data, error } = await supabaseClient.storage
+                .from('faculty-submissions')
+                .createSignedUrl(path, 3600);
+
+            if (!error && data?.signedUrl) {
+                console.log('✓ Success with path:', path);
+                return data.signedUrl;
+            }
+            console.warn(`✗ Failed (${path}):`, error?.message);
+        } catch (err) {
+            console.warn(`✗ Exception (${path}):`, err.message);
+        }
+    }
+
+    console.error('All paths failed for:', storagePath);
+    return raw;
+}
+
 document.addEventListener('DOMContentLoaded', function () {
     if (!isAdmin()) {
         window.location.href = '../../auth/login.html';
@@ -33,6 +81,19 @@ function setupEventListeners() {
 
     if (approveBtn) approveBtn.addEventListener('click', () => handleReviewSubmission('approved'));
     if (rejectBtn)  rejectBtn.addEventListener('click',  () => handleReviewSubmission('rejected'));
+
+    // Cleanup blob URLs when modal closes
+    const reviewModal = document.getElementById('reviewModal');
+    if (reviewModal) {
+        reviewModal.addEventListener('hidden.bs.modal', function() {
+            const iframe = document.getElementById('filePreviewIframe');
+            if (iframe && iframe._blobUrl) {
+                URL.revokeObjectURL(iframe._blobUrl);
+                iframe._blobUrl = null;
+                iframe.src = '';
+            }
+        });
+    }
 }
 
 
@@ -348,7 +409,7 @@ function applyFileFilters() {
 }
 
 
-function showReviewModal(submissionId) {
+async function showReviewModal(submissionId) {
     const submission = allSubmissions.find(s => s.id === submissionId);
     if (!submission) return;
 
@@ -366,6 +427,11 @@ function showReviewModal(submissionId) {
         fileName = file.file_name || fileName;
         fileSize = file.file_size || 0;
         fileUrl = file.file_url || '';
+    }
+
+    // Resolve to signed URL
+    if (fileUrl) {
+        fileUrl = await resolveFileUrl(fileUrl, fileName);
     }
 
     // Store current file info for button actions
@@ -536,45 +602,52 @@ function showPlaceholderData() {
 
 function displayFilePreview(fileUrl, fileName) {
     const container = document.getElementById('filePreviewContainer');
-    if (!container) return;
+    const iframe = document.getElementById('filePreviewIframe');
+    const loading = document.getElementById('previewLoading');
+    const error = document.getElementById('previewError');
+    
+    if (!container || !iframe) return;
     
     if (!fileUrl) {
-        container.innerHTML = `
-            <div class="file-icon-large">
-                <svg viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
-            </div>
-        `;
-        container.classList.remove('has-preview');
+        iframe.style.display = 'none';
+        loading.style.display = 'none';
+        error.style.display = 'flex';
         return;
     }
+    iframe.style.display = 'none';
+    loading.style.display = 'flex';
+    error.style.display = 'none';
+    fetchAndPreviewFile(fileUrl, iframe, loading, error);
+}
 
-    // Extract file extension
-    const ext = fileName.split('.').pop().toLowerCase();
-    const imageExts = ['jpg', 'jpeg', 'png', 'gif', 'webp', 'svg'];
-    const pdfExts = ['pdf'];
+async function fetchAndPreviewFile(fileUrl, iframe, loading, error) {
+    try {
+        const response = await fetch(fileUrl);
+        if (!response.ok) throw new Error(`Fetch failed: ${response.status}`);
 
-    // Show appropriate preview
-    if (imageExts.includes(ext)) {
-        container.innerHTML = `<img src="${fileUrl}" alt="${fileName}" />`;
-        container.classList.add('has-preview');
-    } else if (pdfExts.includes(ext)) {
-        container.innerHTML = `
-            <div style="width: 100%; height: 100%; display: flex; flex-direction: column; align-items: center; justify-content: center; background: #f5f5f5; color: #666;">
-                <svg viewBox="0 0 24 24" style="width: 48px; height: 48px; margin-bottom: 1rem; opacity: 0.5; stroke: currentColor; fill: none; stroke-width: 1.5;">
-                    <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/>
-                </svg>
-                <p style="margin: 0; font-size: 0.9rem; font-weight: 500;">PDF Preview</p>
-                <p style="margin: 0.25rem 0 0 0; font-size: 0.8rem; opacity: 0.7;">Click View to open in new window</p>
-            </div>
-        `;
-        container.classList.add('has-preview');
-    } else {
-        container.innerHTML = `
-            <div class="file-icon-large">
-                <svg viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
-            </div>
-        `;
-        container.classList.remove('has-preview');
+        const blob = await response.blob();
+        const blobUrl = URL.createObjectURL(blob);
+        
+        iframe._blobUrl = blobUrl;
+
+        iframe.onload = function() {
+            loading.style.display = 'none';
+            iframe.style.display = 'block';
+        };
+        
+        iframe.onerror = function() {
+            loading.style.display = 'none';
+            error.style.display = 'flex';
+            iframe.style.display = 'none';
+        };
+
+        iframe.src = blobUrl;
+
+    } catch (err) {
+        console.error('Error loading file preview:', err);
+        loading.style.display = 'none';
+        error.style.display = 'flex';
+        iframe.style.display = 'none';
     }
 }
 
@@ -584,13 +657,11 @@ function viewFile(fileUrl, fileName) {
         return;
     }
     
-    // Open file in new tab
     const ext = fileName.split('.').pop().toLowerCase();
     
     if (['pdf', 'jpg', 'jpeg', 'png', 'gif', 'webp'].includes(ext)) {
         window.open(fileUrl, '_blank');
     } else {
-        // For other file types, just try to open it
         window.open(fileUrl, '_blank');
     }
 }
@@ -600,8 +671,6 @@ function downloadFile(fileUrl, fileName) {
         alert('File URL not available.');
         return;
     }
-    
-    // Create a temporary anchor element to trigger download
     const link = document.createElement('a');
     link.href = fileUrl;
     link.download = fileName;
