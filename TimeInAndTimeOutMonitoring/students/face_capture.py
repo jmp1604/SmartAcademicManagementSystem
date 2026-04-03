@@ -13,9 +13,9 @@ import signal
 # CONFIGURATION
 # ==========================================
 SUPABASE_URL = "https://wjyoruvcyjnwsimeqrgl.supabase.co"
-SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6IndqeW9ydXZjeWpud3NpbWVxcmdsIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc3MTc0MjExOCwiZXhwIjoyMDg3MzE4MTE4fQ.gWuZCPZeJmPy_hskmFkzNc9dHlGHKXDHDqyFNBciKKc"
 
-supabase: Client = create_client(SUPABASE_URL, SUPABASE_KEY)
+
+supabase: Client = create_client(SUPABASE_URL, )
 BUCKET_NAME = "facial_data"
 
 app = Flask(__name__)
