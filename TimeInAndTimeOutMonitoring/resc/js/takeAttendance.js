@@ -248,18 +248,31 @@ function handleStudentEvent(d) {
     const name = d.name || 'Student';
     const time = new Date().toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: true });
 
-    switch (d.action) {
-        case 'SESSION_NOT_STARTED':
-            showNotif({ icon: '⏳', title: 'Session Not Started Yet',
-                msg: d.error || 'Your professor has not started the session yet. Please wait.',
-                buttons: [{ label: 'OK', color: 'orange', action: null }] });
-            break;
+   switch (d.action) {
+    case 'NOT_ENROLLED':
+        showNotif({ icon: '📋', title: 'Not Enrolled',
+            msg: d.error || 'You are not enrolled in any subject with a schedule today.',
+            buttons: [{ label: 'OK', color: 'gray', action: null }] });
+        break;
 
-        case 'SESSION_CANCELLED':
-            showNotif({ icon: '🚫', title: 'Session Cancelled',
-                msg: d.error || 'This session has been cancelled or voided.',
-                buttons: [{ label: 'OK', color: 'gray', action: null }] });
-            break;
+   case 'SESSION_NOT_STARTED':
+    
+    showNotif({ icon: '⏳', title: 'Session Not Started Yet',
+        msg: d.error || 'Your professor has not started the session yet. Please wait.',
+        buttons: [{ label: 'OK', color: 'orange', action: null }] });
+    break;
+
+       case 'SESSION_CANCELLED':
+    showNotif({ icon: '🚫', title: 'Session Cancelled',
+        msg: d.error || 'This session has been cancelled or voided.',
+        buttons: [{ label: 'OK', color: 'gray', action: null }] });
+    break;
+
+case 'SESSION_VOIDED':
+    showNotif({ icon: '⏰', title: 'Session Voided',
+        msg: d.error || `Professor did not start within the required time window. Session has been voided.`,
+        buttons: [{ label: 'OK', color: 'orange', action: null }] });
+    break;
 
         case 'SESSION_ENDED':
             showNotif({ icon: '🔒', title: 'Session Already Ended',

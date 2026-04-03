@@ -164,6 +164,8 @@ def td_to_secs(td):
     if isinstance(td, datetime.timedelta):
         return int(td.total_seconds())
     if isinstance(td, str):
+        # Strip microseconds if present — e.g. "15:49:32.87412" → "15:49:32"
+        td = td.split('.')[0]
         parts = td.split(':')
         return int(parts[0])*3600 + int(parts[1])*60 + int(parts[2]) if len(parts) == 3 else 0
     return 0
@@ -207,10 +209,11 @@ def find_professor_schedule(professor_id, today):
 
     return output
 
+    
 def find_student_schedule(student_id, today):
     day_name = today.strftime("%A")
+    print(f"  [find_student_schedule] student_id={student_id} day={day_name} date={today}")
 
-    # Get enrolled schedule IDs
     enroll_result = supabase.table("schedule_enrollments")\
         .select("schedule_id")\
         .eq("student_id", student_id)\
@@ -218,12 +221,14 @@ def find_student_schedule(student_id, today):
         .execute()
 
     enrolled_ids = [e["schedule_id"] for e in (enroll_result.data or [])]
+    print(f"  [find_student_schedule] enrolled_ids={enrolled_ids}")
+    
     if not enrolled_ids:
+        print(f"  [find_student_schedule] → NO ENROLLMENTS FOUND")
         return None
 
-    # Get active schedules today
     sched_result = supabase.table("lab_schedules")\
-        .select("schedule_id, start_time, end_time")\
+        .select("schedule_id, start_time, end_time, day_of_week, status")\
         .in_("schedule_id", enrolled_ids)\
         .eq("day_of_week", day_name)\
         .eq("status", "active")\
@@ -231,10 +236,12 @@ def find_student_schedule(student_id, today):
         .execute()
 
     schedules = sched_result.data or []
+    print(f"  [find_student_schedule] schedules matching today+active={schedules}")
+    
     if not schedules:
+        print(f"  [find_student_schedule] → NO ACTIVE SCHEDULES FOR TODAY")
         return None
 
-    # Get today's sessions for these schedules
     schedule_ids = [s["schedule_id"] for s in schedules]
     sess_result  = supabase.table("lab_sessions")\
         .select("session_id, schedule_id, status")\
@@ -243,24 +250,43 @@ def find_student_schedule(student_id, today):
         .execute()
 
     sessions_by_schedule = {s["schedule_id"]: s for s in (sess_result.data or [])}
+    print(f"  [find_student_schedule] sessions_today={sessions_by_schedule}")
 
     best, priority = None, 99
+    cancelled_fallback = None  # track cancelled sessions as last resort
+
     for sch in schedules:
         sess           = sessions_by_schedule.get(sch["schedule_id"])
         session_status = sess["status"] if sess else "not_created"
+        session_id     = sess["session_id"] if sess else None
+
+        print(f"  [find_student_schedule] checking schedule={sch['schedule_id']} session_status={session_status}")
 
         if session_status == "cancelled":
+            # Don't skip entirely — save as fallback so student gets
+            # "Session Cancelled" instead of "Not Enrolled"
+            if cancelled_fallback is None:
+                cancelled_fallback = (sch["schedule_id"], sch["start_time"], sch["end_time"],
+                                      session_id, "cancelled")
             continue
 
         rank = {'ongoing': 1, 'dismissing': 1, 'scheduled': 2,
-                'not_created': 2, 'completed': 3}.get(session_status, 4)
+                'not_created': 3, 'completed': 4}.get(session_status, 5)
         if rank < priority:
             priority = rank
-            best     = (sch["schedule_id"], sch["start_time"], sch["end_time"])
+            best = (sch["schedule_id"], sch["start_time"], sch["end_time"],
+                    session_id, session_status)
         if priority == 1:
             break
 
+    # If all sessions were cancelled and nothing else was found,
+    # return the cancelled one so _handle_student can show the right message
+    if best is None and cancelled_fallback is not None:
+        best = cancelled_fallback
+
+    print(f"  [find_student_schedule] → best={best}")
     return best
+
 
 def get_or_create_session(schedule_id, today):
     result = supabase.table("lab_sessions")\
@@ -483,7 +509,6 @@ def _handle_professor(meta, today, now):
                    "name":name,"action":"NO_VALID_SCHEDULE","session_id":None,
                    "error":"No valid schedule available. All classes have ended or been voided.",
                    "timestamp":now.strftime("%Y-%m-%d %H:%M:%S")})
-
 # ─────────────────────────────────────────────
 # Student flow
 # ─────────────────────────────────────────────
@@ -499,26 +524,36 @@ def _handle_student(meta, today, now):
                        "error":"You are not enrolled in any subject with a schedule today.",
                        "timestamp":now.strftime("%Y-%m-%d %H:%M:%S")})
 
-    schedule_id, start_td, end_td = row
+    # Unpack all 5 values
+    schedule_id, start_td, end_td, session_id, status = row
+
     s = datetime.datetime.combine(today, datetime.time()) + datetime.timedelta(seconds=td_to_secs(start_td))
     e = datetime.datetime.combine(today, datetime.time()) + datetime.timedelta(seconds=td_to_secs(end_td))
     print(f"  → Schedule {s:%I:%M %p}–{e:%I:%M %p}")
-
-    session_id, status = get_or_create_session(schedule_id, today)
     print(f"  → session_id={session_id} status={status}")
 
-    if status == "scheduled":
+    # Session was voided — professor did not start within the time window
+    if status == "cancelled":
+        return _push({"role":"student","student_id":sid,"id_number":id_num,
+                       "name":name,"action":"SESSION_CANCELLED","session_id":None,
+                       "error":"The session was voided — professor did not start within the required time.",
+                       "timestamp":now.strftime("%Y-%m-%d %H:%M:%S")})
+
+    # Session not yet started — professor hasn't scanned in yet
+    if status in ("not_created", "scheduled", None) or session_id is None:
         return _push({"role":"student","student_id":sid,"id_number":id_num,
                        "name":name,"action":"SESSION_NOT_STARTED","session_id":None,
                        "error":f"Professor has not started the session yet. Class starts at {s:%I:%M %p}.",
                        "timestamp":now.strftime("%Y-%m-%d %H:%M:%S")})
 
+    # Session already ended
     if status == "completed":
         return _push({"role":"student","student_id":sid,"id_number":id_num,
                        "name":name,"action":"SESSION_ENDED","session_id":session_id,
                        "error":"The session has already ended.",
                        "timestamp":now.strftime("%Y-%m-%d %H:%M:%S")})
 
+    # Only reach here if status is 'ongoing' or 'dismissing'
     # Late detection
     sess_result = supabase.table("lab_sessions")\
         .select("actual_start_time")\
@@ -535,7 +570,7 @@ def _handle_student(meta, today, now):
         if now > grace_cutoff:
             is_late      = True
             late_minutes = int((now - session_start_dt).total_seconds() / 60)
-            print(f"  → LATE by {late_minutes} min (grace cutoff was {grace_cutoff:%I:%M %p})")
+            print(f"  → LATE by {late_minutes} min")
         else:
             print(f"  → ON TIME (grace cutoff {grace_cutoff:%I:%M %p})")
 
@@ -554,7 +589,7 @@ def _handle_student(meta, today, now):
             print(f"  → CANNOT_TIME_OUT — session is 'ongoing', not yet dismissing")
             return _push({"role":"student","student_id":sid,"id_number":id_num,
                            "name":name,"action":"CANNOT_TIME_OUT","session_id":session_id,
-                           "error":"Professor has not allowed dismissal yet. Please wait until the professor enables time-out.",
+                           "error":"Professor has not allowed dismissal yet.",
                            "timestamp":now.strftime("%Y-%m-%d %H:%M:%S")})
         action = "OUT"
     else:
@@ -565,7 +600,6 @@ def _handle_student(meta, today, now):
            "name":name,"action":action,"session_id":session_id,
            "is_late":is_late,"late_minutes":late_minutes,
            "timestamp":now.strftime("%Y-%m-%d %H:%M:%S")})
-
 # ─────────────────────────────────────────────
 # Camera + frame generator
 # ─────────────────────────────────────────────

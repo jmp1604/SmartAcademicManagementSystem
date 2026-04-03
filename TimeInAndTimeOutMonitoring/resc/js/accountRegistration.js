@@ -352,6 +352,14 @@ setInterval(async () => {
 }, 3000);
 
 // Check engine status on page load
+async function checkEngineStatus() {
+    try {
+        const res = await fetch('http://localhost:5000/status');
+        document.getElementById('stopEngineBtn').style.display = res.ok ? 'inline-flex' : 'none';
+    } catch (_) {
+        document.getElementById('stopEngineBtn').style.display = 'none';
+    }
+}
 checkEngineStatus();
 
 async function stopEngine() {
@@ -415,16 +423,7 @@ professorScanBtn.addEventListener('click', async () => {
     }
 });
 
-// ═══════════════════════════════════════════
-// CLEANUP / CLEAR
-// ═══════════════════════════════════════════
-document.getElementById('studentClearBtn').addEventListener('click', () => {
-    closeCameraUI();
-    studentInfoCard.classList.remove('show');
-    studentIdInput.value = '';
-    studentData = null;
-    studentScanBtn.disabled = true;
-});
+
 
 document.getElementById('professorClearBtn').addEventListener('click', () => {
     closeCameraUI();

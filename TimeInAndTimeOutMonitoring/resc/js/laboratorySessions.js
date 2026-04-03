@@ -183,13 +183,14 @@ async function autoTransitionStayIn() {
 // FETCH: Active sessions (ongoing / dismissing)
 // ══════════════════════════════════════════════════════════
 async function fetchActiveSessions() {
-    const { data, error } = await supabaseClient
-        .from('lab_sessions')
-        .select(`
-            session_id,
-            actual_start_time,
-            status,
-            notes,
+   const { data, error } = await supabaseClient
+    .from('lab_sessions')
+    .select(`
+        session_id,
+        actual_start_time,
+        actual_dismiss_time,
+        status,
+        notes,
             lab_schedules (
                 schedule_id,
                 start_time,
@@ -376,8 +377,10 @@ function renderActiveCard(s) {
     const prof = sch?.professors;
     const lab  = sch?.laboratory_rooms;
 
-    const isDismissing = s.status === 'dismissing';
-    const isStayIn     = s.status === 'ongoing' && (s.notes || '').includes('STAY IN');
+const isDismissing = s.status === 'dismissing';
+// STAY IN = was dismissed (actual_dismiss_time is set) but all students
+// already left so autoTransitionStayIn() flipped it back to 'ongoing'
+const isStayIn     = s.status === 'ongoing' && !!s.actual_dismiss_time;
     const pct          = s.total_enrolled > 0
         ? Math.round((s.students_present / s.total_enrolled) * 100) : 0;
 
