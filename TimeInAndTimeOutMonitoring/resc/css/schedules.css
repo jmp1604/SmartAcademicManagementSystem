@@ -172,42 +172,103 @@ hr { border: 0; height: 2px; background: linear-gradient(90deg, var(--green-dark
 .enroll-table th { padding: 12px 14px; text-align: left; color: var(--green-dark); font-size: 11px; font-weight: 800; text-transform: uppercase; letter-spacing: 0.5px; }
 .enroll-table td { padding: 12px 14px; border-bottom: 1px solid var(--border); font-size: 13.5px; vertical-align: middle; }
 .enroll-table tbody tr:hover { background: var(--off-white); }
-
-/* Report Modal Styles (Mirrors Professors CSS exactly) */
-.rm-overlay { display: none; position: fixed; inset: 0; background: rgba(15, 36, 25, 0.7); z-index: 10000; align-items: center; justify-content: center; backdrop-filter: blur(3px); }
+/* ===============================
+   Report Modal (Laboratories Theme)
+================================ */
+.rm-overlay {
+    display: none; position: fixed; inset: 0;
+    background: rgba(0,0,0,.55); z-index: 10000;
+    align-items: center; justify-content: center;
+    backdrop-filter: blur(3px);
+}
 .rm-overlay.on { display: flex; }
-.rm-box { background: var(--white); border-radius: var(--radius-lg); width: 95%; max-width: 1200px; max-height: 90vh; display: flex; flex-direction: column; box-shadow: var(--shadow-lg); animation: rmIn .25s ease-out; overflow: hidden; }
-@keyframes rmIn { from{opacity:0;transform:scale(.95) translateY(10px)} to{opacity:1;transform:scale(1) translateY(0)} }
-.rm-hd { background: var(--green-dark); padding: 20px 28px; display: flex; align-items: center; justify-content: space-between; flex-shrink: 0; }
-.rm-hd h2 { color: var(--white); font-size: 18px; margin: 0; font-family: 'Nunito', sans-serif;}
-.rm-hd p  { color: var(--green-light); font-size: 13px; margin-top: 4px; font-family: 'Nunito Sans', sans-serif; }
-.rm-x { background: rgba(255,255,255,.15); border: none; color: var(--white); width: 34px; height: 34px; border-radius: 50%; cursor: pointer; display: flex; align-items: center; justify-content: center; transition: .2s; }
+
+.rm-box {
+    background: white; border-radius: 14px;
+    width: 96%; max-width: 1200px; max-height: 93vh;
+    display: flex; flex-direction: column;
+    box-shadow: 0 20px 60px rgba(0,0,0,.25);
+    animation: rmIn .22s cubic-bezier(.34,1.56,.64,1);
+    overflow: hidden; /* Keeps bottom corners clean when scrolling */
+}
+@keyframes rmIn {
+    from { opacity: 0; transform: scale(.88) translateY(14px); }
+    to   { opacity: 1; transform: scale(1) translateY(0); }
+}
+
+.rm-hd {
+    background: linear-gradient(135deg, #14532d, #16a34a);
+    padding: 22px 28px; border-radius: 14px 14px 0 0;
+    display: flex; align-items: center;
+    justify-content: space-between; gap: 14px; flex-shrink: 0;
+}
+.rm-hd h2 { color: white; font-size: 19px; font-weight: 700; display: flex; align-items: center; gap: 10px; margin: 0; font-family: 'Nunito', sans-serif; }
+.rm-hd p  { color: rgba(255,255,255,.72); font-size: 12.5px; margin-top: 3px; font-family: 'Nunito Sans', sans-serif; }
+
+.rm-x {
+    background: rgba(255,255,255,.15); border: none; color: white;
+    width: 34px; height: 34px; border-radius: 8px; cursor: pointer;
+    font-size: 15px; display: flex; align-items: center; justify-content: center;
+    transition: .18s; flex-shrink: 0;
+}
 .rm-x:hover { background: rgba(255,255,255,.3); }
 
-.rm-tb { padding: 16px 24px; border-bottom: 1.5px solid var(--border); background: var(--surface); display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
-.rm-chip { padding: 6px 14px; border-radius: 20px; font-size: 12.5px; font-weight: 700; display: inline-flex; align-items: center; gap: 6px; font-family: 'Nunito Sans', sans-serif;}
-.rm-chip.green { background: var(--white); color: var(--green-dark); border: 1.5px solid var(--border); }
-.rm-chip.blue  { background: #eff6ff; color: #1e3a8a; border: 1.5px solid #bfdbfe; }
-.rm-chip.amber  { background: #fffbeb; color: #92400e; border: 1px solid #fde68a; }
+.rm-tb {
+    padding: 14px 22px; border-bottom: 1.5px solid #dcfce7;
+    background: #fafffe; display: flex; align-items: center;
+    gap: 8px; flex-wrap: wrap; flex-shrink: 0;
+}
 
-.rm-tb-right { margin-left: auto; display: flex; gap: 10px; }
-.rm-btn { padding: 8px 16px; border-radius: 8px; font-size: 13px; font-weight: 700; cursor: pointer; border: none; display: inline-flex; align-items: center; gap: 6px; font-family: 'Nunito Sans', sans-serif; transition: transform .2s;}
-.rm-btn:hover { transform: translateY(-2px); }
+.rm-chip {
+    padding: 5px 13px; border-radius: 20px; font-size: 12px; font-weight: 600;
+    display: inline-flex; align-items: center; gap: 5px; font-family: 'Nunito Sans', sans-serif;
+}
+.rm-chip.green { background: #dcfce7; color: #166534; border: 1px solid #bbf7d0; }
+.rm-chip.blue  { background: #dbeafe; color: #1d4ed8; border: 1px solid #bfdbfe; }
+.rm-chip.amber { background: #fef3c7; color: #92400e; border: 1px solid #fde68a; }
+
+.rm-tb-right { margin-left: auto; display: flex; gap: 8px; flex-wrap: wrap; }
+
+.rm-btn {
+    padding: 8px 15px; border-radius: 7px; font-size: 13px; font-weight: 600;
+    cursor: pointer; border: none; display: inline-flex; align-items: center; gap: 6px;
+    transition: .15s; font-family: 'Nunito Sans', sans-serif; white-space: nowrap;
+}
+.rm-btn.save  { background: #166534; color: white; }
+.rm-btn.save:hover  { background: #14532d; }
 .rm-btn.print { background: #f0f9ff; color: #0369a1; border: 1.5px solid #bae6fd; }
-.rm-btn.pdf   { background: #fff5f5; color: var(--red); border: 1.5px solid #fecaca; }
-.rm-btn.excel { background: var(--white); color: var(--green-dark); border: 1.5px solid var(--green-dark); }
+.rm-btn.print:hover { background: #0369a1; color: white; border-color: #0369a1; }
+.rm-btn.pdf   { background: #fff5f5; color: #dc2626; border: 1.5px solid #fecaca; }
+.rm-btn.pdf:hover   { background: #dc2626; color: white; border-color: #dc2626; }
+.rm-btn.excel { background: #f0fdf4; color: #166534; border: 1.5px solid #bbf7d0; }
+.rm-btn.excel:hover { background: #166534; color: white; border-color: #166534; }
 
-.rm-body { overflow-y: auto; flex: 1; padding: 20px; background: var(--white);}
-.rm-table { width: 100%; border-collapse: collapse; font-size: 13px; border: 1px solid var(--border); border-radius: 8px; overflow: hidden;}
-.rm-table thead th { background: var(--surface); color: var(--green-dark); padding: 12px 14px; text-align: left; font-size: 11px; font-weight: 800; text-transform: uppercase; position: sticky; top: 0; border-bottom: 1.5px solid var(--border);}
-.rm-table tbody tr { border-bottom: 1px solid var(--border); }
-.rm-table tbody tr:nth-child(even) { background: var(--off-white); }
-.rm-table td { padding: 12px 14px; font-family: 'Nunito Sans', sans-serif;}
+.rm-body { overflow-y: auto; flex: 1; background: white; }
 
-.rm-badge { padding: 4px 10px; border-radius: 12px; font-size: 11px; font-weight: 800; text-transform: uppercase; }
-.rm-badge.active   { background: #dcfce7; color: var(--green-dark); }
-.rm-badge.inactive { background: #fee2e2; color: var(--red); }
+.rm-table { width: 100%; border-collapse: collapse; font-size: 13px; font-family: 'Nunito Sans', sans-serif; }
+.rm-table thead th {
+    background: #166534; color: white; padding: 11px 14px;
+    text-align: left; font-size: 10.5px; font-weight: 700;
+    text-transform: uppercase; letter-spacing: .6px;
+    white-space: nowrap; position: sticky; top: 0; z-index: 2;
+    border-bottom: none;
+    border-right: 1px solid rgba(255,255,255,.2); /* Vertical white lines in header */
+}
+.rm-table thead th:last-child { border-right: none; }
 
+.rm-table tbody tr { border-bottom: 1px solid #e5e7eb; transition: background .1s; } /* Crisp horizontal rows */
+.rm-table tbody tr:nth-child(even) { background: #f9fffe; }
+.rm-table tbody tr:hover { background: #ecfdf5; }
+.rm-table td { padding: 11px 14px; vertical-align: middle; }
+
+.rm-badge {
+    display: inline-block; padding: 3px 10px; border-radius: 12px;
+    font-size: 11px; font-weight: 700; text-transform: uppercase;
+}
+.rm-badge.active   { background: #dcfce7; color: #166534; }
+.rm-badge.inactive { background: #fee2e2; color: #dc2626; }
+.rm-badge.registered     { background: #dcfce7; color: #166534; }
+.rm-badge.not-registered { background: #fef3c7; color: #92400e; }
 /* Toast */
 .toast { position: fixed; bottom: 30px; right: 30px; padding: 14px 24px; background: var(--green-dark); color: var(--white); border-radius: 12px; font-size: 14px; font-weight: 700; display: none; align-items: center; gap: 10px; z-index: 99999; box-shadow: var(--shadow-md); font-family: 'Nunito Sans', sans-serif;}
 .toast.on { display: flex; animation: slideUp 0.3s ease-out; }
