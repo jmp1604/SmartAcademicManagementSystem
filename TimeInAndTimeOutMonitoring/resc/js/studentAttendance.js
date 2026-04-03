@@ -395,11 +395,36 @@ window.showDetail = function(id) {
 }
 
 window.closeModal = function() { document.getElementById('detailModal').classList.remove('on'); }
+// ────────────────────────────────────────────
+// 4. REPORT MODAL & EXPORT (Laboratories Theme)
+// ────────────────────────────────────────────
 
-// ────────────────────────────────────────────
-// 4. REPORT MODAL & EXPORT
-// ────────────────────────────────────────────
-window.openReportModal = function() {
+let existingReportsToday = []; // Tracks reports to prevent exact duplicates
+
+// ── Pre-fetch Duplicates ──
+window.fetchTodayReports = async function() {
+    const dateStr = new Date().toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' });
+    try {
+        const { data } = await supabaseClient
+            .from('las_reports')
+            .select('report_name, report_data')
+            .eq('report_type', 'attendance')
+            .like('report_name', `%${dateStr}%`); 
+            
+        if (data) {
+            existingReportsToday = data.map(d => ({
+                name: d.report_name,
+                dataString: typeof d.report_data === 'string' ? d.report_data : JSON.stringify(d.report_data)
+            }));
+        } else {
+            existingReportsToday = [];
+        }
+    } catch (e) {
+        existingReportsToday = [];
+    }
+};
+
+window.openReportModal = async function() {
     // Populate stats
     document.getElementById('rmDisplayDate').textContent = document.getElementById('filterDate').value || 'All Dates';
     document.getElementById('rmRecordCount').textContent = META.total;
@@ -445,12 +470,14 @@ window.openReportModal = function() {
     }).join('');
     
     document.getElementById('rmOverlay').classList.add('on');
-}
+    await window.fetchTodayReports(); // Prepare duplicate checker
+};
+
 window.closeReportModal = function() { document.getElementById('rmOverlay').classList.remove('on'); }
 
 // Close modals on Escape
 document.addEventListener('keydown', e => {
-    if (e.key === 'Escape') { closeModal(); closeReportModal(); }
+    if (e.key === 'Escape') { if(typeof closeModal==='function') closeModal(); closeReportModal(); }
 });
 
 function formatTime12Hour(timeString) {
@@ -462,18 +489,61 @@ function formatTime12Hour(timeString) {
     return `${h}:${minutes} ${ampm}`;
 }
 
-window.exportCSV = function() {
-    exportToCSV(false);
-}
-window.rmExportCSV = function() {
-    exportToCSV(true);
+// ── Smart Duplicate Check Helper ──
+function checkDuplicateWarning(exportType) {
+    const dateStr = new Date().toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' });
+    const filterDate = document.getElementById('filterDate').value || 'All Dates';
+    const reportName = `Attendance Report [${filterDate}] — ${dateStr} (${exportType})`;
+    const currentDataString = JSON.stringify(filteredAttendance);
+    
+    const isExactDuplicate = existingReportsToday.some(r => 
+        r.name === reportName && r.dataString === currentDataString
+    );
+    
+    if (isExactDuplicate) {
+        return confirm(`A ${exportType} report with this EXACT data has already been saved today.\n\nAre you sure you want to generate a duplicate?`);
+    }
+    return true; 
 }
 
-function exportToCSV(isReport) {
+// ── Auto-save helper ──────────────────────────────────────────
+async function autoSaveReport(exportType) {
+    const dateStr    = new Date().toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' });
+    const filterDate = document.getElementById('filterDate').value || 'All Dates';
+    const reportName = `Attendance Report [${filterDate}] — ${dateStr} (${exportType})`;
+
+    const payload = {
+        report_type: 'attendance',
+        report_name: reportName,
+        filters:     JSON.stringify({ date: filterDate }),
+        report_data: JSON.stringify(filteredAttendance)
+    };
+
+    try {
+        const { error } = await supabaseClient.from('las_reports').insert([payload]);
+        if (error) throw error;
+        
+        existingReportsToday.push({
+            name: payload.report_name,
+            dataString: payload.report_data
+        }); 
+        
+    } catch (err) {
+        console.error('Auto-save error:', err);
+    }
+}
+
+// ── EXPORT CSV ──
+window.exportCSV = function() { exportToCSV(false); }
+window.rmExportCSV = function() { exportToCSV(true); }
+
+async function exportToCSV(isReport) {
     if (filteredAttendance.length === 0) {
         alert("No records to export.");
         return;
     }
+    if (!checkDuplicateWarning('CSV')) return;
+
     const cols = ['#','Student ID','Name','Course','Section','Subject Code','Subject Name','Laboratory','Professor','Session Date','Time In','Time Out','Duration','Status','Face'];
     const lines = [
         cols.join(','),
@@ -489,7 +559,7 @@ function exportToCSV(isReport) {
             const face = r.verified_by_facial_recognition ? 'Yes' : 'No';
 
             return [
-                i+1, r.id_number, `"${r.student_full_name}"`, r.course, r.class_section,
+                i+1, r.id_number, `"${r.student_full_name || r.student_name}"`, r.course, r.class_section,
                 r.subject_code, `"${r.subject_name}"`, r.lab_code, `"${r.professor_name}"`,
                 r.session_date, `"${tIn}"`, `"${tOut}"`, `"${dur}"`, `"${status}"`, `"${face}"`
             ].join(',');
@@ -500,8 +570,285 @@ function exportToCSV(isReport) {
     const dateStr = document.getElementById('filterDate').value || 'All_Dates';
     a.download = `Attendance_Report_${dateStr}.csv`;
     a.click();
+
+    await autoSaveReport('CSV');
 }
 
-window.exportExcel = function() { alert("Excel export requires SheetJS configuration (similar to previous modules)"); }
-window.printReport = function() { alert("Print functionality triggered (Code logic omitted for brevity)"); }
-window.downloadPDF = function() { alert("PDF download triggered (Code logic omitted for brevity)"); }
+// ── PRINT ──────────────────────────────────────────────────
+window.printReport = async function() {
+    if (filteredAttendance.length === 0) { alert("No records to print."); return; }
+    if (!checkDuplicateWarning('Print')) return;
+
+    const now     = new Date();
+    const dateStr = now.toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' });
+    const timeStr = now.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' });
+    const nowStr  = `${dateStr} at ${timeStr}`;
+    const filterD = document.getElementById('filterDate').value || 'All Dates';
+
+    const cols = ['#','Student ID','Name','Course','Section','Subject Code','Subject Name','Lab','Professor','Date','Time In','Time Out','Dur.','Status','Face'];
+
+    const rows = filteredAttendance.map((r, i) => {
+        let dur = r.duration_minutes ? `${r.duration_minutes}m` : '—';
+        if (!r.time_out && r.time_in) {
+            const mins = Math.round((new Date() - new Date(r.time_in)) / 60000);
+            dur = `${mins}m (ong.)`;
+        }
+        const tIn = r.time_in ? new Date(r.time_in).toLocaleTimeString('en-US', {hour:'numeric',minute:'2-digit'}) : '—';
+        const tOut = r.time_out ? new Date(r.time_out).toLocaleTimeString('en-US', {hour:'numeric',minute:'2-digit'}) : (!r.time_out && r.time_in ? 'In Lab' : '—');
+        
+        const isLate = r.time_in_status === 'late';
+        const status = isLate ? `Late (${r.late_minutes}m)` : 'On Time';
+        const statusColor = isLate ? '#dc2626' : '#166534';
+        
+        const face = r.verified_by_facial_recognition ? 'Face' : 'Manual';
+        const faceColor = r.verified_by_facial_recognition ? '#166534' : '#d97706';
+
+        return `<tr class="${i % 2 === 1 ? 'even' : ''}">
+            <td>${i+1}</td>
+            <td><strong>${r.id_number}</strong></td>
+            <td><strong>${r.student_full_name || r.student_name}</strong></td>
+            <td>${r.course || '—'}</td>
+            <td style="text-align:center">${r.class_section}</td>
+            <td><strong>${r.subject_code}</strong></td>
+            <td style="font-size:9px">${(r.subject_name||'').substring(0,20)}...</td>
+            <td><strong>${r.lab_code}</strong></td>
+            <td style="font-size:9px">${(r.professor_name||'').substring(0,15)}</td>
+            <td>${r.session_date}</td>
+            <td>${tIn}</td>
+            <td>${tOut}</td>
+            <td>${dur}</td>
+            <td><span style="color: ${statusColor}; font-weight: bold;">${status.toUpperCase()}</span></td>
+            <td><span style="color: ${faceColor}; font-weight: bold;">${face.toUpperCase()}</span></td>
+        </tr>`;
+    }).join('');
+
+    const w = window.open('', '_blank');
+    w.document.write(`<!DOCTYPE html><html><head><meta charset="UTF-8"><title>Attendance Report</title>
+    <style>
+        *{margin:0;padding:0;box-sizing:border-box}
+        body{font-family:Arial,sans-serif;padding:20px;font-size:10px;color:#111}
+        
+        /* ── GREEN BANNER HEADER STYLE ── */
+        .header-container { 
+            background-color: #166534; color: white; text-align: center; 
+            margin-bottom: 20px; padding: 20px 15px; border-radius: 8px;
+            -webkit-print-color-adjust: exact; print-color-adjust: exact; 
+        }
+        .logos-text-wrapper { display: flex; justify-content: center; align-items: center; gap: 25px; margin-bottom: 10px; }
+        .logo-img { height: 50px; width: auto; object-fit: contain; }
+        .univ-title { font-size: 18px; font-weight: bold; color: white; line-height: 1.2; letter-spacing: 0.5px;}
+        .college-title { font-size: 11px; color: #bbf7d0; letter-spacing: 1px; text-transform: uppercase;}
+        .report-title { font-size: 16px; font-weight: bold; color: white; margin-top: 12px; text-transform: uppercase; letter-spacing: 1px;}
+        .report-meta { font-size: 11px; color: #bbf7d0; margin-top: 5px; }
+        
+        table{width:100%;border-collapse:collapse; margin-top: 10px;}
+        th{background:#166534;color:#fff;padding:8px 8px;text-align:center;font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:.5px; -webkit-print-color-adjust: exact; print-color-adjust: exact;}
+        td{padding:8px 8px;border-bottom:1px solid #e5e7eb;font-size:10px; text-align:center;}
+        td:nth-child(2), td:nth-child(3), td:nth-child(6), td:nth-child(7), td:nth-child(9) {text-align:left;} 
+        tr:nth-child(even){background:#f9fafb; -webkit-print-color-adjust: exact; print-color-adjust: exact;}
+        .footer{margin-top:20px;text-align:center;font-size:10px;color:#9ca3af;border-top:1px solid #e5e7eb;padding-top:10px}
+        @media print{body{padding:0px}}
+    </style></head><body>
+    
+    <div class="header-container">
+        <div class="logos-text-wrapper">
+            <img src="../resc/assets/plp_logo.png" class="logo-img" alt="PLP Logo">
+            <div>
+                <div class="univ-title">PAMANTASAN NG LUNGSOD NG PASIG</div>
+                <div class="college-title">College of Computer Studies</div>
+            </div>
+            <img src="../resc/assets/ccs_logo.png" class="logo-img" alt="CCS Logo">
+        </div>
+        <div class="report-title">STUDENT ATTENDANCE REPORT</div>
+        <div class="report-meta">Generated: ${nowStr} &nbsp;&middot;&nbsp; Filter: ${filterD} &nbsp;&middot;&nbsp; Total Records: ${filteredAttendance.length}</div>
+    </div>
+
+    <table>
+        <thead><tr>${cols.map(c => `<th>${c}</th>`).join('')}</tr></thead>
+        <tbody>${rows}</tbody>
+    </table>
+    <div class="footer">Laboratory Attendance System &nbsp;&middot;&nbsp; ${nowStr}</div>
+    <script>window.onload=()=>setTimeout(()=>window.print(),500)<\/script>
+    </body></html>`);
+    w.document.close();
+
+    await autoSaveReport('Print');
+};
+
+// ── PDF ────────────────────────────────────────────────────
+window.downloadPDF = async function() {
+    if (filteredAttendance.length === 0) { alert("No records to export."); return; }
+    if (!checkDuplicateWarning('PDF')) return;
+
+    if (!window.jspdf) {
+        alert('PDF library not loaded yet. Please try again.');
+        return;
+    }
+
+    try {
+        const { jsPDF } = window.jspdf;
+        const doc     = new jsPDF({ orientation: 'landscape', unit: 'mm', format: 'a4' });
+        const now     = new Date();
+        const dateStr = now.toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' });
+        const timeStr = now.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' });
+        const nowStr  = `${dateStr} at ${timeStr}`;
+        const filterD = document.getElementById('filterDate').value || 'All Dates';
+        const pageW   = doc.internal.pageSize.width;
+
+        // Helper to safely load the logos
+        function loadImage(src) {
+            return new Promise((resolve) => {
+                const img = new Image();
+                img.crossOrigin = 'anonymous';
+                img.onload = () => {
+                    try {
+                        const canvas = document.createElement('canvas');
+                        canvas.width = img.width; canvas.height = img.height;
+                        canvas.getContext('2d').drawImage(img, 0, 0);
+                        resolve(canvas.toDataURL('image/png'));
+                    } catch(e) { resolve(null); }
+                };
+                img.onerror = () => resolve(null);
+                img.src = src;
+            });
+        }
+
+        const [plpData, ccsData] = await Promise.all([
+            loadImage('../resc/assets/plp_logo.png'),
+            loadImage('../resc/assets/ccs_logo.png')
+        ]);
+
+        const centerX = pageW / 2;
+        const headerHeight = 45; 
+        
+        doc.setFillColor(22, 101, 52); 
+        doc.rect(0, 0, pageW, headerHeight, 'F');
+        
+        const logoSize = 18;
+        if (plpData) doc.addImage(plpData, 'PNG', centerX - 85, 8, logoSize, logoSize);
+        if (ccsData) doc.addImage(ccsData, 'PNG', centerX + 67, 8, logoSize, logoSize);
+
+        doc.setFontSize(16); doc.setTextColor(255, 255, 255); doc.setFont('helvetica', 'bold');
+        doc.text('PAMANTASAN NG LUNGSOD NG PASIG', centerX, 15, { align: 'center' });
+        
+        doc.setFontSize(9); doc.setTextColor(187, 247, 208); doc.setFont('helvetica', 'normal');
+        doc.text('COLLEGE OF COMPUTER STUDIES', centerX, 20, { align: 'center' });
+        
+        doc.setFontSize(14); doc.setTextColor(255, 255, 255); doc.setFont('helvetica', 'bold');
+        doc.text('STUDENT ATTENDANCE REPORT', centerX, 30, { align: 'center' });
+        
+        doc.setFontSize(8); doc.setTextColor(187, 247, 208); doc.setFont('helvetica', 'normal');
+        doc.text(`Generated: ${nowStr}  ·  Filter: ${filterD}  ·  Total Records: ${filteredAttendance.length}`, centerX, 36, { align: 'center' });
+
+        const head = [['#','ID','Name','Course','Sec','Subj','Lab','Prof','Date','In','Out','Dur','Status','Face']];
+        const body = filteredAttendance.map((r, i) => {
+            let dur = r.duration_minutes ? `${r.duration_minutes}m` : '—';
+            if (!r.time_out && r.time_in) {
+                const mins = Math.round((new Date() - new Date(r.time_in)) / 60000);
+                dur = `${mins}m`;
+            }
+            const tIn = r.time_in ? new Date(r.time_in).toLocaleTimeString('en-US', {hour:'numeric',minute:'2-digit'}) : '—';
+            const tOut = r.time_out ? new Date(r.time_out).toLocaleTimeString('en-US', {hour:'numeric',minute:'2-digit'}) : (!r.time_out && r.time_in ? 'In Lab' : '—');
+            const isLate = r.time_in_status === 'late';
+            const status = isLate ? `Late (${r.late_minutes}m)` : 'On Time';
+            const face = r.verified_by_facial_recognition ? 'Face' : 'Manual';
+            
+            return [
+                i + 1, r.id_number, r.student_full_name || r.student_name, r.course || '—', r.class_section,
+                r.subject_code, r.lab_code, (r.professor_name||'').substring(0,15),
+                r.session_date, tIn, tOut, dur, status.toUpperCase(), face.toUpperCase()
+            ];
+        });
+
+        doc.autoTable({
+            head, body,
+            startY: headerHeight + 8,
+            margin: { left: 10, right: 10 },
+            theme: 'striped',
+            headStyles: { fillColor: [22, 101, 52], fontSize: 6.5, fontStyle: 'bold', textColor: 255, halign: 'center', valign: 'middle' },
+            styles: { fontSize: 6.5, cellPadding: 2, valign: 'middle' },
+            columnStyles: {
+                0: { cellWidth: 7, halign: 'center' },
+                1: { cellWidth: 16, halign: 'center', fontStyle: 'bold' },
+                2: { halign: 'left', fontStyle: 'bold' },
+                3: { cellWidth: 10, halign: 'center' },
+                4: { cellWidth: 12, halign: 'center' },
+                5: { cellWidth: 14, halign: 'center', fontStyle: 'bold' },
+                6: { cellWidth: 10, halign: 'center' },
+                7: { halign: 'left' },
+                8: { cellWidth: 16, halign: 'center' },
+                9: { cellWidth: 14, halign: 'center' },
+                10: { cellWidth: 14, halign: 'center' },
+                11: { cellWidth: 10, halign: 'center' },
+                12: { cellWidth: 18, halign: 'center', fontStyle: 'bold' },
+                13: { cellWidth: 12, halign: 'center', fontStyle: 'bold' }
+            },
+            didParseCell(d) {
+                if (d.column.index === 12 && d.section === 'body') {
+                    const s = (d.cell.text[0] || '').toLowerCase();
+                    if (s.includes('late')) { d.cell.styles.textColor = [220, 38, 38]; }
+                    else { d.cell.styles.textColor = [22, 101, 52]; }
+                }
+                if (d.column.index === 13 && d.section === 'body') {
+                    const s = (d.cell.text[0] || '').toLowerCase();
+                    if (s === 'face') { d.cell.styles.textColor = [22, 101, 52]; }
+                    if (s === 'manual') { d.cell.styles.textColor = [217, 119, 6]; }
+                }
+            }
+        });
+
+        const pages = doc.internal.getNumberOfPages();
+        for (let i = 1; i <= pages; i++) {
+            doc.setPage(i); doc.setFontSize(7); doc.setTextColor(156, 163, 175);
+            doc.text(`Laboratory Attendance System  ·  Page ${i} of ${pages}  ·  ${nowStr}`,
+                pageW / 2, doc.internal.pageSize.height - 8, { align: 'center' });
+        }
+
+        doc.save(`Attendance_Report_${filterD.replace(/\//g,'-')}.pdf`);
+
+        await autoSaveReport('PDF');
+
+    } catch (err) {
+        console.error('PDF generation error:', err);
+        alert('There was an error generating the PDF. Check the console.');
+    }
+};
+
+// ── EXCEL ──────────────────────────────────────────────────
+window.exportExcel = async function() {
+    if (filteredAttendance.length === 0) { alert("No records to export."); return; }
+    if (!checkDuplicateWarning('Excel')) return;
+
+    if (!window.XLSX) {
+        return window.exportCSV(); // Fallback
+    }
+    const wb = XLSX.utils.book_new();
+
+    const headers = ['#','Student ID','Name','Course','Section','Subject Code','Subject Name','Laboratory','Professor','Session Date','Time In','Time Out','Duration','Status','Face'];
+                  
+    const rows = filteredAttendance.map((r, i) => {
+        let dur = r.duration_minutes ? `${r.duration_minutes}m` : '—';
+        if (!r.time_out && r.time_in) {
+            const mins = Math.round((new Date() - new Date(r.time_in)) / 60000);
+            dur = `${mins}m`;
+        }
+        const tIn = r.time_in ? new Date(r.time_in).toLocaleTimeString('en-US', {hour:'numeric',minute:'2-digit'}) : '—';
+        const tOut = r.time_out ? new Date(r.time_out).toLocaleTimeString('en-US', {hour:'numeric',minute:'2-digit'}) : (!r.time_out && r.time_in ? 'Still inside' : '—');
+        const status = r.time_in_status === 'late' ? `Late (${r.late_minutes}m)` : 'On Time';
+        const face = r.verified_by_facial_recognition ? 'Yes' : 'No';
+
+        return [
+            i+1, r.id_number, r.student_full_name || r.student_name, r.course, r.class_section,
+            r.subject_code, r.subject_name, r.lab_code, r.professor_name,
+            r.session_date, tIn, tOut, dur, status.toUpperCase(), face.toUpperCase()
+        ];
+    });
+
+    const dataSheet = XLSX.utils.aoa_to_sheet([headers, ...rows]);
+    XLSX.utils.book_append_sheet(wb, dataSheet, 'Attendance');
+
+    const dateStr = document.getElementById('filterDate').value || 'All_Dates';
+    XLSX.writeFile(wb, `Attendance_Report_${dateStr.replace(/\//g,'-')}.xlsx`);
+
+    await autoSaveReport('Excel');
+};

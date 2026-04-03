@@ -559,23 +559,354 @@ function escapeHtml(str) {
     if (!str) return '';
     return String(str).replace(/[&<>"']/g, m => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[m]));
 }
+// ────────────────────────────────────────────
+// 6. REPORTS (Print / PDF / CSV / Excel)
+// ────────────────────────────────────────────
 
-// ────────────────────────────────────────────
-// 6. REPORTS (CSV / Print / PDF - Structure remains identical)
-// ────────────────────────────────────────────
-function exportCSV() {
+let existingReportsToday = []; // Tracks reports to prevent exact duplicates
+
+// ── Smart Duplicate Check Helper ──
+function checkDuplicateWarning(exportType) {
+    const dateStr = new Date().toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' });
+    const reportName = `Schedules Report — ${dateStr} (${exportType})`;
+    const currentDataString = JSON.stringify(allSchedules);
+    
+    const isExactDuplicate = existingReportsToday.some(r => 
+        r.name === reportName && r.dataString === currentDataString
+    );
+    
+    if (isExactDuplicate) {
+        return confirm(`A ${exportType} report with this EXACT data has already been saved today.\n\nAre you sure you want to generate a duplicate?`);
+    }
+    return true; 
+}
+
+// ── Pre-fetch Duplicates (Call this when opening your Report Modal) ──
+async function fetchTodayReports() {
+    const dateStr = new Date().toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' });
+    try {
+        const { data } = await supabaseClient
+            .from('las_reports')
+            .select('report_name, report_data')
+            .eq('report_type', 'schedules')
+            .like('report_name', `%${dateStr}%`); 
+            
+        if (data) {
+            existingReportsToday = data.map(d => ({
+                name: d.report_name,
+                dataString: typeof d.report_data === 'string' ? d.report_data : JSON.stringify(d.report_data)
+            }));
+        } else {
+            existingReportsToday = [];
+        }
+    } catch (e) {
+        existingReportsToday = [];
+    }
+}
+
+// ── Auto-save helper ──────────────────────────────────────────
+async function autoSaveReport(exportType) {
+    const dateStr    = new Date().toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' });
+    const reportName = `Schedules Report — ${dateStr} (${exportType})`;
+
+    const payload = {
+        report_type: 'schedules',
+        report_name: reportName,
+        filters:     JSON.stringify({}),
+        report_data: JSON.stringify(allSchedules)
+    };
+
+    try {
+        const { error } = await supabaseClient.from('las_reports').insert([payload]);
+        if (error) throw error;
+        
+        if (typeof showToast === 'function') showToast(`${exportType} exported & report saved!`, true);
+        
+        existingReportsToday.push({
+            name: payload.report_name,
+            dataString: payload.report_data
+        }); 
+        
+    } catch (err) {
+        console.error('Auto-save error:', err);
+    }
+}
+
+// ── Print ──────────────────────────────────────────────────
+async function printReport() {
+    if (!checkDuplicateWarning('Print')) return;
+
+    // Make sure we have the reports fetched if they bypassed the modal
+    if (existingReportsToday.length === 0) await fetchTodayReports();
+
+    const now     = new Date();
+    const dateStr = now.toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' });
+    const timeStr = now.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' });
+    const nowStr  = `${dateStr} at ${timeStr}`;
+
+    const cols = ['#','Subject','Professor','Section','Lab','Day','Time','Sem / SY','Status','Enrolled','Sessions'];
+
+    const rows = allSchedules.map((r, i) => {
+        let statusColor = r.status.toLowerCase() === 'active' ? '#166534' : '#dc2626';
+        let timeString = `${formatTimeStr(r.start_time)} - ${formatTimeStr(r.end_time)}`;
+        
+        return `<tr class="${i % 2 === 1 ? 'even' : ''}">
+            <td>${i + 1}</td>
+            <td><strong>${r.subjects?.subject_code || '—'}</strong></td>
+            <td>${r.profFullName || '—'}</td>
+            <td>${r.display_section || '—'}</td>
+            <td><strong>${r.laboratory_rooms?.lab_code || '—'}</strong></td>
+            <td>${r.day_of_week}</td>
+            <td>${timeString}</td>
+            <td>${r.semester} / ${r.school_year}</td>
+            <td><span style="color: ${statusColor}; font-weight: bold;">${r.status.toUpperCase()}</span></td>
+            <td style="text-align:center">${r.enrolled_count || 0}</td>
+            <td style="text-align:center">${r.sessions_done || 0}</td>
+        </tr>`;
+    }).join('');
+
+    const w = window.open('', '_blank');
+    w.document.write(`<!DOCTYPE html><html><head><meta charset="UTF-8"><title>Schedules Report</title>
+    <style>
+        *{margin:0;padding:0;box-sizing:border-box}
+        body{font-family:Arial,sans-serif;padding:20px;font-size:11px;color:#111}
+        
+        /* ── GREEN BANNER HEADER STYLE ── */
+        .header-container { 
+            background-color: #166534; 
+            color: white;
+            text-align: center; 
+            margin-bottom: 20px; 
+            padding: 20px 15px; 
+            border-radius: 8px;
+            -webkit-print-color-adjust: exact; 
+            print-color-adjust: exact; 
+        }
+        .logos-text-wrapper { display: flex; justify-content: center; align-items: center; gap: 25px; margin-bottom: 10px; }
+        .logo-img { height: 50px; width: auto; object-fit: contain; }
+        .univ-title { font-size: 18px; font-weight: bold; color: white; line-height: 1.2; letter-spacing: 0.5px;}
+        .college-title { font-size: 11px; color: #bbf7d0; letter-spacing: 1px; text-transform: uppercase;}
+        .report-title { font-size: 16px; font-weight: bold; color: white; margin-top: 12px; text-transform: uppercase; letter-spacing: 1px;}
+        .report-meta { font-size: 11px; color: #bbf7d0; margin-top: 5px; }
+        
+        table{width:100%;border-collapse:collapse; margin-top: 10px;}
+        th{background:#166534;color:#fff;padding:8px 10px;text-align:center;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.5px; -webkit-print-color-adjust: exact; print-color-adjust: exact;}
+        td{padding:8px 10px;border-bottom:1px solid #e5e7eb;font-size:11px; text-align:center;}
+        td:nth-child(2), td:nth-child(3) {text-align:left;} /* Left align Subject and Prof */
+        tr:nth-child(even){background:#f9fafb; -webkit-print-color-adjust: exact; print-color-adjust: exact;}
+        .footer{margin-top:20px;text-align:center;font-size:10px;color:#9ca3af;border-top:1px solid #e5e7eb;padding-top:10px}
+        @media print{body{padding:0px}}
+    </style></head><body>
+    
+    <div class="header-container">
+        <div class="logos-text-wrapper">
+            <img src="../resc/assets/plp_logo.png" class="logo-img" alt="PLP Logo">
+            <div>
+                <div class="univ-title">PAMANTASAN NG LUNGSOD NG PASIG</div>
+                <div class="college-title">College of Computer Studies</div>
+            </div>
+            <img src="../resc/assets/ccs_logo.png" class="logo-img" alt="CCS Logo">
+        </div>
+        <div class="report-title">Schedules Report</div>
+        <div class="report-meta">Generated: ${nowStr} &nbsp;&middot;&nbsp; Total Schedules: ${allSchedules.length}</div>
+    </div>
+
+    <table>
+        <thead><tr>${cols.map(c => `<th>${c}</th>`).join('')}</tr></thead>
+        <tbody>${rows}</tbody>
+    </table>
+    <div class="footer">Laboratory Attendance System &nbsp;&middot;&nbsp; ${nowStr}</div>
+    <script>window.onload=()=>setTimeout(()=>window.print(),500)<\/script>
+    </body></html>`);
+    w.document.close();
+
+    await autoSaveReport('Print');
+}
+
+// ── PDF ────────────────────────────────────────────────────
+async function downloadPDF() {
+    if (!checkDuplicateWarning('PDF')) return;
+
+    if (!window.jspdf) {
+        if (typeof showToast === 'function') showToast('PDF library not loaded yet. Please try again.', true);
+        else alert('PDF library not loaded yet. Please try again.');
+        return;
+    }
+
+    try {
+        const { jsPDF } = window.jspdf;
+        const doc     = new jsPDF({ orientation: 'landscape', unit: 'mm', format: 'a4' });
+        const now     = new Date();
+        const dateStr = now.toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' });
+        const timeStr = now.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' });
+        const nowStr  = `${dateStr} at ${timeStr}`;
+        const pageW   = doc.internal.pageSize.width;
+
+        // Helper to safely load the logos
+        function loadImage(src) {
+            return new Promise((resolve) => {
+                const img = new Image();
+                img.crossOrigin = 'anonymous';
+                img.onload = () => {
+                    try {
+                        const canvas = document.createElement('canvas');
+                        canvas.width = img.width; canvas.height = img.height;
+                        canvas.getContext('2d').drawImage(img, 0, 0);
+                        resolve(canvas.toDataURL('image/png'));
+                    } catch(e) {
+                        resolve(null); 
+                    }
+                };
+                img.onerror = () => resolve(null);
+                img.src = src;
+            });
+        }
+
+        const [plpData, ccsData] = await Promise.all([
+            loadImage('../resc/assets/plp_logo.png'),
+            loadImage('../resc/assets/ccs_logo.png')
+        ]);
+
+        const centerX = pageW / 2;
+        const headerHeight = 45; // Height of the green banner
+        
+        // ── DRAW SOLID GREEN BANNER ──
+        doc.setFillColor(22, 101, 52); 
+        doc.rect(0, 0, pageW, headerHeight, 'F');
+        
+        // ── LOGOS ──
+        const logoSize = 18;
+        if (plpData) doc.addImage(plpData, 'PNG', centerX - 85, 8, logoSize, logoSize);
+        if (ccsData) doc.addImage(ccsData, 'PNG', centerX + 67, 8, logoSize, logoSize);
+
+        // ── CENTERED HEADER TEXT ──
+        doc.setFontSize(16); 
+        doc.setTextColor(255, 255, 255); 
+        doc.setFont('helvetica', 'bold');
+        doc.text('PAMANTASAN NG LUNGSOD NG PASIG', centerX, 15, { align: 'center' });
+        
+        doc.setFontSize(9); 
+        doc.setTextColor(187, 247, 208); 
+        doc.setFont('helvetica', 'normal');
+        doc.text('COLLEGE OF COMPUTER STUDIES', centerX, 20, { align: 'center' });
+        
+        doc.setFontSize(14); 
+        doc.setTextColor(255, 255, 255); 
+        doc.setFont('helvetica', 'bold');
+        doc.text('SCHEDULES REPORT', centerX, 30, { align: 'center' });
+        
+        doc.setFontSize(8); 
+        doc.setTextColor(187, 247, 208); 
+        doc.setFont('helvetica', 'normal');
+        doc.text(`Generated: ${nowStr}  ·  Total Schedules: ${allSchedules.length}`, centerX, 36, { align: 'center' });
+
+        // ── AUTO-EXPANDING CLEAN TABLE ──
+        const head = [['#','Subject','Professor','Section','Lab','Day','Time','Sem / SY','Status','Enrolled','Sessions']];
+        const body = allSchedules.map((r, i) => {
+            let timeString = `${formatTimeStr(r.start_time)} - ${formatTimeStr(r.end_time)}`;
+            return [
+                i + 1, 
+                r.subjects?.subject_code || '—', 
+                r.profFullName || '—', 
+                r.display_section || '—', 
+                r.laboratory_rooms?.lab_code || '—',
+                r.day_of_week, 
+                timeString,
+                `${r.semester} / ${r.school_year}`,
+                r.status.toUpperCase(),
+                r.enrolled_count || 0,
+                r.sessions_done || 0
+            ];
+        });
+
+        doc.autoTable({
+            head, body,
+            startY: headerHeight + 8,
+            margin: { left: 14, right: 14 }, // Stretches the table to the page margins
+            theme: 'striped',
+            headStyles: { 
+                fillColor: [22, 101, 52], fontSize: 7.5, fontStyle: 'bold', textColor: 255, halign: 'center', valign: 'middle'
+            },
+            styles: { fontSize: 7.5, cellPadding: 3, valign: 'middle' },
+            columnStyles: {
+                0: { cellWidth: 10, halign: 'center' }, // #
+                1: { halign: 'center', fontStyle: 'bold' }, // Subject
+                2: { halign: 'left' }, // Professor (auto stretches)
+                3: { halign: 'center' }, // Section
+                4: { halign: 'center', fontStyle: 'bold' }, // Lab
+                5: { halign: 'center' }, // Day
+                6: { halign: 'center' }, // Time (auto stretches)
+                7: { halign: 'center' }, // Sem / SY
+                8: { halign: 'center', fontStyle: 'bold' }, // Status
+                9: { cellWidth: 16, halign: 'center' }, // Enrolled (fixed small width so it doesn't wrap)
+                10: { cellWidth: 16, halign: 'center' } // Sessions (fixed small width so it doesn't wrap)
+            },
+            didParseCell(d) {
+                if (d.column.index === 8 && d.section === 'body') {
+                    const s = (d.cell.text[0] || '').toLowerCase();
+                    if (s === 'active') { d.cell.styles.textColor = [22, 101, 52]; }
+                    else { d.cell.styles.textColor = [220, 38, 38]; }
+                }
+            }
+        });
+
+        const pages = doc.internal.getNumberOfPages();
+        for (let i = 1; i <= pages; i++) {
+            doc.setPage(i); doc.setFontSize(7); doc.setTextColor(156, 163, 175);
+            doc.text(`Laboratory Attendance System  ·  Page ${i} of ${pages}  ·  ${nowStr}`,
+                pageW / 2, doc.internal.pageSize.height - 8, { align: 'center' });
+        }
+
+        doc.save(`Schedules_Report_${new Date().toISOString().split('T')[0]}.pdf`);
+
+        await autoSaveReport('PDF');
+
+    } catch (err) {
+        console.error('PDF generation error:', err);
+        if (typeof showToast === 'function') showToast('There was an error generating the PDF. Check the console.', true);
+        else alert('There was an error generating the PDF. Check the console.');
+    }
+}
+
+// ── CSV ────────────────────────────────────────────────────
+async function exportCSV() {
+    if (!checkDuplicateWarning('CSV')) return;
+
     const cols = ['#','Schedule ID','Professor','Employee ID','Subject Code','Subject Name','Section','Day','Start Time','End Time','Laboratory','Lab Name','Semester','School Year','Status','Enrolled','Sessions Done'];
     const lines = [
         cols.join(','),
         ...allSchedules.map((r,i) => [
-            i+1, r.schedule_id, `"${r.profFullName}"`, r.professors?.employee_id, r.subjects?.subject_code, `"${r.subjects?.subject_name}"`, r.display_section, r.day_of_week, `"${formatTimeStr(r.start_time)}"`, `"${formatTimeStr(r.end_time)}"`, r.laboratory_rooms?.lab_code, `"${r.laboratory_rooms?.lab_name}"`, r.semester, r.school_year, r.status, r.enrolled_count, r.sessions_done
+            i+1, r.schedule_id, `"${r.profFullName}"`, r.professors?.employee_id, r.subjects?.subject_code, `"${r.subjects?.subject_name}"`, r.display_section, r.day_of_week, `"${formatTimeStr(r.start_time)}"`, `"${formatTimeStr(r.end_time)}"`, r.laboratory_rooms?.lab_code, `"${r.laboratory_rooms?.lab_name}"`, r.semester, r.school_year, r.status, r.enrolled_count || 0, r.sessions_done || 0
         ].join(','))
     ];
     const a = document.createElement('a');
     a.href = URL.createObjectURL(new Blob([lines.join('\n')], {type:'text/csv'}));
     a.download = `Schedules_Report_${new Date().toISOString().split('T')[0]}.csv`;
     a.click();
+    URL.revokeObjectURL(a.href);
+    
+    await autoSaveReport('CSV');
 }
 
-function printReport() { alert("Print functionality triggered (use jsPDF window write from original logic)"); }
-function downloadPDF() { alert("PDF download triggered (use jsPDF from original logic)"); }
+// ── Excel ──────────────────────────────────────────────────
+async function exportExcel() {
+    if (!checkDuplicateWarning('Excel')) return;
+
+    if (!window.XLSX) {
+        return exportCSV(); // Fallback to CSV if SheetJS is missing
+    }
+    const wb = XLSX.utils.book_new();
+
+    const headers = ['#','Schedule ID','Professor','Employee ID','Subject Code','Subject Name','Section','Day','Start Time','End Time','Laboratory','Lab Name','Semester','School Year','Status','Enrolled','Sessions Done'];
+                  
+    const rows = allSchedules.map((r, i) => [
+        i + 1, r.schedule_id, r.profFullName, r.professors?.employee_id, r.subjects?.subject_code, r.subjects?.subject_name, r.display_section, r.day_of_week, formatTimeStr(r.start_time), formatTimeStr(r.end_time), r.laboratory_rooms?.lab_code, r.laboratory_rooms?.lab_name, r.semester, r.school_year, r.status.toUpperCase(), r.enrolled_count || 0, r.sessions_done || 0
+    ]);
+
+    const dataSheet = XLSX.utils.aoa_to_sheet([headers, ...rows]);
+    XLSX.utils.book_append_sheet(wb, dataSheet, 'Schedules');
+
+    XLSX.writeFile(wb, `Schedules_Report_${new Date().toISOString().split('T')[0]}.xlsx`);
+
+    await autoSaveReport('Excel');
+}
