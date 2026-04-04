@@ -1,3 +1,5 @@
+let activeSemesterId = null;
+
 document.addEventListener('DOMContentLoaded', async function () {
     const searchInput    = document.querySelector('.files-search');
     const catFilter      = document.querySelector('.cat-filter');
@@ -65,6 +67,8 @@ async function loadActiveSemester() {
             return false;
         }
         
+        activeSemesterId = sem.id;
+        
         // Display the semester in the page
         const semesterEl = document.getElementById('myfiles-current-semester');
         if (semesterEl) semesterEl.textContent = sem.name;
@@ -113,6 +117,7 @@ async function loadMyFiles() {
                 )
             `)
             .eq('professor_id', sessionUser.id)
+            .eq('semester_id', activeSemesterId)
             .order('submitted_at', { ascending: false });
 
         if (submissionsError) {
@@ -217,6 +222,7 @@ function updateStatistics(submissions) {
     const pendingEl = document.getElementById('myfiles-pending');
     const rejectedEl = document.getElementById('myfiles-rejected');
 
+    // Submissions are already filtered by current semester in loadMyFiles
     const total = submissions.length;
     const approved = submissions.filter(s => s.status === 'approved').length;
     const pending = submissions.filter(s => s.status === 'pending').length;
