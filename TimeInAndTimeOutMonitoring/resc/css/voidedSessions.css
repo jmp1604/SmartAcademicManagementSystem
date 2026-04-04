@@ -58,19 +58,29 @@ hr {
     border: none; margin: 0 0 24px; border-radius: 2px;
 }
 
-/* ── BUTTONS ── */
-.btn-report {
-    padding: 10px 20px; background: var(--white);
-    color: var(--green-dark); border: 1.5px solid var(--green-bright);
-    border-radius: var(--radius); font-size: 14px; font-weight: 700; 
-    cursor: pointer; display: inline-flex; align-items: center; gap: 8px;
-    transition: all .2s; font-family: 'Nunito', sans-serif;
-}
-.btn-report:hover {
-    background: var(--green-dark); color: var(--white);
-    border-color: var(--green-dark); transform: translateY(-1px);
+
+.btn-report { 
+    padding: 9px 18px; 
+    background: #dcfce7;          /* Soft light green background */
+    color: #166534;               /* Signature dark green text for contrast */
+    border: 1.5px solid #bbf7d0;  /* Slightly darker green border */
+    border-radius: 8px; 
+    font-size: 13.5px; 
+    font-weight: 800; 
+    cursor: pointer; 
+    display: inline-flex; 
+    align-items: center; 
+    gap: 8px; 
+    transition: all .2s ease; 
+    font-family: 'Nunito Sans', sans-serif; 
+    margin-left: auto;            /* Keeps it grouped with the Add button */
 }
 
+.btn-report:hover { 
+    background: #bbf7d0;          /* Slightly darker pastel green on hover */
+    transform: translateY(-2px); 
+    box-shadow: 0 4px 12px rgba(22, 101, 52, 0.15); /* Soft green shadow */
+}
 /* ── FILTER PILLS ── */
 .pills { display: flex; flex-wrap: wrap; gap: 10px; margin-bottom: 24px; }
 .pill {
