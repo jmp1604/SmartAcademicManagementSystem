@@ -202,19 +202,49 @@ function initFilters() {
         renderTable(allProfessors);
     });
 }
-
 // ────────────────────────────────────────────
 // MODALS & UTILS
 // ────────────────────────────────────────────
-function openFaceRegModal(employeeId) {
-    document.getElementById('profIdSearch').value = employeeId;
-    document.getElementById('faceRegModal').classList.add('active');
-    searchProfessor(); // Auto-search if opened from table icon
+
+function openModal(id) {
+    const m = document.getElementById(id);
+    if (!m) return;
+    m.style.display = 'flex';
+    setTimeout(() => m.classList.add('active'), 10);
 }
 
 function closeModal(id) {
-    document.getElementById(id).classList.remove('active');
+    const m = document.getElementById(id);
+    if (!m) return;
+    m.classList.remove('active');
+    
+    setTimeout(() => {
+        m.style.display = 'none';
+        
+        // Reset the form when the modal closes
+        if (id === 'faceRegModal') {
+            document.getElementById('profIdSearch').value = '';
+            document.getElementById('profStudentInfo').innerHTML = '';
+            document.getElementById('profFaceStatus').innerHTML = '';
+            document.getElementById('profFaceStatus').className = 'face-status';
+            const rb = document.getElementById('profRegisterFaceBtn');
+            if (rb) rb.style.display = 'none';
+        }
+    }, 200);
 }
+
+function openFaceRegModal(employeeId) {
+    openModal('faceRegModal');
+    document.getElementById('profIdSearch').value = employeeId;
+    searchProfessor(); // Auto-search if opened from table icon
+}
+
+// Close modal if user clicks on the dark background overlay
+window.addEventListener('click', e => {
+    if (e.target.classList.contains('prof-modal')) {
+        closeModal(e.target.id);
+    }
+});
 
 function showToast(msg) {
     const t = document.getElementById('toast');
@@ -632,4 +662,78 @@ async function exportExcel() {
 // Stubs for real-time validation visual feedback
 function initRealTimeValidation() {
     // Wired up via supabaseClient.from().select() calls as needed.
+}
+// ── FACE REGISTRATION SEARCH & REDIRECT ──
+async function searchProfessor() {
+    const empId = document.getElementById('profIdSearch').value.trim();
+    const searchBtn = document.getElementById('profSearchBtn');
+    const resultDiv = document.getElementById('profSearchResult');
+    
+    if (!empId) { showToast('Please enter an Employee ID.'); return; }
+
+    // Disable button and show spinner
+    searchBtn.disabled = true;
+    searchBtn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Searching...';
+    
+    // Hide previous results while searching
+    resultDiv.style.display = 'none'; 
+    resultDiv.classList.remove('active');
+
+    try {
+        const { data: p, error } = await supabaseClient
+            .from('professors')
+            .select('employee_id, first_name, last_name, facial_dataset_path')
+            .eq('employee_id', empId)
+            .single();
+
+        if (error || !p) {
+            showToast('Professor not found.');
+            document.getElementById('profRegisterFaceBtn').style.display = 'none';
+            return;
+        }
+
+        const hasFace = !!p.facial_dataset_path;
+        const statusDiv = document.getElementById('profFaceStatus');
+        statusDiv.className = 'face-status ' + (hasFace ? 'registered' : 'not-registered');
+        statusDiv.innerHTML = hasFace
+            ? '<i class="fa-solid fa-check-circle"></i> Facial data already registered'
+            : '<i class="fa-solid fa-exclamation-circle"></i> Facial data not registered yet';
+
+        const rb = document.getElementById('profRegisterFaceBtn');
+        rb.style.display = hasFace ? 'none' : 'flex';
+
+        document.getElementById('profStudentInfo').innerHTML = `
+            <div class="info-item"><label>Employee ID</label><div class="value">${escapeHtml(p.employee_id)}</div></div>
+            <div class="info-item"><label>Full Name</label><div class="value">${escapeHtml(p.first_name)} ${escapeHtml(p.last_name)}</div></div>
+        `;
+        
+        // ✅ THE FIX: Explicitly reveal the result box with animation
+        resultDiv.style.display = 'block';
+        setTimeout(() => resultDiv.classList.add('active'), 10);
+        
+    } catch (err) {
+        showToast('Error: ' + err.message);
+    } finally {
+        // Reset the button back to normal
+        searchBtn.disabled = false;
+        searchBtn.innerHTML = '<i class="fa-solid fa-search"></i> Search Professor';
+    }
+}
+
+function redirectToProfFaceReg() {
+    const empId = document.getElementById('profIdSearch').value.trim();
+    
+    // Safely redirect to the registration portal
+    window.top.location.href = 
+        '/INTEG SYSTEM/SmartAcademicManagementSystem/TimeInAndTimeOutMonitoring/students/accountRegistration.html'
+        + '?role=professor&employee_id=' + encodeURIComponent(empId);
+}
+
+function redirectToProfFaceReg() {
+    const empId = document.getElementById('profIdSearch').value.trim();
+    
+    // Uses a relative path to jump from /admin/ back to /students/
+    window.top.location.href = 
+        '../students/accountRegistration.html'
+        + '?role=professor&employee_id=' + encodeURIComponent(empId);
 }

@@ -198,16 +198,16 @@ hr {
 }
 
 .btn-add-prof {
-    background: var(--green-dark);
-    color: var(--white);
-    border: none;
-}
-.btn-add-prof:hover {
-    background: var(--green-mid);
-    transform: translateY(-2px);
-    box-shadow: var(--shadow-md);
+    background: #d97706; /* Student Amber Color */
+    color: #ffffff;      /* White text */
+    border: none;        /* Remove any default borders */
 }
 
+.btn-add-prof:hover {
+    background: #b45309; /* Darker amber on hover */
+    transform: translateY(-2px);
+    box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1); /* Soft shadow */
+}
 /* ===============================
    Controls Card (Filters)
 ================================ */

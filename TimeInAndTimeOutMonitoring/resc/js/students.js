@@ -1,15 +1,11 @@
 /* ============================================================
    resc/js/attendeesList.js
    Students List — Supabase migration
-   Replaces: students.php, add_student.php, remove_student.php,
-             search_student.php, check_Studentduplicate.php,
-             import_students.php, save_report.php
-   Uses: Supabase RLS policies (anon key, department-scoped)
 ============================================================ */
 
 // ── State ──────────────────────────────────────────────────
-let allStudents  = [];   // raw rows from Supabase
-let reportRows   = [];   // enriched rows for the report modal
+let allStudents  = [];
+let reportRows   = [];
 let META = { total: 0, registered: 0, pending: 0, date: '' };
 
 // ── Init ───────────────────────────────────────────────────
@@ -22,6 +18,44 @@ document.addEventListener('DOMContentLoaded', async () => {
     initFilters();
     initAddStudentForm();
     initDuplicateChecks();
+});
+
+document.addEventListener('DOMContentLoaded', () => {
+    const params = new URLSearchParams(window.location.search);
+    const role      = params.get('role');       // "student" or "professor"
+    const studentId = params.get('student_id'); // raw digits e.g. "2300223"
+
+    // 1. Auto-select the Student tab if role=student
+    if (role === 'student') {
+        // Click the Student role button to activate it
+        document.querySelectorAll('.role-btn').forEach(btn => {
+            btn.classList.remove('active');
+        });
+        const studentBtn = document.querySelector('.role-btn[data-role="student"]');
+        if (studentBtn) {
+            studentBtn.classList.add('active');
+            studentBtn.click(); // trigger any tab-switching logic already attached
+        }
+    }
+
+    // 2. Pre-fill the Student ID field and auto-trigger the search
+    if (studentId) {
+        // Format for display: "2300223" → "23-00223"
+        const formatted = studentId.replace(/^(\d{2})(\d+)$/, '$1-$2');
+
+        // Try the most common ID field names — adjust if yours differs
+        const idField = document.getElementById('studentId')
+                     || document.getElementById('student_id')
+                     || document.querySelector('input[name="student_id"]')
+                     || document.querySelector('input[placeholder*="ID"]');
+
+        if (idField) {
+            idField.value = formatted;
+            // Fire input/change so any listeners pick it up
+            idField.dispatchEvent(new Event('input', { bubbles: true }));
+            idField.dispatchEvent(new Event('change', { bubbles: true }));
+        }
+    }
 });
 
 // ══════════════════════════════════════════════════════════
@@ -100,8 +134,6 @@ function renderTable(students) {
             : '-';
         const statusCls = (s.status || 'active').toLowerCase();
         const faceData  = hasFace ? 'registered' : 'not-registered';
-
-        // Display formatted ID (e.g. "23-00221")
         const displayId = formatStudentId(s.id_number);
 
         return `<tr data-id="${s.student_id}" data-status="${statusCls}" data-face="${faceData}">
@@ -122,7 +154,6 @@ function renderTable(students) {
                 }
             </td>
             <td style="font-size:12.5px">${dateReg}</td>
-          
         </tr>`;
     }).join('');
 }
@@ -156,7 +187,6 @@ function applyFilters() {
     const so = document.getElementById('sortFilter').value;
 
     let filtered = allStudents.filter(s => {
-        // Allow searching both raw ("2300221") and formatted ("23-00221")
         const formattedId = formatStudentId(s.id_number || '').toLowerCase();
         const matchQ  = !q || s.id_number?.toLowerCase().includes(q)
                            || formattedId.includes(q)
@@ -187,20 +217,17 @@ function generateUUID() {
 }
 
 function initAddStudentForm() {
-    // ── Live ID formatter: auto-insert dash after 2 digits ──
     const idInput = document.getElementById('field_id_number');
     if (idInput) {
         idInput.addEventListener('input', function () {
             const start = this.selectionStart;
             const prev  = this.value;
             this.value  = formatStudentId(this.value);
-            // Adjust caret position for the inserted dash
             const diff  = this.value.length - prev.length;
             this.setSelectionRange(start + diff, start + diff);
         });
     }
 
-     // ── Course: force uppercase ──
     const courseInput = document.querySelector('[name="course"]');
     if (courseInput) {
         courseInput.addEventListener('input', function () {
@@ -210,8 +237,6 @@ function initAddStudentForm() {
         });
     }
 
-
-     // ── Section: 1 letter only, uppercase ──
     const sectionInput = document.querySelector('[name="section"]');
     if (sectionInput) {
         sectionInput.addEventListener('input', function () {
@@ -232,15 +257,12 @@ function initAddStudentForm() {
         btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Saving...';
 
         const fd = new FormData(this);
-
-        // Strip dash → raw 7-digit string for DB
         const idNumberRaw = rawStudentId(fd.get('id_number')?.trim() || '');
         const firstName   = fd.get('first_name')?.trim() || '';
         const lastName    = fd.get('last_name')?.trim() || '';
         const email       = fd.get('email')?.trim() || '';
         const editId      = this.dataset.editId;
 
-        // Validation
         if (!editId && !idNumberRaw) {
             showToast('❌ Student ID is required.', false);
             btn.disabled = false; btn.innerHTML = '<i class="fa-solid fa-save"></i> Save Student'; return;
@@ -264,7 +286,6 @@ function initAddStudentForm() {
 
         try {
             if (editId) {
-                // ── UPDATE existing student ──
                 const { error } = await supabaseClient
                     .from('students')
                     .update({
@@ -284,10 +305,9 @@ function initAddStudentForm() {
                 delete this.dataset.editId;
 
             } else {
-                // ── INSERT new student — store raw digits in DB ──
                 const payload = {
                     student_id:  generateUUID(),
-                    id_number:   idNumberRaw,   // always raw digits, never formatted
+                    id_number:   idNumberRaw,
                     first_name:  firstName,
                     middle_name: fd.get('middle_name')?.trim() || null,
                     last_name:   lastName,
@@ -335,7 +355,6 @@ async function openEditModal(studentId) {
     const student = allStudents.find(s => s.student_id === studentId);
     if (!student) return;
 
-    // Pre-fill — show formatted ID in the input
     document.getElementById('field_id_number').value    = formatStudentId(student.id_number || '');
     document.getElementById('field_first_name').value   = student.first_name || '';
     document.querySelector('[name="middle_name"]').value = student.middle_name || '';
@@ -346,10 +365,8 @@ async function openEditModal(studentId) {
     document.querySelector('[name="status"]').value      = student.status || 'active';
     document.getElementById('field_email').value         = student.email || '';
 
-    // Mark form as edit mode
     document.getElementById('addStudentForm').dataset.editId = studentId;
 
-    // Update modal title and button
     document.querySelector('#addStudentModal .modal-header h2').innerHTML =
         '<i class="fa-solid fa-pen-to-square"></i> Edit Student';
     document.getElementById('addStudentBtn').innerHTML =
@@ -382,7 +399,7 @@ async function removeStudent(studentId) {
 }
 
 // ══════════════════════════════════════════════════════════
-// 6. DUPLICATE CHECKS (replaces check_Studentduplicate.php)
+// 6. DUPLICATE CHECKS
 // ══════════════════════════════════════════════════════════
 function initDuplicateChecks() {
     const idField    = document.getElementById('field_id_number');
@@ -392,7 +409,6 @@ function initDuplicateChecks() {
 
     if (idField) {
         idField.addEventListener('input', debounce(async () => {
-            // Strip dash before querying DB
             const val = rawStudentId(idField.value.trim());
             if (!val || val.length < 7) { setDupState(idField, 'dup_id_number', false, ''); return; }
             const { count } = await supabaseClient
@@ -418,13 +434,11 @@ function initDuplicateChecks() {
     if (emailField) {
         emailField.addEventListener('input', debounce(async () => {
             const val = emailField.value.trim();
-
             if (val && !/^[a-z]+_[a-z]+@plpasig\.edu\.ph$/i.test(val)) {
                 setDupState(emailField, 'dup_email', true, 'Format must be: <strong>lastname_firstname@plpasig.edu.ph</strong>');
                 return;
             }
             if (!val) { setDupState(emailField, 'dup_email', false, ''); return; }
-
             const { count } = await supabaseClient
                 .from('students').select('student_id', { count: 'exact', head: true })
                 .eq('email', val);
@@ -465,7 +479,7 @@ function clearAddStudentDups() {
 }
 
 // ══════════════════════════════════════════════════════════
-// 7. FACE REGISTRATION SEARCH (replaces search_student.php)
+// 7. FACE REGISTRATION SEARCH
 // ══════════════════════════════════════════════════════════
 async function searchStudent() {
     const studentId    = document.getElementById('studentIdSearch').value.trim();
@@ -478,10 +492,13 @@ async function searchStudent() {
     searchBtn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Searching...';
 
     try {
+        // ✅ FIX: Strip dash so both "23-00223" and "2300223" match the DB's raw digits
+        const rawId = rawStudentId(studentId);
+
         const { data: s, error } = await supabaseClient
             .from('students')
             .select('id_number, first_name, middle_name, last_name, course, year_level, section, email, facial_dataset_path')
-            .eq('id_number', studentId)
+            .eq('id_number', rawId)
             .single();
 
         if (error || !s) {
@@ -498,7 +515,7 @@ async function searchStudent() {
 
         const rb = document.getElementById('registerFaceBtn');
         rb.style.display = hasFace ? 'none' : 'block';
-        rb.dataset.studentId = studentId;
+        rb.dataset.studentId = rawId;
 
         document.getElementById('studentInfo').innerHTML = `
             <div class="info-item"><label>Student ID</label><div class="value">${escHtml(formatStudentId(s.id_number))}</div></div>
@@ -519,15 +536,17 @@ async function searchStudent() {
 
 function openFaceRegModal(idNumber) {
     openModal('faceRegModal');
-    document.getElementById('studentIdSearch').value = idNumber;
+    document.getElementById('studentIdSearch').value = formatStudentId(idNumber);
     searchStudent();
 }
 
 function redirectToFaceReg() {
     const sid = document.getElementById('registerFaceBtn').dataset.studentId;
-    window.top.location.href = '../attendee/accountRegistration.html?student_id=' + sid;
+    // ⚠️ Adjust path to match where accountRegistration.html actually lives
+    window.top.location.href =
+        '../../TimeInAndTimeOutMonitoring/students/accountRegistration.html'
+        + '?role=student&student_id=' + encodeURIComponent(sid);
 }
-
 // ══════════════════════════════════════════════════════════
 // 8a. DOWNLOAD EXCEL TEMPLATE
 // ══════════════════════════════════════════════════════════
@@ -537,10 +556,8 @@ async function downloadExcelTemplate() {
     }
 
     const wb = XLSX.utils.book_new();
-
     const headers = ['Student ID', 'First Name', 'Middle Name', 'Last Name',
                      'Course', 'Year Level', 'Section', 'Email'];
-
     const sampleData = [
         ['2300221', 'Juan',  'Dela',   'Cruz',   'Computer Science',       '3', 'A', 'cruz_juan@plpasig.edu.ph'],
         ['2300222', 'Maria', 'Santos', 'Garcia', 'Information Technology', '2', 'B', 'garcia_maria@plpasig.edu.ph'],
@@ -555,8 +572,7 @@ async function downloadExcelTemplate() {
     XLSX.utils.book_append_sheet(wb, ws, 'Student Import Template');
 
     const instructions = [
-        ['STUDENT IMPORT TEMPLATE - INSTRUCTIONS'],
-        [''],
+        ['STUDENT IMPORT TEMPLATE - INSTRUCTIONS'],[''],
         ['Column Definitions:'],
         ['A - Student ID',   'Required', 'Unique 7-digit identifier (e.g., 2300221)'],
         ['B - First Name',   'Required', "Student's first name"],
@@ -566,8 +582,7 @@ async function downloadExcelTemplate() {
         ['F - Year Level',   'Optional', 'Number from 1-5'],
         ['G - Section',      'Optional', 'e.g., A, B (Just the letter without the year)'],
         ['H - Email',        'Optional', 'Must follow lastname_firstname@plpasig.edu.ph'],
-        [''],
-        ['Important Notes:'],
+        [''],['Important Notes:'],
         ['1. Do NOT delete the header row (row 1)'],
         ['2. Student ID must be unique and exactly 7 digits'],
         ['3. First Name and Last Name are required'],
@@ -575,11 +590,6 @@ async function downloadExcelTemplate() {
         ['5. Email must follow: lastname_firstname@plpasig.edu.ph'],
         ['6. Delete the sample data rows before importing your own data'],
         ['7. Duplicate Student IDs will update the existing record'],
-        [''],
-        ['Tips:'],
-        ['- You can copy and paste data from other spreadsheets'],
-        ['- Make sure there are no empty rows between student records'],
-        ['- The system will skip empty rows automatically'],
     ];
 
     const wsInstructions = XLSX.utils.aoa_to_sheet(instructions);
@@ -617,9 +627,8 @@ async function handleImport() {
             const rows = XLSX.utils.sheet_to_json(ws, { header: 1, defval: '' });
 
             const dataRows = rows.slice(1).filter(r => String(r[0] || '').trim() !== '');
-            let successCount = 0;
-            let errorCount   = 0;
-            const errors     = [];
+            let successCount = 0, errorCount = 0;
+            const errors = [];
 
             for (let i = 0; i < dataRows.length; i++) {
                 const r      = dataRows[i];
@@ -628,7 +637,6 @@ async function handleImport() {
                 progressFill.style.width = pct + '%';
                 progressFill.textContent = pct + '%';
 
-                // Strip any dashes from imported ID (supports both "2300221" and "23-00221")
                 const idNumber   = rawStudentId(String(r[0] || '').trim());
                 const firstName  = String(r[1] || '').trim();
                 const middleName = String(r[2] || '').trim() || null;
@@ -639,34 +647,29 @@ async function handleImport() {
                 const email      = String(r[7] || '').trim() || null;
 
                 if (!idNumber || !firstName || !lastName) {
-                    errors.push(`Row ${rowNum}: Missing required fields (ID, First Name, or Last Name)`);
+                    errors.push(`Row ${rowNum}: Missing required fields`);
                     errorCount++; continue;
                 }
                 if (yearRaw !== null && (isNaN(yearRaw) || yearRaw < 1 || yearRaw > 5)) {
-                    errors.push(`Row ${rowNum}: Invalid year level "${r[5]}" (must be 1–5)`);
+                    errors.push(`Row ${rowNum}: Invalid year level`);
                     errorCount++; continue;
                 }
                 if (email && !/^[a-z]+_[a-z]+@plpasig\.edu\.ph$/i.test(email)) {
-                    errors.push(`Row ${rowNum}: Invalid email "${email}". Must be lastname_firstname@plpasig.edu.ph`);
+                    errors.push(`Row ${rowNum}: Invalid email "${email}"`);
                     errorCount++; continue;
                 }
 
                 const { data: existing } = await supabaseClient
-                    .from('students')
-                    .select('student_id')
-                    .eq('id_number', idNumber)
-                    .maybeSingle();
+                    .from('students').select('student_id').eq('id_number', idNumber).maybeSingle();
 
                 let opError;
                 if (existing) {
-                    const { error } = await supabaseClient
-                        .from('students')
+                    const { error } = await supabaseClient.from('students')
                         .update({ first_name: firstName, middle_name: middleName, last_name: lastName, course, year_level: yearRaw, section, email })
                         .eq('student_id', existing.student_id);
                     opError = error;
                 } else {
-                    const { error } = await supabaseClient
-                        .from('students')
+                    const { error } = await supabaseClient.from('students')
                         .insert([{ student_id: generateUUID(), id_number: idNumber, first_name: firstName, middle_name: middleName, last_name: lastName, course, year_level: yearRaw, section, email, status: 'active', password: 'changeme123' }]);
                     opError = error;
                 }
@@ -679,12 +682,10 @@ async function handleImport() {
                 <div class="success"><i class="fa-solid fa-check-circle"></i> Import completed!</div>
                 <p><strong>Processed:</strong> ${dataRows.length}</p>
                 <p><strong>Imported / Updated:</strong> <span class="success">${successCount}</span></p>
-                ${errorCount > 0
-                    ? `<p><strong>Errors:</strong> <span class="error">${errorCount}</span></p>
-                       <ul style="margin-top:6px;font-size:12px;color:#dc2626;max-height:120px;overflow-y:auto">
-                           ${errors.map(err => `<li>${err}</li>`).join('')}
-                       </ul>`
-                    : ''}
+                ${errorCount > 0 ? `<p><strong>Errors:</strong> <span class="error">${errorCount}</span></p>
+                    <ul style="margin-top:6px;font-size:12px;color:#dc2626;max-height:120px;overflow-y:auto">
+                        ${errors.map(err => `<li>${err}</li>`).join('')}
+                    </ul>` : ''}
             `;
 
             if (successCount > 0) {
@@ -731,7 +732,7 @@ async function buildReportRows() {
             : '-';
 
         enriched.push({
-            id_number:         formatStudentId(s.id_number), // formatted for display
+            id_number:         formatStudentId(s.id_number),
             first_name:        s.first_name,
             middle_name:       s.middle_name || '—',
             last_name:         s.last_name,
@@ -748,7 +749,8 @@ async function buildReportRows() {
     }
     reportRows = enriched;
 }
-let existingReportsToday = []; // Tracks reports to prevent exact duplicates
+
+let existingReportsToday = [];
 
 async function openReportModal() {
     document.getElementById('rmGenDate').innerHTML =
@@ -781,23 +783,14 @@ async function openReportModal() {
 
     document.getElementById('rmOverlay').classList.add('on');
 
-    // ── PRE-FETCH TODAY'S REPORTS TO PREVENT EXACT DUPLICATES ──
     const dateStr = new Date().toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' });
     try {
         const { data } = await supabaseClient
-            .from('las_reports')
-            .select('report_name, report_data')
-            .eq('report_type', 'students')
-            .like('report_name', `%${dateStr}%`); 
-            
-        if (data) {
-            existingReportsToday = data.map(d => ({
-                name: d.report_name,
-                dataString: typeof d.report_data === 'string' ? d.report_data : JSON.stringify(d.report_data)
-            }));
-        } else {
-            existingReportsToday = [];
-        }
+            .from('las_reports').select('report_name, report_data')
+            .eq('report_type', 'students').like('report_name', `%${dateStr}%`);
+        existingReportsToday = data
+            ? data.map(d => ({ name: d.report_name, dataString: typeof d.report_data === 'string' ? d.report_data : JSON.stringify(d.report_data) }))
+            : [];
     } catch (e) {
         existingReportsToday = [];
     }
@@ -807,353 +800,163 @@ function closeReportModal() {
     document.getElementById('rmOverlay').classList.remove('on');
 }
 
-// ── Smart Duplicate Check Helper ──
 function checkDuplicateWarning(exportType) {
     const dateStr = new Date().toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' });
     const reportName = `Students Report — ${dateStr} (${exportType})`;
     const currentDataString = JSON.stringify(reportRows);
-    
-    const isExactDuplicate = existingReportsToday.some(r => 
-        r.name === reportName && r.dataString === currentDataString
-    );
-    
+    const isExactDuplicate = existingReportsToday.some(r => r.name === reportName && r.dataString === currentDataString);
     if (isExactDuplicate) {
         return confirm(`A ${exportType} report with this EXACT data has already been saved today.\n\nAre you sure you want to generate a duplicate?`);
     }
-    return true; 
+    return true;
 }
 
-// ── Save to Reports (Manual Button) ───────────────────────────
 async function saveReport() {
     if (!checkDuplicateWarning('Manual Save')) return;
-
     const btn = document.querySelector('.rm-btn[onclick="saveReport()"]');
-    if (btn) {
-        btn.disabled = true;
-        btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Saving...';
-    }
-
+    if (btn) { btn.disabled = true; btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Saving...'; }
     await autoSaveReport('Manual Save');
-
-    if (btn) {
-        btn.disabled = false;
-        btn.innerHTML = '<i class="fa-solid fa-floppy-disk"></i> Save to Reports';
-    }
+    if (btn) { btn.disabled = false; btn.innerHTML = '<i class="fa-solid fa-floppy-disk"></i> Save to Reports'; }
 }
 
-// ── Auto-save helper ──────────────────────────────────────────
 async function autoSaveReport(exportType) {
     const dateStr    = new Date().toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' });
     const reportName = `Students Report — ${dateStr} (${exportType})`;
-
-    const payload = {
-        report_type: 'students',
-        report_name: reportName,
-        filters:     JSON.stringify({}),
-        report_data: JSON.stringify(reportRows)
-    };
-
+    const payload = { report_type: 'students', report_name: reportName, filters: JSON.stringify({}), report_data: JSON.stringify(reportRows) };
     try {
         const { error } = await supabaseClient.from('las_reports').insert([payload]);
         if (error) throw error;
-        
-        if (exportType === 'Manual Save') {
-            showToast('Report saved successfully!', true);
-        } else {
-            console.log(`[Auto-Save] ${exportType} report securely archived.`);
-        }
-        
-        existingReportsToday.push({
-            name: payload.report_name,
-            dataString: payload.report_data
-        }); 
-        
+        if (exportType === 'Manual Save') showToast('Report saved successfully!', true);
+        else console.log(`[Auto-Save] ${exportType} report archived.`);
+        existingReportsToday.push({ name: payload.report_name, dataString: payload.report_data });
     } catch (err) {
         console.error('Auto-save error:', err);
     }
 }
 
-// ── Print ──────────────────────────────────────────────────
 async function printReport() {
     if (!checkDuplicateWarning('Print')) return;
-
-    const now     = new Date();
-    const dateStr = now.toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' });
-    const timeStr = now.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' });
-    const nowStr  = `${dateStr} at ${timeStr}`;
-
+    const now = new Date();
+    const nowStr = `${now.toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' })} at ${now.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' })}`;
     const cols = ['#','Student ID','Last Name','First Name','Middle Name','Course','Year','Section','Face Status','Status','Subjects','Attendances','Email','Date Registered'];
-
     const rows = reportRows.map((r, i) => {
         let faceColor = r.face_status.toLowerCase() === 'registered' ? '#166534' : '#d97706';
         let statusColor = r.status.toLowerCase() === 'active' ? '#166534' : (r.status.toLowerCase() === 'inactive' ? '#dc2626' : '#2563eb');
-        
         return `<tr class="${i % 2 === 1 ? 'even' : ''}">
-            <td>${i + 1}</td>
-            <td><strong>${r.id_number}</strong></td>
-            <td><strong>${r.last_name}</strong></td>
-            <td>${r.first_name}</td>
-            <td>${r.middle_name}</td>
-            <td>${r.course}</td>
-            <td style="text-align:center">${r.year_level}</td>
+            <td>${i + 1}</td><td><strong>${r.id_number}</strong></td>
+            <td><strong>${r.last_name}</strong></td><td>${r.first_name}</td><td>${r.middle_name}</td>
+            <td>${r.course}</td><td style="text-align:center">${r.year_level}</td>
             <td style="text-align:center">${r.section}</td>
-            <td><span style="color: ${faceColor}; font-weight: bold;">${r.face_status.toUpperCase()}</span></td>
-            <td><span style="color: ${statusColor}; font-weight: bold;">${r.status.toUpperCase()}</span></td>
+            <td><span style="color:${faceColor};font-weight:bold">${r.face_status.toUpperCase()}</span></td>
+            <td><span style="color:${statusColor};font-weight:bold">${r.status.toUpperCase()}</span></td>
             <td style="text-align:center">${r.enrolled_subjects}</td>
             <td style="text-align:center">${r.total_attendances}</td>
-            <td style="font-size:9px">${r.email}</td>
-            <td>${r.date_registered}</td>
+            <td style="font-size:9px">${r.email}</td><td>${r.date_registered}</td>
         </tr>`;
     }).join('');
-
     const w = window.open('', '_blank');
     w.document.write(`<!DOCTYPE html><html><head><meta charset="UTF-8"><title>Students List Report</title>
-    <style>
-        *{margin:0;padding:0;box-sizing:border-box}
-        body{font-family:Arial,sans-serif;padding:20px;font-size:11px;color:#111}
-        
-        /* ── GREEN BANNER HEADER STYLE ── */
-        .header-container { 
-            background-color: #166534; 
-            color: white;
-            text-align: center; 
-            margin-bottom: 20px; 
-            padding: 20px 15px; 
-            border-radius: 8px;
-            -webkit-print-color-adjust: exact; 
-            print-color-adjust: exact; 
-        }
-        .logos-text-wrapper { display: flex; justify-content: center; align-items: center; gap: 25px; margin-bottom: 10px; }
-        .logo-img { height: 50px; width: auto; object-fit: contain; }
-        .univ-title { font-size: 18px; font-weight: bold; color: white; line-height: 1.2; letter-spacing: 0.5px;}
-        .college-title { font-size: 11px; color: #bbf7d0; letter-spacing: 1px; text-transform: uppercase;}
-        .report-title { font-size: 16px; font-weight: bold; color: white; margin-top: 12px; text-transform: uppercase; letter-spacing: 1px;}
-        .report-meta { font-size: 11px; color: #bbf7d0; margin-top: 5px; }
-        
-        table{width:100%;border-collapse:collapse; margin-top: 10px;}
-        th{background:#166534;color:#fff;padding:8px 10px;text-align:center;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.5px; -webkit-print-color-adjust: exact; print-color-adjust: exact;}
-        td{padding:8px 10px;border-bottom:1px solid #e5e7eb;font-size:11px; text-align:center;}
-        td:nth-child(2), td:nth-child(3), td:nth-child(4), td:nth-child(5) {text-align:left;} /* Left align Names */
-        tr:nth-child(even){background:#f9fafb; -webkit-print-color-adjust: exact; print-color-adjust: exact;}
-        .footer{margin-top:20px;text-align:center;font-size:10px;color:#9ca3af;border-top:1px solid #e5e7eb;padding-top:10px}
-        @media print{body{padding:0px}}
-    </style></head><body>
-    
+    <style>*{margin:0;padding:0;box-sizing:border-box}body{font-family:Arial,sans-serif;padding:20px;font-size:11px;color:#111}
+    .header-container{background-color:#166534;color:white;text-align:center;margin-bottom:20px;padding:20px 15px;border-radius:8px;-webkit-print-color-adjust:exact;print-color-adjust:exact}
+    .logos-text-wrapper{display:flex;justify-content:center;align-items:center;gap:25px;margin-bottom:10px}
+    .logo-img{height:50px;width:auto;object-fit:contain}.univ-title{font-size:18px;font-weight:bold;color:white;line-height:1.2}
+    .college-title{font-size:11px;color:#bbf7d0;letter-spacing:1px;text-transform:uppercase}
+    .report-title{font-size:16px;font-weight:bold;color:white;margin-top:12px;text-transform:uppercase;letter-spacing:1px}
+    .report-meta{font-size:11px;color:#bbf7d0;margin-top:5px}
+    table{width:100%;border-collapse:collapse;margin-top:10px}
+    th{background:#166534;color:#fff;padding:8px 10px;text-align:center;font-size:10px;font-weight:700;text-transform:uppercase;-webkit-print-color-adjust:exact;print-color-adjust:exact}
+    td{padding:8px 10px;border-bottom:1px solid #e5e7eb;font-size:11px;text-align:center}
+    td:nth-child(2),td:nth-child(3),td:nth-child(4),td:nth-child(5){text-align:left}
+    tr:nth-child(even){background:#f9fafb;-webkit-print-color-adjust:exact;print-color-adjust:exact}
+    .footer{margin-top:20px;text-align:center;font-size:10px;color:#9ca3af;border-top:1px solid #e5e7eb;padding-top:10px}
+    @media print{body{padding:0px}}</style></head><body>
     <div class="header-container">
         <div class="logos-text-wrapper">
             <img src="../resc/assets/plp_logo.png" class="logo-img" alt="PLP Logo">
-            <div>
-                <div class="univ-title">PAMANTASAN NG LUNGSOD NG PASIG</div>
-                <div class="college-title">College of Computer Studies</div>
-            </div>
+            <div><div class="univ-title">PAMANTASAN NG LUNGSOD NG PASIG</div><div class="college-title">College of Computer Studies</div></div>
             <img src="../resc/assets/ccs_logo.png" class="logo-img" alt="CCS Logo">
         </div>
         <div class="report-title">Students List Report</div>
-        <div class="report-meta">Generated: ${nowStr} &nbsp;&middot;&nbsp; Total Students: ${META.total} &nbsp;&middot;&nbsp; Face Registered: ${META.registered} &nbsp;&middot;&nbsp; Pending Face: ${META.pending}</div>
+        <div class="report-meta">Generated: ${nowStr} &nbsp;&middot;&nbsp; Total: ${META.total} &nbsp;&middot;&nbsp; Face Registered: ${META.registered} &nbsp;&middot;&nbsp; Pending: ${META.pending}</div>
     </div>
-
-    <table>
-        <thead><tr>${cols.map(c => `<th>${c}</th>`).join('')}</tr></thead>
-        <tbody>${rows}</tbody>
-    </table>
+    <table><thead><tr>${cols.map(c => `<th>${c}</th>`).join('')}</tr></thead><tbody>${rows}</tbody></table>
     <div class="footer">Laboratory Attendance System &nbsp;&middot;&nbsp; ${nowStr}</div>
-    <script>window.onload=()=>setTimeout(()=>window.print(),500)<\/script>
-    </body></html>`);
+    <script>window.onload=()=>setTimeout(()=>window.print(),500)<\/script></body></html>`);
     w.document.close();
-
     await autoSaveReport('Print');
 }
 
-// ── PDF ────────────────────────────────────────────────────
 async function downloadPDF() {
     if (!checkDuplicateWarning('PDF')) return;
-
-    if (!window.jspdf) {
-        showToast('PDF library not loaded yet. Please try again.', true);
-        return;
-    }
-
+    if (!window.jspdf) { showToast('PDF library not loaded yet. Please try again.', true); return; }
     try {
         const { jsPDF } = window.jspdf;
-        const doc     = new jsPDF({ orientation: 'landscape', unit: 'mm', format: 'a4' });
-        const now     = new Date();
-        const dateStr = now.toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' });
-        const timeStr = now.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' });
-        const nowStr  = `${dateStr} at ${timeStr}`;
-        const pageW   = doc.internal.pageSize.width;
-
-        // Helper to safely load the logos
+        const doc = new jsPDF({ orientation: 'landscape', unit: 'mm', format: 'a4' });
+        const now = new Date();
+        const nowStr = `${now.toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' })} at ${now.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' })}`;
+        const pageW = doc.internal.pageSize.width;
         function loadImage(src) {
             return new Promise((resolve) => {
-                const img = new Image();
-                img.crossOrigin = 'anonymous';
-                img.onload = () => {
-                    try {
-                        const canvas = document.createElement('canvas');
-                        canvas.width = img.width; canvas.height = img.height;
-                        canvas.getContext('2d').drawImage(img, 0, 0);
-                        resolve(canvas.toDataURL('image/png'));
-                    } catch(e) {
-                        resolve(null); 
-                    }
-                };
-                img.onerror = () => resolve(null);
-                img.src = src;
+                const img = new Image(); img.crossOrigin = 'anonymous';
+                img.onload = () => { try { const canvas = document.createElement('canvas'); canvas.width = img.width; canvas.height = img.height; canvas.getContext('2d').drawImage(img, 0, 0); resolve(canvas.toDataURL('image/png')); } catch(e) { resolve(null); } };
+                img.onerror = () => resolve(null); img.src = src;
             });
         }
-
-        const [plpData, ccsData] = await Promise.all([
-            loadImage('../resc/assets/plp_logo.png'),
-            loadImage('../resc/assets/ccs_logo.png')
-        ]);
-
-        const centerX = pageW / 2;
-        const headerHeight = 45; // Height of the green banner
-        
-        // ── DRAW SOLID GREEN BANNER ──
-        doc.setFillColor(22, 101, 52); 
-        doc.rect(0, 0, pageW, headerHeight, 'F');
-        
-        // ── LOGOS ──
+        const [plpData, ccsData] = await Promise.all([loadImage('../resc/assets/plp_logo.png'), loadImage('../resc/assets/ccs_logo.png')]);
+        const centerX = pageW / 2, headerHeight = 45;
+        doc.setFillColor(22, 101, 52); doc.rect(0, 0, pageW, headerHeight, 'F');
         const logoSize = 18;
         if (plpData) doc.addImage(plpData, 'PNG', centerX - 85, 8, logoSize, logoSize);
         if (ccsData) doc.addImage(ccsData, 'PNG', centerX + 67, 8, logoSize, logoSize);
-
-        // ── CENTERED HEADER TEXT ──
-        doc.setFontSize(16); 
-        doc.setTextColor(255, 255, 255); 
-        doc.setFont('helvetica', 'bold');
+        doc.setFontSize(16); doc.setTextColor(255,255,255); doc.setFont('helvetica','bold');
         doc.text('PAMANTASAN NG LUNGSOD NG PASIG', centerX, 15, { align: 'center' });
-        
-        doc.setFontSize(9); 
-        doc.setTextColor(187, 247, 208); 
-        doc.setFont('helvetica', 'normal');
+        doc.setFontSize(9); doc.setTextColor(187,247,208); doc.setFont('helvetica','normal');
         doc.text('COLLEGE OF COMPUTER STUDIES', centerX, 20, { align: 'center' });
-        
-        doc.setFontSize(14); 
-        doc.setTextColor(255, 255, 255); 
-        doc.setFont('helvetica', 'bold');
+        doc.setFontSize(14); doc.setTextColor(255,255,255); doc.setFont('helvetica','bold');
         doc.text('STUDENTS LIST REPORT', centerX, 30, { align: 'center' });
-        
-        doc.setFontSize(8); 
-        doc.setTextColor(187, 247, 208); 
-        doc.setFont('helvetica', 'normal');
-        doc.text(`Generated: ${nowStr}  ·  Total Students: ${META.total}  ·  Face Registered: ${META.registered}  ·  Pending Face: ${META.pending}`, centerX, 36, { align: 'center' });
-
-        // ── AUTO-EXPANDING CLEAN TABLE ──
-        // Since Students has 14 columns, we need a smaller font
-        const head = [['#','Student ID','Last Name','First Name','M.I.','Course','Yr','Section','Face Status','Status','Subjects','Attended','Email','Date Reg']];
-        const body = reportRows.map((r, i) => [
-            i + 1, r.id_number, r.last_name, r.first_name, r.middle_name.substring(0,2) + '.',
-            r.course, r.year_level, r.section, r.face_status.toUpperCase(), r.status.toUpperCase(),
-            r.enrolled_subjects, r.total_attendances, r.email, r.date_registered
-        ]);
-
-        doc.autoTable({
-            head, body,
-            startY: headerHeight + 8,
-            margin: { left: 10, right: 10 },
-            theme: 'striped',
-            headStyles: { 
-                fillColor: [22, 101, 52], fontSize: 6.5, fontStyle: 'bold', textColor: 255, halign: 'center', valign: 'middle'
-            },
+        doc.setFontSize(8); doc.setTextColor(187,247,208); doc.setFont('helvetica','normal');
+        doc.text(`Generated: ${nowStr}  ·  Total: ${META.total}  ·  Face Registered: ${META.registered}  ·  Pending: ${META.pending}`, centerX, 36, { align: 'center' });
+        const head = [['#','Student ID','Last Name','First Name','M.I.','Course','Yr','Sec','Face','Status','Subj','Att','Email','Date']];
+        const body = reportRows.map((r, i) => [i+1, r.id_number, r.last_name, r.first_name, r.middle_name.substring(0,2)+'.', r.course, r.year_level, r.section, r.face_status.toUpperCase(), r.status.toUpperCase(), r.enrolled_subjects, r.total_attendances, r.email, r.date_registered]);
+        doc.autoTable({ head, body, startY: headerHeight+8, margin: { left: 10, right: 10 }, theme: 'striped',
+            headStyles: { fillColor: [22,101,52], fontSize: 6.5, fontStyle: 'bold', textColor: 255, halign: 'center', valign: 'middle' },
             styles: { fontSize: 6.5, cellPadding: 2, valign: 'middle' },
-            columnStyles: {
-                0: { cellWidth: 7, halign: 'center' },
-                1: { cellWidth: 18, halign: 'center', fontStyle: 'bold' },
-                2: { cellWidth: 20 },
-                3: { cellWidth: 20 },
-                4: { cellWidth: 10 },
-                5: { cellWidth: 12, halign: 'center' },
-                6: { cellWidth: 8, halign: 'center' },
-                7: { cellWidth: 14, halign: 'center' },
-                8: { cellWidth: 18, halign: 'center', fontStyle: 'bold' },
-                9: { cellWidth: 15, halign: 'center', fontStyle: 'bold' },
-                10: { cellWidth: 14, halign: 'center' },
-                11: { cellWidth: 16, halign: 'center' },
-                12: { cellWidth: 'auto' }, // Email stretches to fill remaining space
-                13: { cellWidth: 18, halign: 'center' }
-            },
+            columnStyles: { 0:{cellWidth:7,halign:'center'}, 1:{cellWidth:18,halign:'center',fontStyle:'bold'}, 2:{cellWidth:20}, 3:{cellWidth:20}, 4:{cellWidth:10}, 5:{cellWidth:22}, 6:{cellWidth:8,halign:'center'}, 7:{cellWidth:8,halign:'center'}, 8:{cellWidth:18,halign:'center',fontStyle:'bold'}, 9:{cellWidth:15,halign:'center',fontStyle:'bold'}, 10:{cellWidth:10,halign:'center'}, 11:{cellWidth:10,halign:'center'}, 12:{cellWidth:'auto'}, 13:{cellWidth:18,halign:'center'} },
             didParseCell(d) {
-                if (d.column.index === 8 && d.section === 'body') {
-                    const s = (d.cell.text[0] || '').toLowerCase();
-                    if (s === 'registered') { d.cell.styles.textColor = [22, 101, 52]; }
-                    if (s === 'not registered') { d.cell.styles.textColor = [217, 119, 6]; }
-                }
-                if (d.column.index === 9 && d.section === 'body') {
-                    const s = (d.cell.text[0] || '').toLowerCase();
-                    if (s === 'active') { d.cell.styles.textColor = [22, 101, 52]; }
-                    if (s === 'inactive') { d.cell.styles.textColor = [220, 38, 38]; }
-                    if (s === 'graduated') { d.cell.styles.textColor = [37, 99, 235]; }
-                }
+                if (d.column.index === 8 && d.section === 'body') { const s=(d.cell.text[0]||'').toLowerCase(); if(s==='registered'){d.cell.styles.textColor=[22,101,52];} if(s==='not registered'){d.cell.styles.textColor=[217,119,6];} }
+                if (d.column.index === 9 && d.section === 'body') { const s=(d.cell.text[0]||'').toLowerCase(); if(s==='active'){d.cell.styles.textColor=[22,101,52];} if(s==='inactive'){d.cell.styles.textColor=[220,38,38];} if(s==='graduated'){d.cell.styles.textColor=[37,99,235];} }
             }
         });
-
         const pages = doc.internal.getNumberOfPages();
-        for (let i = 1; i <= pages; i++) {
-            doc.setPage(i); doc.setFontSize(7); doc.setTextColor(156, 163, 175);
-            doc.text(`Laboratory Attendance System  ·  Page ${i} of ${pages}  ·  ${nowStr}`,
-                pageW / 2, doc.internal.pageSize.height - 8, { align: 'center' });
-        }
-
+        for (let i = 1; i <= pages; i++) { doc.setPage(i); doc.setFontSize(7); doc.setTextColor(156,163,175); doc.text(`Laboratory Attendance System  ·  Page ${i} of ${pages}  ·  ${nowStr}`, pageW/2, doc.internal.pageSize.height-8, { align: 'center' }); }
         doc.save(`Students_Report_${now.toISOString().split('T')[0]}.pdf`);
-
         await autoSaveReport('PDF');
-
     } catch (err) {
         console.error('PDF generation error:', err);
-        showToast('There was an error generating the PDF. Check the console.', true);
+        showToast('There was an error generating the PDF.', true);
     }
 }
 
-// ── CSV ────────────────────────────────────────────────────
 async function exportCSV() {
     if (!checkDuplicateWarning('CSV')) return;
-
-    const cols = ['#','Student ID','Last Name','First Name','Middle Name','Course','Year Level',
-                  'Section','Face Status','Status','Enrolled Subjects','Total Attendances',
-                  'Email','Date Registered'];
-    const lines = [
-        cols.join(','),
-        ...reportRows.map((r, i) => [
-            i + 1, `"${r.id_number}"`, `"${r.last_name}"`, `"${r.first_name}"`, `"${r.middle_name}"`,
-            `"${r.course}"`, r.year_level, `"${r.section}"`, `"${r.face_status}"`, r.status,
-            r.enrolled_subjects, r.total_attendances, `"${r.email}"`, `"${r.date_registered}"`
-        ].join(','))
-    ];
+    const cols = ['#','Student ID','Last Name','First Name','Middle Name','Course','Year Level','Section','Face Status','Status','Enrolled Subjects','Total Attendances','Email','Date Registered'];
+    const lines = [cols.join(','), ...reportRows.map((r, i) => [i+1,`"${r.id_number}"`,`"${r.last_name}"`,`"${r.first_name}"`,`"${r.middle_name}"`,`"${r.course}"`,r.year_level,`"${r.section}"`,`"${r.face_status}"`,r.status,r.enrolled_subjects,r.total_attendances,`"${r.email}"`,`"${r.date_registered}"`].join(','))];
     const a = document.createElement('a');
     a.href = URL.createObjectURL(new Blob([lines.join('\n')], { type: 'text/csv' }));
     a.download = `Students_Report_${new Date().toISOString().split('T')[0]}.csv`;
-    a.click();
-    URL.revokeObjectURL(a.href);
-    
+    a.click(); URL.revokeObjectURL(a.href);
     await autoSaveReport('CSV');
 }
 
-// ── Excel ──────────────────────────────────────────────────
 async function exportExcel() {
     if (!checkDuplicateWarning('Excel')) return;
-
-    if (!window.XLSX) {
-        return exportCSV(); // Fallback if library fails
-    }
+    if (!window.XLSX) return exportCSV();
     const wb = XLSX.utils.book_new();
-
-    const headers = ['#','Student ID','Last Name','First Name','Middle Name','Course','Year Level',
-                  'Section','Face Status','Status','Enrolled Subjects','Total Attendances',
-                  'Email','Date Registered'];
-                  
-    const rows = reportRows.map((r, i) => [
-        i + 1, r.id_number, r.last_name, r.first_name, r.middle_name,
-        r.course, r.year_level, r.section, r.face_status, r.status.toUpperCase(),
-        r.enrolled_subjects, r.total_attendances, r.email, r.date_registered
-    ]);
-
+    const headers = ['#','Student ID','Last Name','First Name','Middle Name','Course','Year Level','Section','Face Status','Status','Enrolled Subjects','Total Attendances','Email','Date Registered'];
+    const rows = reportRows.map((r, i) => [i+1, r.id_number, r.last_name, r.first_name, r.middle_name, r.course, r.year_level, r.section, r.face_status, r.status.toUpperCase(), r.enrolled_subjects, r.total_attendances, r.email, r.date_registered]);
     const dataSheet = XLSX.utils.aoa_to_sheet([headers, ...rows]);
     XLSX.utils.book_append_sheet(wb, dataSheet, 'Students');
-
     XLSX.writeFile(wb, `Students_Report_${new Date().toISOString().split('T')[0]}.xlsx`);
-
     await autoSaveReport('Excel');
 }
 
@@ -1209,11 +1012,6 @@ document.addEventListener('keydown', e => {
 // ══════════════════════════════════════════════════════════
 // 11. UTILITIES
 // ══════════════════════════════════════════════════════════
-
-/**
- * formatStudentId — converts raw digits to display format
- * "2300221" → "23-00221"
- */
 function formatStudentId(raw) {
     if (!raw) return '';
     const digits = String(raw).replace(/\D/g, '').slice(0, 7);
@@ -1221,10 +1019,6 @@ function formatStudentId(raw) {
     return digits.slice(0, 2) + '-' + digits.slice(2);
 }
 
-/**
- * rawStudentId — strips dash for DB storage/queries
- * "23-00221" → "2300221"
- */
 function rawStudentId(formatted) {
     if (!formatted) return '';
     return String(formatted).replace(/-/g, '');
@@ -1239,11 +1033,7 @@ function showToast(msg, showLink) {
 
 function escHtml(str) {
     if (!str) return '';
-    return String(str)
-        .replace(/&/g, '&amp;')
-        .replace(/</g, '&lt;')
-        .replace(/>/g, '&gt;')
-        .replace(/"/g, '&quot;');
+    return String(str).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
 }
 
 function capitalize(s) {
