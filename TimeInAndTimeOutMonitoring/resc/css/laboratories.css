@@ -24,6 +24,7 @@
 }
 
 *, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
+
 body {
     font-family: 'Nunito Sans', sans-serif;
     background: var(--white);
@@ -32,6 +33,18 @@ body {
     font-size: 15px;
     line-height: 1.6;
 }
+
+/* ── LAYOUT ── */
+.main-content {
+    margin-left: var(--sidebar-collapsed, 64px);
+    margin-top: 68px;
+    min-height: calc(100vh - 68px);
+    transition: margin-left 0.45s cubic-bezier(0.25, 0.46, 0.45, 0.94);
+}
+.main-content.sidebar-open {
+    margin-left: var(--sidebar-expanded, 240px);
+}
+
 .container { width: 100%; padding: 32px 36px 48px; }
 
 /* ── PAGE HEADER ── */
@@ -131,9 +144,9 @@ body {
 
 .btn-report { 
     padding: 9px 18px; 
-    background: #dcfce7;          /* Soft light green background */
-    color: #166534;               /* Signature dark green text for contrast */
-    border: 1.5px solid #bbf7d0;  /* Slightly darker green border */
+    background: #dcfce7;          
+    color: #166534;               
+    border: 1.5px solid #bbf7d0;  
     border-radius: 8px; 
     font-size: 13.5px; 
     font-weight: 800; 
@@ -143,14 +156,15 @@ body {
     gap: 8px; 
     transition: all .2s ease; 
     font-family: 'Nunito Sans', sans-serif; 
-    margin-left: auto;            /* Keeps it grouped with the Add button */
+    margin-left: auto;            
 }
 
 .btn-report:hover { 
-    background: #bbf7d0;          /* Slightly darker pastel green on hover */
+    background: #bbf7d0;          
     transform: translateY(-2px); 
-    box-shadow: 0 4px 12px rgba(22, 101, 52, 0.15); /* Soft green shadow */
+    box-shadow: 0 4px 12px rgba(22, 101, 52, 0.15); 
 }
+
 /* ── TABLE ── */
 .labs-container {
     background: var(--white); border-radius: var(--radius-lg);
@@ -159,24 +173,36 @@ body {
 }
 .table-wrapper { overflow-x: auto; }
 table { width: 100%; border-collapse: collapse; }
-thead { background: linear-gradient(90deg, #166534, #14532d); }
-th {
-    padding: 14px 16px; text-align: left;
-    font-weight: 700; color: #fff; font-size: 12.5px;
-    border-bottom: 2px solid rgba(255,255,255,.25);
-    text-transform: uppercase; letter-spacing: .5px;
-    font-family: 'Nunito', sans-serif;
-}
 
-th { border-right: 1px solid rgba(255,255,255,.2); }
-th:last-child { border-right: none; }
-td {
-    padding: 14px 16px; border-bottom: 1px solid var(--border);
-    font-size: 14px; color: var(--text-body);
+/* ── MAIN TABLE STYLES ── */
+thead th {
+    background: linear-gradient(90deg, #166534, #14532d); 
+    color: #ffffff;
+    padding: 14px 18px; 
+    text-align: left; 
+    font-size: 12.5px; 
+    font-weight: 800;
+    text-transform: uppercase; 
+    letter-spacing: 0.5px; 
+    font-family: 'Nunito', sans-serif;
+    border-bottom: none;
+    border-right: 1px solid rgba(255, 255, 255, 0.2); 
+    white-space: nowrap;
+}
+thead th:last-child { border-right: none; }
+
+tbody td {
+    padding: 14px 18px; 
+    border-bottom: 1px solid var(--border);
+    font-size: 14px; 
+    color: var(--text-body); 
+    vertical-align: middle;
+    font-family: 'Nunito Sans', sans-serif;
 }
 tbody tr:last-child td { border-bottom: none; }
 tbody tr:hover { background: var(--surface); }
 
+/* ── STATUS BADGES ── */
 .status-badge {
     display: inline-flex; align-items: center;
     padding: 4px 12px; border-radius: 99px;
@@ -186,6 +212,7 @@ tbody tr:hover { background: var(--surface); }
 .status-badge.maintenance { background: #fee2e2; color: var(--red); }
 .status-badge.inactive    { background: #f1f5f9; color: #64748b; }
 
+/* ── ACTION BUTTONS ── */
 .action-btns { display: flex; gap: 8px; align-items: center; white-space: nowrap; }
 .action-btn {
     width: 38px; height: 38px; min-width: 38px; padding: 0;
@@ -226,7 +253,7 @@ tbody tr:hover { background: var(--surface); }
 .modal-header h2 {
     font-family: 'Nunito', sans-serif;
     color: var(--green-dark); font-size: 20px; font-weight: 800;
-    display: flex; align-items: center; gap: 9px;
+    display: flex; align-items: center; gap: 9px; margin: 0;
 }
 .close-modal {
     background: var(--surface); border: 1px solid var(--border);
@@ -243,10 +270,11 @@ tbody tr:hover { background: var(--surface); }
 }
 .form-group input, .form-group select, .form-group textarea {
     width: 100%; padding: 10px 13px;
-    border: 1.5px solid var(--border); border-radius: var(--radius);
+    border: 1.5px solid var(--border); border-radius: var(--radius-lg);
     font-size: 14px; font-family: 'Nunito Sans', sans-serif;
     color: var(--text-dark); background: var(--white);
     outline: none; transition: border-color .18s, box-shadow .18s;
+    box-sizing: border-box;
 }
 .form-group input:focus, .form-group select:focus, .form-group textarea:focus {
     border-color: var(--green-bright);
@@ -270,6 +298,7 @@ tbody tr:hover { background: var(--surface); }
     display: flex; flex-direction: column;
     box-shadow: 0 20px 60px rgba(0,0,0,.25);
     animation: rmIn .22s cubic-bezier(.34,1.56,.64,1);
+    overflow: hidden; /* Keeps bottom corners clean */
 }
 @keyframes rmIn {
     from { opacity: 0; transform: scale(.88) translateY(14px); }
@@ -281,8 +310,8 @@ tbody tr:hover { background: var(--surface); }
     display: flex; align-items: center;
     justify-content: space-between; gap: 14px; flex-shrink: 0;
 }
-.rm-hd h2 { color: white; font-size: 19px; font-weight: 700; display: flex; align-items: center; gap: 10px; margin: 0; }
-.rm-hd p  { color: rgba(255,255,255,.72); font-size: 12.5px; margin-top: 3px; }
+.rm-hd h2 { color: white; font-size: 19px; font-weight: 700; display: flex; align-items: center; gap: 10px; margin: 0; font-family: 'Nunito', sans-serif;}
+.rm-hd p  { color: rgba(255,255,255,.72); font-size: 12.5px; margin-top: 3px; font-family: 'Nunito Sans', sans-serif;}
 .rm-x {
     background: rgba(255,255,255,.15); border: none; color: white;
     width: 34px; height: 34px; border-radius: 8px; cursor: pointer;
@@ -297,7 +326,7 @@ tbody tr:hover { background: var(--surface); }
 }
 .rm-chip {
     padding: 5px 13px; border-radius: 20px; font-size: 12px; font-weight: 600;
-    display: inline-flex; align-items: center; gap: 5px;
+    display: inline-flex; align-items: center; gap: 5px; font-family: 'Nunito Sans', sans-serif;
 }
 .rm-chip.green { background: #dcfce7; color: #166534; border: 1px solid #bbf7d0; }
 .rm-chip.red   { background: #fee2e2; color: #dc2626; border: 1px solid #fecaca; }
@@ -306,7 +335,7 @@ tbody tr:hover { background: var(--surface); }
 .rm-btn {
     padding: 8px 15px; border-radius: 7px; font-size: 13px; font-weight: 600;
     cursor: pointer; border: none; display: inline-flex; align-items: center; gap: 6px;
-    transition: .15s; font-family: inherit; white-space: nowrap;
+    transition: .15s; font-family: 'Nunito Sans', sans-serif; white-space: nowrap;
 }
 .rm-btn.save  { background: #166534; color: white; }
 .rm-btn.save:hover  { background: #14532d; }
@@ -316,18 +345,34 @@ tbody tr:hover { background: var(--surface); }
 .rm-btn.pdf:hover   { background: #dc2626; color: white; border-color: #dc2626; }
 .rm-btn.excel { background: #f0fdf4; color: #166534; border: 1.5px solid #bbf7d0; }
 .rm-btn.excel:hover { background: #166534; color: white; border-color: #166534; }
-.rm-body { overflow-y: auto; flex: 1; }
-.rm-table { width: 100%; border-collapse: collapse; font-size: 13px; }
+.rm-body { overflow-y: auto; flex: 1; background: white;}
+
+/* ── REPORT MODAL TABLE ── */
+.rm-table { width: 100%; border-collapse: collapse; font-size: 13px; font-family: 'Nunito Sans', sans-serif;}
 .rm-table thead th {
-    background: #166534; color: white; padding: 11px 14px;
-    text-align: left; font-size: 10.5px; font-weight: 700;
-    text-transform: uppercase; letter-spacing: .6px;
-    white-space: nowrap; position: sticky; top: 0; z-index: 2;
+    background: linear-gradient(90deg, #166534, #14532d); 
+    color: white; 
+    padding: 11px 14px;
+    text-align: left; 
+    font-size: 10.5px; 
+    font-weight: 800;
+    text-transform: uppercase; 
+    letter-spacing: .6px;
+    white-space: nowrap; 
+    position: sticky; 
+    top: 0; 
+    z-index: 2;
+    border-bottom: none;
+    border-right: 1px solid rgba(255,255,255,.2); /* Vertical white lines */
+    font-family: 'Nunito', sans-serif;
 }
-.rm-table tbody tr { border-bottom: 1px solid #f0fdf4; transition: background .1s; }
-.rm-table tbody tr:nth-child(even) { background: #f9fffe; }
+.rm-table thead th:last-child { border-right: none; }
+
+.rm-table tbody tr { border-bottom: 1px solid #e5e7eb; transition: background .1s; }
+.rm-table tbody tr:nth-child(even) { background: #f9fffe; } /* Standardized alternating rows */
 .rm-table tbody tr:hover { background: #ecfdf5; }
 .rm-table td { padding: 11px 14px; vertical-align: middle; }
+
 .rm-badge {
     display: inline-block; padding: 3px 10px; border-radius: 12px;
     font-size: 11px; font-weight: 700; text-transform: uppercase;
@@ -361,22 +406,3 @@ tbody tr:hover { background: var(--surface); }
     .action-btns { flex-direction: column; }
     .container   { padding: 20px 16px; }
 }
-/* ============================================================
-   PATCH — paste these rules at the TOP of laboratories.css
-   They push the page below the fixed header (68px) and to
-   the right of the collapsed sidebar (64px), exactly like
-   dashboard.css does.  Nothing else in your file changes.
-============================================================ */
-
-.main-content {
-    margin-left: var(--sidebar-collapsed, 64px);
-    margin-top: 68px;
-    min-height: calc(100vh - 68px);
-    transition: margin-left 0.45s cubic-bezier(0.25, 0.46, 0.45, 0.94);
-}
-
-.main-content.sidebar-open {
-    margin-left: var(--sidebar-expanded, 240px);
-}
-
-/* ── paste your existing laboratories.css content below this line ── */
