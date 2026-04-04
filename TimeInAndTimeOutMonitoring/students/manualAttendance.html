@@ -1,0 +1,127 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Manual Attendance | Time In & Time Out Monitoring System</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Nunito:wght@400;500;600;700;800&family=Nunito+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
+<link rel="stylesheet" href="../resc/css/manualAttendance.css">
+</head>
+<body>
+
+<!-- ── LEFT PANEL ── -->
+<div class="lp">
+    <div class="lp-grid"></div>
+    <div class="lp-top">
+        <div class="bl">
+            <img src="../resc/assets/plp_logo.png" alt="PLP">
+            <div class="ld"></div>
+            <img src="../resc/assets/ccs_logo.png" alt="CCS" onerror="this.style.display='none';this.previousElementSibling.style.display='none'">
+        </div>
+        <div class="bn">
+            <small>Attendee Portal</small>
+            Lab Attendance System
+        </div>
+    </div>
+    <div class="lp-center">
+        <div class="lbadge"><i class="fa-solid fa-pencil"></i> Manual Entry</div>
+        <h1>Attendance<br><span>Manual Mode</span></h1>
+        <p>Use this when facial recognition is unavailable. Enter your ID to record your attendance for today's session.</p>
+        <div class="feats">
+            <div class="fi">
+                <div class="fd"><i class="fa-solid fa-id-card"></i></div>
+                <div class="ft"><strong>Students &amp; Professors</strong><br>Enter your ID number below</div>
+            </div>
+            <div class="fi">
+                <div class="fd"><i class="fa-solid fa-clock-rotate-left"></i></div>
+                <div class="ft"><strong>Time In &amp; Out</strong><br>Attendance tracked per session</div>
+            </div>
+            <div class="fi">
+                <div class="fd"><i class="fa-solid fa-shield-halved"></i></div>
+                <div class="ft"><strong>Session Rules</strong><br>Mirrors facial recognition logic</div>
+            </div>
+        </div>
+    </div>
+    <div class="lp-bot">&copy; <span id="footerYear"></span> Laboratory Management System &middot; All rights reserved</div>
+</div>
+
+<!-- ── RIGHT PANEL ── -->
+<div class="rp">
+    <div class="fb">
+
+        <div class="clock-strip">
+            <i class="fa-regular fa-clock"></i>
+            <span id="live-clock">Loading...</span>
+        </div>
+
+        <div class="card">
+            <div class="card-bar"></div>
+            <div class="ch">
+                <div class="welcome"><i class="fa-solid fa-fingerprint"></i> Manual Attendance</div>
+                <h2>Check In / Out</h2>
+                <p>Enter your Student or Employee ID to proceed.</p>
+            </div>
+            <div class="fg">
+                <label><i class="fa-solid fa-id-card"></i> ID Number</label>
+                <div class="iw">
+                    <input type="text" id="id_input"
+                           placeholder="e.g. 23-00221 or 443562323"
+                           autocomplete="off" autocorrect="off"
+                           spellcheck="false" inputmode="text">
+                    <i class="fa-solid fa-barcode fi-icon"></i>
+                </div>
+                <p class="hint">
+                    <i class="fa-solid fa-circle-info"></i>
+                    Students: School ID &nbsp;&middot;&nbsp; Professors: Employee ID
+                </p>
+            </div>
+            <button class="btn-lookup" id="btn-lookup">
+                <i class="fa-solid fa-magnifying-glass"></i> Look Up &amp; Check Status
+            </button>
+        </div>
+
+        <!-- Result Panel -->
+        <div id="result-panel">
+            <div class="rc">
+                <div class="rh">
+                    <div class="av av-s" id="rav">👤</div>
+                    <div>
+                        <div id="rname"></div>
+                        <div id="rrole"></div>
+                    </div>
+                </div>
+                <div class="rb2">
+                    <div class="ig" id="rinfo"></div>
+                    <div class="sm" id="rmsg"></div>
+                    <button class="btn-c bg" id="btn-confirm" style="display:none">
+                        <i class="fa-solid fa-check"></i> Confirm
+                    </button>
+                    <button class="btn-reset" id="btn-reset">
+                        <i class="fa-solid fa-rotate-left"></i> Search Again
+                    </button>
+                </div>
+            </div>
+        </div>
+
+    </div>
+</div>
+
+<!-- Toast -->
+<div id="toast">
+    <i id="toast-icon" class="fa-solid fa-check-circle"></i>
+    <span id="toast-msg"></span>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="../../config/.env.js"></script>
+<script>
+    const supabaseClient = supabase.createClient(
+        ENV.SUPABASE_PROJECT_URL,
+        ENV.SUPABASE_ANON_KEY
+    );
+</script>
+<script src="../resc/js/manualAttendance.js"></script>
+</body>
+</html>
