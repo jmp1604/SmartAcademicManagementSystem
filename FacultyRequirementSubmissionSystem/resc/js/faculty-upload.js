@@ -19,6 +19,11 @@ async function loadActiveSemester() {
         }
         activeSemesterId = sem.id;
         activeSemesterName = sem.name;
+        
+        // Display the semester in the page
+        const semesterEl = document.getElementById('upload-current-semester');
+        if (semesterEl) semesterEl.textContent = activeSemesterName;
+        
         return true;
     } catch (e) {
         console.error('loadActiveSemester error:', e);
