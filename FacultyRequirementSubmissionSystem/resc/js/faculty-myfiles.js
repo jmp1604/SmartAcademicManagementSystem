@@ -1,7 +1,9 @@
 document.addEventListener('DOMContentLoaded', async function () {
-    const searchInput  = document.querySelector('.files-search');
-    const catFilter    = document.querySelector('.cat-filter');
-    const statusFilter = document.querySelector('.status-filter');
+    const searchInput    = document.querySelector('.files-search');
+    const catFilter      = document.querySelector('.cat-filter');
+    const statusFilter   = document.querySelector('.status-filter');
+    const semesterFilter = document.querySelector('.semester-filter');
+    await loadActiveSemester();
     await loadMyFiles();
     initializeModal();
     
@@ -30,21 +32,49 @@ document.addEventListener('DOMContentLoaded', async function () {
     });
     
     function applyFilters() {
-        const q      = (searchInput?.value || '').toLowerCase();
-        const cat    = (catFilter?.value    || '').toLowerCase();
-        const status = (statusFilter?.value || '').toLowerCase();
+        const q       = (searchInput?.value || '').toLowerCase();
+        const cat     = (catFilter?.value    || '').toLowerCase();
+        const status  = (statusFilter?.value || '').toLowerCase();
+        const sem     = (semesterFilter?.value || '').toLowerCase();
 
         document.querySelectorAll('.file-card[data-cat]').forEach(function (card) {
-            const matchQ      = !q      || card.dataset.name?.toLowerCase().includes(q);
-            const matchCat    = !cat    || cat === 'all categories' || card.dataset.cat?.toLowerCase() === cat;
-            const matchStatus = !status || status === 'all status'  || card.dataset.status?.toLowerCase() === status;
-            card.style.display = (matchQ && matchCat && matchStatus) ? '' : 'none';
+            const matchQ       = !q       || card.dataset.name?.toLowerCase().includes(q);
+            const matchCat     = !cat     || cat === 'all categories' || card.dataset.cat?.toLowerCase() === cat;
+            const matchStatus  = !status  || status === 'all status'  || card.dataset.status?.toLowerCase() === status;
+            const matchSem     = !sem     || sem === 'all semesters' || card.dataset.semester?.toLowerCase() === sem;
+            card.style.display = (matchQ && matchCat && matchStatus && matchSem) ? '' : 'none';
         });
     }
     searchInput?.addEventListener('input',  applyFilters);
     catFilter?.addEventListener('change',   applyFilters);
     statusFilter?.addEventListener('change', applyFilters);
+    semesterFilter?.addEventListener('change', applyFilters);
 });
+
+async function loadActiveSemester() {
+    try {
+        const { data: sem, error } = await supabaseClient
+            .from('semesters')
+            .select('id, name')
+            .eq('is_active', true)
+            .limit(1)
+            .single();
+        
+        if (error || !sem) {
+            console.error('No active semester found');
+            return false;
+        }
+        
+        // Display the semester in the page
+        const semesterEl = document.getElementById('myfiles-current-semester');
+        if (semesterEl) semesterEl.textContent = sem.name;
+        
+        return true;
+    } catch (e) {
+        console.error('loadActiveSemester error:', e);
+        return false;
+    }
+}
 
 async function loadMyFiles() {
     try {
@@ -59,6 +89,16 @@ async function loadMyFiles() {
             showNoFilesMessage('Please log in to view your files.');
             return;
         }
+        
+        // Fetch semesters for mapping
+        const { data: semesters, error: semestersError } = await supabaseClient
+            .from('semesters')
+            .select('id, name');
+        const semesterMap = {};
+        if (!semestersError && semesters) {
+            semesters.forEach(sem => { semesterMap[sem.id] = sem.name; });
+        }
+        
         const { data: submissions, error: submissionsError } = await supabaseClient
             .from('submissions')
             .select(`
@@ -89,6 +129,10 @@ async function loadMyFiles() {
         console.log('Submissions loaded:', submissions);
 
         for (let submission of submissions) {
+            // Map semester name from semester map
+            if (submission.semester_id && semesterMap[submission.semester_id]) {
+                submission.semester_name = semesterMap[submission.semester_id];
+            }
             if (submission.submission_files && submission.submission_files.length > 0) {
                 for (let file of submission.submission_files) {
                     file.signed_url = await resolveFileUrl(file.file_url || file.file_path, file.file_name);
@@ -102,6 +146,9 @@ async function loadMyFiles() {
             
             console.log('Calling populateCategoryFilter...');
             populateCategoryFilter(submissions);
+            
+            console.log('Calling populateSemesterFilter...');
+            populateSemesterFilter(submissions);
             
             console.log('Calling renderFiles...');
             renderFiles(submissions);
@@ -203,6 +250,27 @@ function populateCategoryFilter(submissions) {
     }
 }
 
+function populateSemesterFilter(submissions) {
+    try {
+        const semesterFilter = document.querySelector('.semester-filter');
+        if (!semesterFilter) return;
+        const semesters = new Map();
+        submissions.forEach(submission => {
+            const semId = submission.semester_id;
+            if (semId) semesters.set(semId, submission.semester_name || `Semester ${semId}`);
+        });
+        const allSemestersOption = '<option value="all semesters">All Semesters</option>';
+        const semesterOptions = Array.from(semesters.entries())
+            .sort((a, b) => a[1].localeCompare(b[1]))
+            .map(([id, name]) => `<option value="${escapeHtml(name.toLowerCase())}">${escapeHtml(name)}</option>`)
+            .join('');
+
+        semesterFilter.innerHTML = allSemestersOption + semesterOptions;
+    } catch (err) {
+        console.error('Error in populateSemesterFilter:', err);
+    }
+}
+
 function renderFiles(submissions) {
     const filesGrid = document.getElementById('files-grid');
     if (!filesGrid) {
@@ -256,9 +324,10 @@ function renderFiles(submissions) {
         const fileName = file.file_name;
         const fileExt = fileName.split('.').pop().toLowerCase();
         const fileIcon = getFileIcon(fileExt);
+        const semesterName = submission.semester_name || `Semester ${submission.semester_id}`;
 
         return `
-            <div class="file-card" data-name="${escapeHtml(fileName)}" data-cat="${escapeHtml(categoryName.toLowerCase())}" data-status="${status}">
+            <div class="file-card" data-name="${escapeHtml(fileName)}" data-cat="${escapeHtml(categoryName.toLowerCase())}" data-status="${status}" data-semester="${escapeHtml(semesterName.toLowerCase())}">
                 <div class="file-icon ${fileExt}">${fileIcon}</div>
                 <div class="file-info">
                     <div class="file-name" title="${escapeHtml(fileName)}">${escapeHtml(fileName)}</div>
@@ -271,7 +340,10 @@ function renderFiles(submissions) {
                         <span class="req-icon">${categoryIcon}</span>
                         <span class="req-text">${escapeHtml(requirementName)}</span>
                     </div>
-                    <div class="file-category-badge">${escapeHtml(categoryName)}</div>
+                    <div style="display: flex; gap: 0.5rem; margin-top: 0.5rem;">
+                        <div class="file-category-badge">${escapeHtml(categoryName)}</div>
+                        <div class="file-category-badge" style="background: rgba(59, 130, 246, 0.15); color: #1e40af;">${escapeHtml(semesterName)}</div>
+                    </div>
                 </div>
                 <div class="file-status" style="background:${statusColor};">
                     ${statusIcon}

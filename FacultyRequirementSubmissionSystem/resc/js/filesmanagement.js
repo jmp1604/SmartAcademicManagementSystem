@@ -2,6 +2,8 @@ let allSubmissions = [];
 let currentSubmissionId = null;
 let currentFileUrl = null;
 let currentFileName = null;
+let activeSemesterId = null;
+let activeSemesterName = null;
 
 async function resolveFileUrl(raw, fileName) {
     if (!raw) { console.warn('No file URL for:', fileName); return null; }
@@ -51,17 +53,45 @@ async function resolveFileUrl(raw, fileName) {
     return raw;
 }
 
-document.addEventListener('DOMContentLoaded', function () {
+document.addEventListener('DOMContentLoaded', async function () {
     if (!isAdmin()) {
         window.location.href = '../../auth/login.html';
         return;
     }
 
+    await loadActiveSemester();
     loadSubmissions();
     setupEventListeners();
     populateDeptFilter();
     populateCatFilter();
 });
+
+async function loadActiveSemester() {
+    try {
+        const { data: sem, error } = await supabaseClient
+            .from('semesters')
+            .select('id, name')
+            .eq('is_active', true)
+            .limit(1)
+            .single();
+        
+        if (error || !sem) {
+            console.error('No active semester found');
+            return false;
+        }
+        activeSemesterId = sem.id;
+        activeSemesterName = sem.name;
+        
+        // Display the semester in the page
+        const semesterEl = document.getElementById('filesmanagement-current-semester');
+        if (semesterEl) semesterEl.textContent = activeSemesterName;
+        
+        return true;
+    } catch (e) {
+        console.error('loadActiveSemester error:', e);
+        return false;
+    }
+}
 
 function setupEventListeners() {
     const searchInput = document.querySelector('.search-input');
@@ -188,6 +218,10 @@ async function loadSubmissions() {
         }
 
         allSubmissions = submissions || [];
+        // Filter submissions by active semester
+        if (activeSemesterId) {
+            allSubmissions = allSubmissions.filter(s => s.semester_id === activeSemesterId);
+        }
         console.log('✓ Submissions loaded:', allSubmissions.length, 'records');
         if (allSubmissions.length > 0) console.log('Sample submission:', allSubmissions[0]);
 

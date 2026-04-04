@@ -209,6 +209,16 @@ body {
 
 .page-header {
     margin-bottom: 1.8rem;
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    flex-wrap: wrap;
+    gap: 2rem;
+}
+
+.page-header > div:first-child {
+    flex: 1;
+    min-width: 300px;
 }
 
 .page-header h1 {
@@ -222,6 +232,33 @@ body {
 .page-header p {
     font-size: .9rem;
     color: var(--text-muted);
+}
+
+.semester-badge {
+    display: flex;
+    align-items: center;
+    gap: .6rem;
+    background: linear-gradient(135deg, rgba(20, 90, 46, 0.08), rgba(20, 90, 46, 0.04));
+    border: 1.5px solid rgba(20, 90, 46, 0.2);
+    border-radius: 0.65rem;
+    padding: 0.7rem 1.2rem;
+    white-space: nowrap;
+    height: fit-content;
+}
+
+.semester-label {
+    font-size: 0.85rem;
+    font-weight: 600;
+    color: var(--text-muted);
+    text-transform: uppercase;
+    letter-spacing: 0.03em;
+}
+
+.semester-name {
+    font-size: 1rem;
+    font-weight: 700;
+    color: var(--green-mid);
+    font-family: 'Source Sans 3', sans-serif;
 }
 
 .panel {
@@ -384,8 +421,9 @@ body {
 .btn-primary-green {
     display: inline-flex;
     align-items: center;
-    gap: .5rem;
-    padding: .55rem 1.2rem;
+    justify-content: center;
+    gap: .6rem;
+    padding: .65rem 1.5rem;
     background: var(--green-btn);
     color: #fff;
     border: none;
@@ -398,6 +436,7 @@ body {
     box-shadow: 0 3px 10px rgba(20,90,46,.3);
     font-family: 'Source Sans 3', sans-serif;
     text-decoration: none;
+    white-space: nowrap;
 }
 
 .btn-primary-green svg {
