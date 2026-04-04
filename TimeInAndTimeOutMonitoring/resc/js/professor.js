@@ -131,14 +131,14 @@ async function loadProfessorsData() {
 
     } catch (error) {
         console.error('Error loading professors:', error);
-        document.getElementById('professorsTableBody').innerHTML = `<tr><td colspan="8" style="text-align:center;color:red;">Error loading data.</td></tr>`;
+        document.getElementById('professorsTableBody').innerHTML = `<tr><td colspan="7" style="text-align:center;color:red;">Error loading data.</td></tr>`;
     }
 }
 
 function renderTable(data) {
     const tbody = document.getElementById('professorsTableBody');
     if (!data.length) {
-        tbody.innerHTML = `<tr><td colspan="8" style="text-align:center;padding:20px;color:#6b7280;">No professors found.</td></tr>`;
+        tbody.innerHTML = `<tr><td colspan="7" style="text-align:center;padding:20px;color:#6b7280;">No professors found.</td></tr>`;
         return;
     }
 
@@ -166,12 +166,6 @@ function renderTable(data) {
                        <div class="session-badge"><i class="fa-solid fa-chalkboard"></i> ${escapeHtml(prof.inSessionObj.code)}</div>`
                     : `<span class="status-indicator available"><span class="status-dot inactive"></span> Available</span>`
                 }
-            </td>
-            <td>
-                <div class="table-actions">
-                    <button class="action-btn edit" onclick='editProfessor(${JSON.stringify(prof).replace(/'/g, "&#39;")})'><i class="fa-solid fa-edit"></i></button>
-                    <button class="action-btn delete" onclick="deleteProfessor('${prof.professor_id}')"><i class="fa-solid fa-trash"></i></button>
-                </div>
             </td>
         </tr>
     `).join('');
@@ -210,112 +204,8 @@ function initFilters() {
 }
 
 // ────────────────────────────────────────────
-// FORM SUBMISSION & DUPLICATE CHECK
-// ────────────────────────────────────────────
-document.getElementById('professorForm').addEventListener('submit', async function(e) {
-    e.preventDefault();
-    const btn = this.querySelector('.pm-btn-submit');
-    const ogText = btn.innerHTML;
-    btn.disabled = true;
-    btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Saving...';
-
-    const formData = new FormData(this);
-    const id = formData.get('professor_id');
-    const payload = {
-        employee_id: formData.get('employee_id').trim(),
-        first_name: formData.get('first_name').trim(),
-        middle_name: formData.get('middle_name').trim() || null,
-        last_name: formData.get('last_name').trim(),
-        department: formData.get('department').trim() || null,
-        email: formData.get('email').trim(),
-        status: formData.get('status')
-    };
-
-    try {
-        // 1. Check Duplicates manually
-        let dupQuery = supabaseClient.from('professors').select('professor_id, employee_id, email').or(`employee_id.eq.${payload.employee_id},email.eq.${payload.email}`);
-        if (id) dupQuery = dupQuery.neq('professor_id', id);
-        
-        const { data: dups } = await dupQuery;
-        if (dups && dups.length > 0) {
-            showValidationError("Duplicate found: This Employee ID or Email is already registered.");
-            btn.disabled = false; btn.innerHTML = ogText;
-            return;
-        }
-
-        // 2. Save Professor
-        // 🚨 IMPORTANT AUTH CONSTRAINT NOTE:
-        // If this is a NEW professor (no id), you CANNOT just insert into the 'professors' table 
-        // if your Auth constraint (REFERENCES auth.users(id)) is active. 
-        // 
-        // To do this securely in a production app, you should replace the IF block below with a fetch() call
-        // to a Supabase Edge Function built by your Auth team.
-        
-        if (id) {
-            // Update existing
-            const { error } = await supabaseClient.from('professors').update(payload).eq('professor_id', id);
-            if (error) throw error;
-        } else {
-            // Insert new (Requires disabled constraint OR a standalone UUID generated here)
-            payload.professor_id = crypto.randomUUID(); 
-            // In a real system, you'd generate the auth user first, then pass the auth user ID here!
-            payload.password = formData.get('password'); // (Only if your system handles hashing elsewhere)
-            const { error } = await supabaseClient.from('professors').insert([payload]);
-            if (error) throw error;
-        }
-
-        showToast("Professor saved successfully!");
-        closeModal('professorModal');
-        await loadProfessorsData(); // Reload table
-        
-    } catch (err) {
-        showValidationError("Error saving: " + err.message);
-    } finally {
-        btn.disabled = false;
-        btn.innerHTML = ogText;
-    }
-});
-
-// ────────────────────────────────────────────
 // MODALS & UTILS
 // ────────────────────────────────────────────
-function openAddModal() {
-    document.getElementById('professorForm').reset();
-    document.getElementById('professorId').value = '';
-    document.getElementById('modalTitleText').textContent = 'Add Professor';
-    document.getElementById('passwordRequired').style.display = 'inline';
-    document.getElementById('passwordHint').style.display = 'block';
-    document.getElementById('professorModal').classList.add('active');
-}
-
-function editProfessor(prof) {
-    document.getElementById('professorId').value = prof.professor_id;
-    document.getElementById('employeeId').value = prof.employee_id;
-    document.getElementById('firstName').value = prof.first_name;
-    document.getElementById('middleName').value = prof.middle_name || '';
-    document.getElementById('lastName').value = prof.last_name;
-    document.getElementById('department').value = prof.department || '';
-    document.getElementById('email').value = prof.email;
-    document.getElementById('status').value = prof.status;
-    
-    document.getElementById('modalTitleText').textContent = 'Edit Professor';
-    document.getElementById('passwordRequired').style.display = 'none';
-    document.getElementById('passwordHint').style.display = 'none';
-    document.getElementById('professorModal').classList.add('active');
-}
-
-async function deleteProfessor(id) {
-    if(!confirm("Are you sure you want to remove this professor?")) return;
-    try {
-        const { error } = await supabaseClient.from('professors').delete().eq('professor_id', id);
-        if(error) throw error;
-        showToast("Professor removed.");
-        loadProfessorsData();
-    } catch (err) {
-        alert("Error: " + err.message);
-    }
-}
-
 function openFaceRegModal(employeeId) {
     document.getElementById('profIdSearch').value = employeeId;
     document.getElementById('faceRegModal').classList.add('active');
@@ -333,14 +223,11 @@ function showToast(msg) {
     setTimeout(() => t.classList.remove('on'), 3000);
 }
 
-function showValidationError(msg) {
-    alert(msg); // Simplified for separation. In production, append to DOM as done in PHP version.
-}
-
 function escapeHtml(str) {
     if (!str) return '';
     return String(str).replace(/[&<>"']/g, m => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[m]));
 }
+
 // ────────────────────────────────────────────
 // REPORT MODAL LOGIC (With Duplicate Prevention & Green Banner)
 // ────────────────────────────────────────────
@@ -453,7 +340,6 @@ async function autoSaveReport(exportType) {
         if (error) throw error;
         
         if (exportType === 'Manual Save') {
-            // Use your system's toast notification if available, otherwise fallback to alert
             if (typeof showToast === 'function') showToast('Report saved successfully!', true);
             else alert('Report saved successfully!');
         } else {
@@ -528,7 +414,7 @@ async function printReport() {
         table{width:100%;border-collapse:collapse; margin-top: 10px;}
         th{background:#166534;color:#fff;padding:8px 10px;text-align:center;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.5px; -webkit-print-color-adjust: exact; print-color-adjust: exact;}
         td{padding:8px 10px;border-bottom:1px solid #e5e7eb;font-size:11px; text-align:center;}
-        td:nth-child(2), td:nth-child(3), td:nth-child(4), td:nth-child(5), td:nth-child(6), td:nth-child(11) {text-align:left;} /* Left align Names and text */
+        td:nth-child(2), td:nth-child(3), td:nth-child(4), td:nth-child(5), td:nth-child(6), td:nth-child(11) {text-align:left;}
         tr:nth-child(even){background:#f9fafb; -webkit-print-color-adjust: exact; print-color-adjust: exact;}
         .footer{margin-top:20px;text-align:center;font-size:10px;color:#9ca3af;border-top:1px solid #e5e7eb;padding-top:10px}
         @media print{body{padding:0px}}
@@ -577,7 +463,6 @@ async function downloadPDF() {
         const nowStr  = `${dateStr} at ${timeStr}`;
         const pageW   = doc.internal.pageSize.width;
 
-        // Helper to safely load the logos
         function loadImage(src) {
             return new Promise((resolve) => {
                 const img = new Image();
@@ -603,18 +488,15 @@ async function downloadPDF() {
         ]);
 
         const centerX = pageW / 2;
-        const headerHeight = 45; // Height of the green banner
+        const headerHeight = 45;
         
-        // ── DRAW SOLID GREEN BANNER ──
         doc.setFillColor(22, 101, 52); 
         doc.rect(0, 0, pageW, headerHeight, 'F');
         
-        // ── LOGOS ──
         const logoSize = 18;
         if (plpData) doc.addImage(plpData, 'PNG', centerX - 85, 8, logoSize, logoSize);
         if (ccsData) doc.addImage(ccsData, 'PNG', centerX + 67, 8, logoSize, logoSize);
 
-        // ── CENTERED HEADER TEXT ──
         doc.setFontSize(16); 
         doc.setTextColor(255, 255, 255); 
         doc.setFont('helvetica', 'bold');
@@ -635,7 +517,6 @@ async function downloadPDF() {
         doc.setFont('helvetica', 'normal');
         doc.text(`Generated: ${nowStr}  ·  Total Professors: ${META.total}  ·  Face Registered: ${META.facial}  ·  Active Schedules: ${META.schedules}`, centerX, 36, { align: 'center' });
 
-        // ── AUTO-EXPANDING CLEAN TABLE ──
         const head = [['#','Emp ID','Last Name','First Name','M.I.','Department','Face Status','Status','Schedules','Sessions Done','Subjects']];
         const body = reportRows.map((r, i) => {
             const mi = r.middle_name ? r.middle_name.substring(0,2) + '.' : '—';
@@ -667,7 +548,7 @@ async function downloadPDF() {
                 7: { cellWidth: 15, halign: 'center', fontStyle: 'bold' },
                 8: { cellWidth: 20, halign: 'center' },
                 9: { cellWidth: 20, halign: 'center' },
-                10: { cellWidth: 'auto' } // Subjects
+                10: { cellWidth: 'auto' }
             },
             didParseCell(d) {
                 if (d.column.index === 6 && d.section === 'body') {
@@ -750,6 +631,5 @@ async function exportExcel() {
 
 // Stubs for real-time validation visual feedback
 function initRealTimeValidation() {
-    // Example: You can wire up the input blur events here similarly to how it was done, 
-    // replacing the PHP fetch calls with supabaseClient.from().select() calls.
+    // Wired up via supabaseClient.from().select() calls as needed.
 }

@@ -5,35 +5,33 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Dashboard | Laboratory Attendance System</title>
 
-    <!-- Fonts -->
     <link href="https://fonts.googleapis.com/css2?family=Nunito:wght@300;400;600;700;800&family=Nunito+Sans:wght@300;400;500;600;700&display=swap" rel="stylesheet">
 
-    <!-- Font Awesome -->
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
 
-    <!-- Shared component styles: header + sidebar -->
     <link rel="stylesheet" href="../resc/css/header.css">
     <link rel="stylesheet" href="../resc/css/nav.css">
 
-    <!-- Page-specific styles -->
     <link rel="stylesheet" href="../resc/css/dashboard.css">
 </head>
 <body>
 
-    <!-- Shared header injected by sidebar.js -->
     <div id="header-container"></div>
 
-    <!-- Shared sidebar injected by sidebar.js -->
     <div id="sidebar-container"></div>
 
-    <!-- Main content — pushed right of sidebar, below header via dashboard.css -->
     <main class="main-content">
         <div class="container">
 
-            <h1>Dashboard</h1>
+            <div class="page-header">
+                <div class="header-titles">
+                    <h1><i class="fa-solid fa-chart-pie"></i> Dashboard</h1>
+                    <p>Real-time overview of laboratory usage, attendance, and system metrics</p>
+                </div>
+            </div>
+            
             <hr>
 
-            <!-- Profile Section -->
             <section class="profile-section">
                 <div class="profile-card" id="profileCard">
                     <div class="profile-picture">
@@ -53,7 +51,6 @@
                 </div>
             </section>
 
-            <!-- Summary Cards -->
             <section class="summary-section">
                 <div class="cards">
                     <div class="card event-card">
@@ -110,7 +107,6 @@
                 </div>
             </section>
 
-            <!-- Laboratory Status Section -->
             <section class="lab-section">
                 <div class="lab-header-title">
                     <i class="fa-solid fa-building"></i>
@@ -123,21 +119,16 @@
                 </div>
             </section>
 
-        </div><!-- /.container -->
-    </main>
+        </div></main>
 
-    <!-- Supabase -->
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <script src="../../config/.env.js"></script>
     <script src="../../config/config.js"></script>
 
-    <!-- Shared header + sidebar loader -->
     <script src="../includes/sidebar.js"></script>
 
-    <!-- Page logic -->
     <script src="../resc/js/dashboard.js"></script>
 
-    <!-- Inject header & sidebar, mark Dashboard as active -->
     <script>
         loadHeader();
         loadSidebar('dashboard');

@@ -58,19 +58,29 @@ hr {
     border: none; margin: 0 0 24px; border-radius: 2px;
 }
 
-/* ── BUTTONS ── */
-.btn-report {
-    padding: 10px 20px; background: var(--white);
-    color: var(--green-dark); border: 1.5px solid var(--green-bright);
-    border-radius: var(--radius); font-size: 14px; font-weight: 700; 
-    cursor: pointer; display: inline-flex; align-items: center; gap: 8px;
-    transition: all .2s; font-family: 'Nunito', sans-serif;
-}
-.btn-report:hover {
-    background: var(--green-dark); color: var(--white);
-    border-color: var(--green-dark); transform: translateY(-1px);
+
+.btn-report { 
+    padding: 9px 18px; 
+    background: #dcfce7;          /* Soft light green background */
+    color: #166534;               /* Signature dark green text for contrast */
+    border: 1.5px solid #bbf7d0;  /* Slightly darker green border */
+    border-radius: 8px; 
+    font-size: 13.5px; 
+    font-weight: 800; 
+    cursor: pointer; 
+    display: inline-flex; 
+    align-items: center; 
+    gap: 8px; 
+    transition: all .2s ease; 
+    font-family: 'Nunito Sans', sans-serif; 
+    margin-left: auto;            /* Keeps it grouped with the Add button */
 }
 
+.btn-report:hover { 
+    background: #bbf7d0;          /* Slightly darker pastel green on hover */
+    transform: translateY(-2px); 
+    box-shadow: 0 4px 12px rgba(22, 101, 52, 0.15); /* Soft green shadow */
+}
 /* ── FILTER PILLS ── */
 .pills { display: flex; flex-wrap: wrap; gap: 10px; margin-bottom: 24px; }
 .pill {
@@ -224,6 +234,8 @@ tbody tr:hover { background: var(--surface); }
     from { opacity: 0; transform: scale(.88) translateY(14px); }
     to   { opacity: 1; transform: scale(1) translateY(0); }
 }
+
+
 /* ── REPORT MODAL (Laboratories Theme) ── */
 .rm-box {
     background: white; border-radius: 14px; width: 96%; max-width: 1150px; max-height: 93vh;
@@ -266,12 +278,21 @@ tbody tr:hover { background: var(--surface); }
 
 .rm-body { overflow-y: auto; flex: 1; background: white; }
 .rm-table { width: 100%; border-collapse: collapse; font-size: 13.5px; }
-
 .rm-table thead th {
-    background: #166534; color: white; padding: 12px 16px;
-    text-align: left; font-size: 11px; font-weight: 800; font-family: 'Nunito', sans-serif;
-    text-transform: uppercase; letter-spacing: .6px; white-space: nowrap; position: sticky; top: 0; z-index: 2;
-    border-right: 1px solid rgba(255,255,255,.2); /* Adds the vertical header dividers */
+    background: linear-gradient(90deg, #166534, #14532d); /* ← Updated to the standard gradient */
+    color: white; 
+    padding: 11px 14px; /* Matched padding to standard modal */
+    text-align: left; 
+    font-size: 10.5px; 
+    font-weight: 800; 
+    font-family: 'Nunito', sans-serif;
+    text-transform: uppercase; 
+    letter-spacing: .6px; 
+    white-space: nowrap; 
+    position: sticky; 
+    top: 0; 
+    z-index: 2;
+    border-right: 1px solid rgba(255,255,255,.2); 
     border-bottom: none;
 }
 .rm-table thead th:last-child { border-right: none; }

@@ -1,7 +1,7 @@
 import sys, io
 sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding='utf-8')
 
-import os, signal, warnings, datetime, queue, threading, json
+import os, signal, warnings, datetime, queue, threading, json, time
 import numpy as np
 import cv2
 import face_recognition
@@ -29,7 +29,7 @@ CORS(app)
 
 attendee_queue = queue.Queue()
 recently_seen  = {}
-COOLDOWN_SECS  = 5
+COOLDOWN_SECS  = 15
 
 PROFESSOR_START_WINDOW = 45
 STUDENT_GRACE_MINUTES  = 15
@@ -38,11 +38,8 @@ thread_pool = ThreadPoolExecutor(max_workers=3)
 
 # ─────────────────────────────────────────────
 # Timezone-safe datetime parser
-# Supabase returns timestamptz as "2024-01-15T08:30:00+00:00"
-# We convert it to local Philippine time (naive) for duration math.
 # ─────────────────────────────────────────────
 def parse_dt(value) -> datetime.datetime:
-    """Parse a Supabase timestamptz string into a naive LOCAL datetime."""
     if value is None:
         return None
     s = str(value).replace('Z', '+00:00')
@@ -57,12 +54,10 @@ def parse_dt(value) -> datetime.datetime:
 
 # ─────────────────────────────────────────────
 # now_store / now_local helpers
-# now_store → UTC-aware  → stored correctly in Supabase timestamptz
-# now_local → naive local → used for duration math (matches parse_dt output)
 # ─────────────────────────────────────────────
 def get_now():
-    now_store = datetime.datetime.now(datetime.timezone.utc)   # for DB writes
-    now_local = datetime.datetime.now()                        # for duration calc
+    now_store = datetime.datetime.now(datetime.timezone.utc)
+    now_local = datetime.datetime.now()
     return now_store, now_local
 
 # ─────────────────────────────────────────────
@@ -94,7 +89,6 @@ def load_encodings_from_storage(cloud_folder, meta):
                 if img is None:
                     continue
                 rgb_img = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
-                # Change num_jitters=1 to 0
                 encs = face_recognition.face_encodings(rgb_img)
                 if encs:
                     known_encodings.append(encs[0])
@@ -163,6 +157,66 @@ def load_all_faces():
 load_all_faces()
 
 # ─────────────────────────────────────────────
+# FIX 1: Session Cache (eliminates repeated DB calls)
+# ─────────────────────────────────────────────
+schedule_cache   = {}   # { student_id: [(schedule_id, start, end, day)] }
+session_cache    = {}   # { schedule_id: (session_id, status) }
+attendance_cache = {}   # { (session_id, student_id): record }
+cache_lock       = threading.Lock()
+last_cache_refresh = 0
+CACHE_TTL        = 60   # seconds
+
+def refresh_session_cache():
+    global last_cache_refresh
+    today = datetime.date.today()
+    try:
+        result = supabase.table("lab_sessions")\
+            .select("session_id, schedule_id, status")\
+            .eq("session_date", str(today))\
+            .execute()
+        with cache_lock:
+            session_cache.clear()
+            for row in (result.data or []):
+                session_cache[row["schedule_id"]] = (row["session_id"], row["status"])
+        last_cache_refresh = time.time()
+        print(f"✓ Session cache refreshed: {len(session_cache)} sessions")
+    except Exception as e:
+        print(f"⚠ Session cache refresh failed: {e}")
+
+def get_session_cached(schedule_id):
+    if time.time() - last_cache_refresh > CACHE_TTL:
+        threading.Thread(target=refresh_session_cache, daemon=True).start()
+    with cache_lock:
+        return session_cache.get(schedule_id, (None, "not_created"))
+
+def update_session_cache(schedule_id, session_id, status):
+    with cache_lock:
+        session_cache[schedule_id] = (session_id, status)
+
+def get_attendance_cached(session_id, student_id):
+    key = (session_id, student_id)
+    with cache_lock:
+        if key in attendance_cache:
+            return attendance_cache[key]
+    # Not in cache — fetch from DB
+    result = supabase.table("lab_attendance")\
+        .select("attendance_id, time_in, time_out")\
+        .eq("session_id", session_id)\
+        .eq("student_id", student_id)\
+        .execute()
+    rec = result.data[0] if result.data else None
+    with cache_lock:
+        attendance_cache[key] = rec
+    return rec
+
+def invalidate_attendance_cache(session_id, student_id):
+    with cache_lock:
+        attendance_cache.pop((session_id, student_id), None)
+
+# Call at startup
+refresh_session_cache()
+
+# ─────────────────────────────────────────────
 # Time helper
 # ─────────────────────────────────────────────
 def td_to_secs(td):
@@ -192,13 +246,8 @@ def find_professor_schedule(professor_id, today):
     output    = []
 
     for sch in schedules:
-        sess_result = supabase.table("lab_sessions")\
-            .select("session_id, status")\
-            .eq("schedule_id", sch["schedule_id"])\
-            .eq("session_date", str(today))\
-            .execute()
-
-        session = sess_result.data[0] if sess_result.data else None
+        # FIX 1: Use cache instead of individual DB call per schedule
+        session_id, session_status = get_session_cached(sch["schedule_id"])
 
         output.append({
             "schedule_id":    sch["schedule_id"],
@@ -207,68 +256,60 @@ def find_professor_schedule(professor_id, today):
             "lab_code":       sch["laboratory_rooms"]["lab_code"] if sch.get("laboratory_rooms") else "N/A",
             "start_time":     sch["start_time"] or "00:00:00",
             "end_time":       sch["end_time"]   or "00:00:00",
-            "session_id":     session["session_id"] if session else None,
-            "session_status": session["status"]     if session else "not_created",
+            "session_id":     session_id,
+            "session_status": session_status,
         })
 
     return output
 
 
+# FIX 2: Batched student query — one joined query instead of two
 def find_student_schedule(student_id, today):
     day_name = today.strftime("%A")
     print(f"  [find_student_schedule] student_id={student_id} day={day_name} date={today}")
 
-    enroll_result = supabase.table("schedule_enrollments")\
-        .select("schedule_id")\
+    # Single joined query replaces the old two-step enrollment → schedule lookup
+    result = supabase.table("schedule_enrollments")\
+        .select("schedule_id, lab_schedules!inner(schedule_id, start_time, end_time, day_of_week, status)")\
         .eq("student_id", student_id)\
         .eq("status", "enrolled")\
         .execute()
 
-    enrolled_ids = [e["schedule_id"] for e in (enroll_result.data or [])]
-    print(f"  [find_student_schedule] enrolled_ids={enrolled_ids}")
+    rows = result.data or []
+    print(f"  [find_student_schedule] enrolled rows={len(rows)}")
 
-    if not enrolled_ids:
+    if not rows:
         print(f"  [find_student_schedule] → NO ENROLLMENTS FOUND")
         return None
 
-    sched_result = supabase.table("lab_schedules")\
-        .select("schedule_id, start_time, end_time, day_of_week, status")\
-        .in_("schedule_id", enrolled_ids)\
-        .eq("day_of_week", day_name)\
-        .eq("status", "active")\
-        .order("start_time")\
-        .execute()
+    # Filter to today's active schedules locally (no extra DB round-trip)
+    matching = [
+        r for r in rows
+        if r.get("lab_schedules") and
+           r["lab_schedules"].get("day_of_week") == day_name and
+           r["lab_schedules"].get("status") == "active"
+    ]
+    print(f"  [find_student_schedule] schedules matching today+active={len(matching)}")
 
-    schedules = sched_result.data or []
-    print(f"  [find_student_schedule] schedules matching today+active={schedules}")
-
-    if not schedules:
+    if not matching:
         print(f"  [find_student_schedule] → NO ACTIVE SCHEDULES FOR TODAY")
         return None
-
-    schedule_ids = [s["schedule_id"] for s in schedules]
-    sess_result  = supabase.table("lab_sessions")\
-        .select("session_id, schedule_id, status")\
-        .in_("schedule_id", schedule_ids)\
-        .eq("session_date", str(today))\
-        .execute()
-
-    sessions_by_schedule = {s["schedule_id"]: s for s in (sess_result.data or [])}
-    print(f"  [find_student_schedule] sessions_today={sessions_by_schedule}")
 
     best, priority     = None, 99
     cancelled_fallback = None
 
-    for sch in schedules:
-        sess           = sessions_by_schedule.get(sch["schedule_id"])
-        session_status = sess["status"] if sess else "not_created"
-        session_id     = sess["session_id"] if sess else None
+    for row in matching:
+        sch        = row["lab_schedules"]
+        schedule_id = sch["schedule_id"]
 
-        print(f"  [find_student_schedule] checking schedule={sch['schedule_id']} session_status={session_status}")
+        # FIX 1: Use session cache instead of a DB call
+        session_id, session_status = get_session_cached(schedule_id)
+
+        print(f"  [find_student_schedule] checking schedule={schedule_id} session_status={session_status}")
 
         if session_status == "cancelled":
             if cancelled_fallback is None:
-                cancelled_fallback = (sch["schedule_id"], sch["start_time"], sch["end_time"],
+                cancelled_fallback = (schedule_id, sch["start_time"], sch["end_time"],
                                       session_id, "cancelled")
             continue
 
@@ -276,7 +317,7 @@ def find_student_schedule(student_id, today):
                 'not_created': 3, 'completed': 4}.get(session_status, 5)
         if rank < priority:
             priority = rank
-            best = (sch["schedule_id"], sch["start_time"], sch["end_time"],
+            best = (schedule_id, sch["start_time"], sch["end_time"],
                     session_id, session_status)
         if priority == 1:
             break
@@ -289,14 +330,10 @@ def find_student_schedule(student_id, today):
 
 
 def get_or_create_session(schedule_id, today):
-    result = supabase.table("lab_sessions")\
-        .select("session_id, status")\
-        .eq("schedule_id", schedule_id)\
-        .eq("session_date", str(today))\
-        .execute()
-
-    if result.data:
-        return result.data[0]["session_id"], result.data[0]["status"]
+    # FIX 1: Check cache first
+    session_id, status = get_session_cached(schedule_id)
+    if session_id:
+        return session_id, status
 
     now_store, _ = get_now()
     insert_result = supabase.table("lab_sessions").insert({
@@ -306,7 +343,9 @@ def get_or_create_session(schedule_id, today):
         "created_at":   now_store.isoformat()
     }).execute()
 
-    return insert_result.data[0]["session_id"], "scheduled"
+    new_id = insert_result.data[0]["session_id"]
+    update_session_cache(schedule_id, new_id, "scheduled")
+    return new_id, "scheduled"
 
 # ─────────────────────────────────────────────
 # Shared state for threading
@@ -317,23 +356,22 @@ latest_frame       = None
 recognition_result = {"locations": [], "labels": [], "colors": []}
 
 # ─────────────────────────────────────────────
-# Recognition worker thread
+# FIX 3: Recognition worker with frame skipping
 # ─────────────────────────────────────────────
 def recognition_worker():
     global latest_frame
-    skip = 0
+    frame_skip = 0
     while True:
         with frame_lock:
             if latest_frame is None:
                 continue
             frame = latest_frame.copy()
 
-        skip += 1
-        if skip % 2 != 0:
-
+        # FIX 3: Skip every other frame to reduce CPU load
+        frame_skip += 1
+        if frame_skip % 2 != 0:
             continue
 
-        # Change 0.25 to 0.2 — less pixels = faster detection
         small = cv2.resize(frame, (0, 0), fx=0.2, fy=0.2)
         rgb   = cv2.cvtColor(small, cv2.COLOR_BGR2RGB)
         locs  = face_recognition.face_locations(rgb, model="hog")
@@ -368,13 +406,12 @@ def recognition_worker():
 
                 if not last or (datetime.datetime.now() - last).total_seconds() >= COOLDOWN_SECS:
                     recently_seen[key] = datetime.datetime.now()
-                        # ── Push instant popup IMMEDIATELY before any DB queries ──
                     _push({
                        "role":   meta["role"],
                        "name":   meta["name"],
                        "action": "LOADING",
                        "timestamp": datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-                    })   
+                    })
                     thread_pool.submit(handle_recognized, meta,
                                        datetime.date.today(), datetime.datetime.now())
             else:
@@ -466,6 +503,8 @@ def _handle_professor(meta, today, now):
             }).execute()
             session_id     = insert_result.data[0]["session_id"]
             session_status = "scheduled"
+            # FIX 1: Update cache after creating session
+            update_session_cache(schedule_id, session_id, session_status)
 
         # Auto-void if past start window
         if session_status == "scheduled" and now > void_cutoff:
@@ -476,6 +515,8 @@ def _handle_professor(meta, today, now):
                 "notes":      f"Auto-voided: professor did not start within {PROFESSOR_START_WINDOW} minutes",
                 "updated_at": now_store.isoformat()
             }).eq("session_id", session_id).execute()
+            # FIX 1: Update cache after voiding
+            update_session_cache(schedule_id, session_id, "cancelled")
             print(f"     → Voided session {session_id}, continuing...")
             continue
 
@@ -581,12 +622,8 @@ def _handle_student(meta, today, now):
         else:
             print(f"  → ON TIME (grace cutoff {grace_cutoff:%I:%M %p})")
 
-    att_result = supabase.table("lab_attendance")\
-        .select("attendance_id, time_in, time_out")\
-        .eq("session_id", session_id)\
-        .eq("student_id", sid)\
-        .execute()
-    rec = att_result.data[0] if att_result.data else None
+    # FIX 4: Use attendance cache instead of direct DB call
+    rec = get_attendance_cached(session_id, sid)
 
     if rec is None:
         action = "IN"
@@ -639,6 +676,9 @@ def generate_frames():
 # ─────────────────────────────────────────────
 # /confirm_attendance
 # ─────────────────────────────────────────────
+# ─────────────────────────────────────────────
+# /confirm_attendance
+# ─────────────────────────────────────────────
 @app.route('/confirm_attendance', methods=['POST'])
 def confirm_attendance():
     data       = request.get_json()
@@ -646,9 +686,6 @@ def confirm_attendance():
     session_id = data.get("session_id")
     action     = data.get("action")
 
-    # ── FIX: two separate now values ──
-    # now_store → UTC-aware, stored correctly in Supabase timestamptz
-    # now_local → naive local time, used for duration math with parse_dt()
     now_store, now_local = get_now()
 
     no_db = {"NO_SCHEDULE","NOT_ENROLLED","SESSION_NOT_STARTED","SESSION_ENDED",
@@ -659,7 +696,6 @@ def confirm_attendance():
         return jsonify({"success": False, "message": "Missing session_id"}), 400
 
     try:
-        # Block time-out if session is still 'ongoing'
         if action == "OUT":
             sess_result = supabase.table("lab_sessions")\
                 .select("status")\
@@ -677,48 +713,57 @@ def confirm_attendance():
         rec = att_result.data[0] if att_result.data else None
 
         if rec is None:
-            # TIME IN — store UTC timestamp
             is_late      = data.get("is_late", False)
             late_minutes = int(data.get("late_minutes", 0))
             time_status  = "late" if is_late else "on-time"
             supabase.table("lab_attendance").insert({
                 "session_id":                     session_id,
                 "student_id":                     student_id,
-                "time_in":                        now_store.isoformat(),  # ← UTC
+                "time_in":                        now_store.isoformat(),
                 "time_in_status":                 time_status,
                 "late_minutes":                   late_minutes,
                 "verified_by_facial_recognition": True,
-                "created_at":                     now_store.isoformat()   # ← UTC
+                "created_at":                     now_store.isoformat()
             }).execute()
+            # Invalidate cache so next scan gets fresh data
+            invalidate_attendance_cache(session_id, student_id)
+            # Reset cooldown so popup won't re-trigger immediately after Time IN
+            if student_id:
+                recently_seen[f"student_{student_id}"] = datetime.datetime.now()
             msg = f"Time IN recorded ✅ — {'⚠ LATE by '+str(late_minutes)+' min' if is_late else 'On Time'}"
             return jsonify({"success": True, "message": msg})
 
         if rec["time_in"] and not rec["time_out"]:
-            # TIME OUT — parse stored UTC time to local, compute duration with local now
-            time_in_dt = parse_dt(rec["time_in"])           # → local naive
-            duration   = int((now_local - time_in_dt).total_seconds() / 60)  # both local
+            time_in_dt = parse_dt(rec["time_in"])
+            duration   = int((now_local - time_in_dt).total_seconds() / 60)
             supabase.table("lab_attendance").update({
-                "time_out":         now_store.isoformat(),  # ← UTC
-                "duration_minutes": duration,               # ← positive ✓
-                "updated_at":       now_store.isoformat()   # ← UTC
+                "time_out":         now_store.isoformat(),
+                "duration_minutes": duration,
+                "updated_at":       now_store.isoformat()
             }).eq("attendance_id", rec["attendance_id"]).execute()
+            # Invalidate cache after time-out
+            invalidate_attendance_cache(session_id, student_id)
+            # Reset cooldown so popup won't re-trigger immediately after Time OUT
+            if student_id:
+                recently_seen[f"student_{student_id}"] = datetime.datetime.now()
             return jsonify({"success": True, "message": "Time OUT recorded ✅"})
 
         return jsonify({"success": True, "message": "Attendance already complete ✔"})
 
     except Exception as e:
         return jsonify({"success": False, "message": str(e)}), 500
-
 # ─────────────────────────────────────────────
 # /confirm_session
 # ─────────────────────────────────────────────
 @app.route('/confirm_session', methods=['POST'])
 def confirm_session():
-    data       = request.get_json()
-    session_id = data.get("session_id")
-    action     = data.get("action")
+    data        = request.get_json()
+    session_id  = data.get("session_id")
+    action      = data.get("action")
+    schedule    = data.get("schedule", {})
+    schedule_id = schedule.get("schedule_id") if schedule else None
+    professor_id = data.get("professor_id")
 
-    # ── FIX: two separate now values ──
     now_store, now_local = get_now()
 
     no_db = {"NO_SCHEDULE","TOO_EARLY","SCHEDULE_ENDED","SESSION_VOIDED",
@@ -732,44 +777,64 @@ def confirm_session():
         if action == "START":
             supabase.table("lab_sessions").update({
                 "status":            "ongoing",
-                "actual_start_time": now_local.time().isoformat(),  # ← local time string (HH:MM:SS)
-                "updated_at":        now_store.isoformat()          # ← UTC timestamp
+                "actual_start_time": now_local.time().isoformat(),
+                "updated_at":        now_store.isoformat()
             }).eq("session_id", session_id).execute()
+            # Update session cache after state change
+            if schedule_id:
+                update_session_cache(schedule_id, session_id, "ongoing")
+            # Reset cooldown so popup won't re-trigger immediately
+            if professor_id:
+                recently_seen[f"professor_{professor_id}"] = datetime.datetime.now()
             return jsonify({"success": True,
                             "message": f"✅ Session started — Students have {STUDENT_GRACE_MINUTES} min grace period"})
 
         if action == "DISMISS":
             supabase.table("lab_sessions").update({
                 "status":              "dismissing",
-                "actual_dismiss_time": now_local.time().isoformat(),  # ← local time string
-                "updated_at":          now_store.isoformat()          # ← UTC timestamp
+                "actual_dismiss_time": now_local.time().isoformat(),
+                "updated_at":          now_store.isoformat()
             }).eq("session_id", session_id).execute()
+            # Update session cache after state change
+            if schedule_id:
+                update_session_cache(schedule_id, session_id, "dismissing")
+            # Reset cooldown so popup won't re-trigger immediately
+            if professor_id:
+                recently_seen[f"professor_{professor_id}"] = datetime.datetime.now()
             return jsonify({"success": True,
                             "message": "✅ Dismissal mode ON — Students may now time out"})
 
         if action == "END":
             supabase.table("lab_sessions").update({
                 "status":          "completed",
-                "actual_end_time": now_local.time().isoformat(),  # ← local time string
-                "updated_at":      now_store.isoformat()          # ← UTC timestamp
+                "actual_end_time": now_local.time().isoformat(),
+                "updated_at":      now_store.isoformat()
             }).eq("session_id", session_id).execute()
+            # Update session cache after state change
+            if schedule_id:
+                update_session_cache(schedule_id, session_id, "completed")
+            # Reset cooldown so popup won't re-trigger immediately
+            if professor_id:
+                recently_seen[f"professor_{professor_id}"] = datetime.datetime.now()
 
             # Auto time-out remaining students
             att_result = supabase.table("lab_attendance")\
-                .select("attendance_id, time_in")\
+                .select("attendance_id, time_in, student_id")\
                 .eq("session_id", session_id)\
                 .not_.is_("time_in", "null")\
                 .is_("time_out", "null")\
                 .execute()
 
             for att in (att_result.data or []):
-                time_in_dt = parse_dt(att["time_in"])           # → local naive
-                duration   = int((now_local - time_in_dt).total_seconds() / 60)  # both local
+                time_in_dt = parse_dt(att["time_in"])
+                duration   = int((now_local - time_in_dt).total_seconds() / 60)
                 supabase.table("lab_attendance").update({
-                    "time_out":         now_store.isoformat(),  # ← UTC
-                    "duration_minutes": duration,               # ← positive ✓
-                    "updated_at":       now_store.isoformat()   # ← UTC
+                    "time_out":         now_store.isoformat(),
+                    "duration_minutes": duration,
+                    "updated_at":       now_store.isoformat()
                 }).eq("attendance_id", att["attendance_id"]).execute()
+                # Invalidate attendance cache for auto-timed-out students
+                invalidate_attendance_cache(session_id, att["student_id"])
 
             return jsonify({"success": True,
                             "message": "✅ Session ended — remaining students timed out"})
@@ -778,7 +843,6 @@ def confirm_session():
 
     except Exception as e:
         return jsonify({"success": False, "message": str(e)}), 500
-
 # ─────────────────────────────────────────────
 # SSE + Video
 # ─────────────────────────────────────────────
@@ -837,7 +901,7 @@ h2{color:#22c55e;font-size:1.25rem;letter-spacing:1px;display:flex;align-items:c
 #card{background:#161b2e;border-radius:18px;padding:30px 28px 26px;
       max-width:400px;width:92%;border:2px solid #1e3a5f;text-align:center;
       box-shadow:0 16px 48px rgba(0,0,0,.7);
-      animation:pop .28s cubic-bezier(.34,1.56,.64,1)}
+      animation:pop .1s ease-out}
 @keyframes pop{from{opacity:0;transform:scale(.82) translateY(18px)}
                to  {opacity:1;transform:scale(1)  translateY(0)}}
 #card.green{border-color:#166534}
@@ -907,7 +971,6 @@ function show(data) {
   payload = data;
   const action = data.action || '', role = data.role || 'student', isErr = ERR_ACTIONS.has(action);
 
-  // ── LOADING: show popup instantly while DB queries run ──
   if (action === 'LOADING') {
     const av = document.getElementById('av');
     av.className = 'avatar ' + (role === 'professor' ? 'av-prof' : 'av-student');
@@ -920,10 +983,39 @@ function show(data) {
     msgEl.className = 'mi';
     document.getElementById('btnOk').style.display = 'none';
     document.getElementById('overlay').classList.add('on');
-    return; // wait for the real action to arrive
-}
+    return;
+  }
 
-} // ← this closing brace was missing — closes the show() function
+  const card = document.getElementById('card');
+  card.dataset.isLate = data.is_late ? '1' : '0';
+  card.dataset.lateMinutes = data.late_minutes || 0;
+
+  const av = document.getElementById('av');
+  if (isErr) { av.className = 'avatar av-err'; av.textContent = '❌'; card.className = 'red'; }
+  else if (action === 'DISMISS') { av.className = 'avatar av-dismiss'; av.textContent = '🚪'; card.className = 'orange'; }
+  else if (data.is_late) { av.className = 'avatar av-warn'; av.textContent = '⚠'; card.className = 'amber'; }
+  else { av.className = 'avatar ' + (role === 'professor' ? 'av-prof' : 'av-student'); av.textContent = role === 'professor' ? '👨‍🏫' : '🎓'; card.className = 'green'; }
+
+  document.getElementById('cardName').textContent = data.name || '';
+  document.getElementById('cardRole').textContent = role === 'professor' ? 'Professor' : 'Student';
+
+  const msgObj = resolveMsg(data, isErr);
+  const msgEl = document.getElementById('cardMsg');
+  msgEl.textContent = msgObj.txt;
+  msgEl.className = msgObj.cls;
+
+  const btn = document.getElementById('btnOk');
+  btn.style.display = isErr ? 'none' : 'block';
+  btn.className = 'btn';
+  if (action === 'DISMISS') btn.classList.add('dismiss-btn');
+  if (action === 'END') btn.classList.add('end-btn');
+  btn.textContent = label(action);
+
+  document.getElementById('overlay').classList.add('on');
+
+  remaining = 4; updateCD();
+  cd = setInterval(() => { remaining--; updateCD(); if (remaining <= 0) dismiss(); }, 1000);
+}
 
 function updateCD(){
   document.getElementById('countdown').textContent=remaining>0?`Auto-dismiss in ${remaining}s`:'';
@@ -943,7 +1035,6 @@ function resolveMsg(d,isErr){
     END:{txt:'⏹ End the session completely. Remaining students will be auto timed-out.',cls:'mw'},
     COMPLETED:{txt:'Attendance already complete for this session.',cls:'mi'},
   };
-
   return map[d.action]||{txt:d.action,cls:'mi'};
 }
 function label(a){
@@ -985,6 +1076,7 @@ if __name__ == '__main__':
     print("Lab Attendance — Supabase Edition ✓")
     print(f"Encodings loaded  : {len(known_encodings)}")
     print(f"Grace period      : {STUDENT_GRACE_MINUTES} min after professor starts")
+    print(f"Session cache TTL : {CACHE_TTL}s")
     print("Scanner UI        : http://127.0.0.1:5000/scanner")
     print("=" * 60)
     app.run(host='127.0.0.1', port=5000, debug=False, threaded=True, use_reloader=False)
