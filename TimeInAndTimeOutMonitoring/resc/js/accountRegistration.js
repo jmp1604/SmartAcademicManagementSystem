@@ -379,11 +379,14 @@ async function stopEngine() {
     }
 }
 
-
 professorScanBtn.addEventListener('click', async () => {
     if (!professorData) return;
     const btn = document.getElementById('professorScanBtn');
     btn.disabled = true;
+
+    // ✅ ADD THESE TWO LINES — mirrors the student flow
+    cameraContainer.style.display = 'flex';
+    captureStatus.innerHTML = '<i class="fa-solid fa-microchip fa-spin"></i> Initializing Engine...';
 
     try {
         // STEP 1: Wake up the engine via PHP
@@ -401,6 +404,7 @@ professorScanBtn.addEventListener('click', async () => {
         await waitForFlask();
 
         // STEP 3: Tell Flask to start registration
+        captureStatus.innerHTML = '<i class="fa-solid fa-broom fa-spin"></i> Purging old data & warming up...';
         await fetch('http://localhost:5000/start_registration', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
@@ -408,7 +412,7 @@ professorScanBtn.addEventListener('click', async () => {
                 id_number:  professorData.employee_id,
                 firstName:  professorData.first_name,
                 lastName:   professorData.last_name,
-                role:       'professor'   // ← Add this
+                role:       'professor'
             })
         });
 
@@ -417,6 +421,7 @@ professorScanBtn.addEventListener('click', async () => {
         openCameraUI();
 
     } catch (err) {
+        cameraContainer.style.display = 'none'; // ✅ Hide modal on error
         alert("❌ Registration Error: " + err.message);
     } finally {
         btn.disabled = false;
