@@ -50,11 +50,29 @@
 <!-- ── RIGHT PANEL ── -->
 <div class="rp">
     <div class="fb">
+<div style="display:flex;align-items:center;gap:10px;margin-bottom:12px;">
+    <a href="takeAttendance.html"
+       style="display:inline-flex;align-items:center;gap:7px;
+              padding:8px 16px;
+              background:#ffffff;
+              color:#1a4731;
+              border:1.5px solid #d4e6d9;
+              border-radius:99px;
+              font-size:13.5px;
+              font-weight:600;
+              text-decoration:none;
+              font-family:'Nunito Sans',sans-serif;
+              transition:all .2s;"
+       onmouseover="this.style.background='#1a4731';this.style.color='#fff';this.style.borderColor='#1a4731'"
+       onmouseout="this.style.background='#ffffff';this.style.color='#1a4731';this.style.borderColor='#d4e6d9'">
+        <i class="fa-solid fa-arrow-left"></i> Back to Face Recognition
+    </a>
+</div>
 
-        <div class="clock-strip">
-            <i class="fa-regular fa-clock"></i>
-            <span id="live-clock">Loading...</span>
-        </div>
+<div class="clock-strip">
+    <i class="fa-regular fa-clock"></i>
+    <span id="live-clock">Loading...</span>
+</div>
 
         <div class="card">
             <div class="card-bar"></div>
@@ -113,6 +131,21 @@
     <i id="toast-icon" class="fa-solid fa-check-circle"></i>
     <span id="toast-msg"></span>
 </div>
+
+<script>
+    // ── Access Guard ──
+    // Block direct URL access — only allow if granted from takeAttendance page
+    (function() {
+        const granted = sessionStorage.getItem('manual_access_granted');
+        if (!granted) {
+            // Not authorized — redirect back
+            window.location.replace('takeAttendance.html');
+        } else {
+            // Consume the token so refreshing also requires re-auth
+            sessionStorage.removeItem('manual_access_granted');
+        }
+    })();
+</script>
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="../../config/.env.js"></script>
