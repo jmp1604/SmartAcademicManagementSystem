@@ -44,6 +44,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     await loadActiveSemester();
     await loadCategories();
     await loadSemesters();
+    await loadDepartments();
     await loadUserDepartmentName();
     await loadRequirements();
     initializeEventListeners();
@@ -64,8 +65,6 @@ async function loadActiveSemester() {
         }
         activeSemesterId = sem.id;
         activeSemesterName = sem.name;
-        
-        // Display the semester in the page
         const semesterEl = document.getElementById('requirement-current-semester');
         if (semesterEl) semesterEl.textContent = activeSemesterName;
         
@@ -106,11 +105,18 @@ async function loadUserDepartmentName() {
 
 async function loadCategories() {
     try {
-        const { data, error } = await supabaseClient
+        const currentUser = getCurrentUser();
+        let query = supabaseClient
             .from('categories')
             .select('*')
-            .eq('status', 'active')
-            .order('name', { ascending: true });
+            .eq('status', 'active');
+        
+        // Filter by department if user has one
+        if (currentUser?.departmentId) {
+            query = query.eq('department_id', currentUser.departmentId);
+        }
+        
+        const { data, error } = await query.order('name', { ascending: true });
 
         if (error) throw error;
 

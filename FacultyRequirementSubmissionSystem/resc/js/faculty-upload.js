@@ -480,10 +480,12 @@ async function updateUploadStatistics() {
         const sessionUser = getCurrentUser();
         if (!sessionUser?.id) return;
 
+        // Filter by current semester to show only this semester's stats
         const { data: submissions, error } = await supabaseClient
             .from('submissions')
             .select('status')
-            .eq('professor_id', sessionUser.id);
+            .eq('professor_id', sessionUser.id)
+            .eq('semester_id', activeSemesterId);
 
         if (error) return;
 
