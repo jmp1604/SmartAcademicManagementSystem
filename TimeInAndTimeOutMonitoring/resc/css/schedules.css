@@ -50,7 +50,50 @@ body {
 hr { border: 0; height: 2px; background: linear-gradient(90deg, var(--green-dark), var(--green-bright), transparent); margin: 0 0 28px; border-radius: 2px; }
 
 /* Header & Stats */
-.page-header { display: flex; align-items: center; gap: 15px; margin-bottom: 12px; flex-wrap: wrap; }
+/* Header & Stats */
+.page-header { 
+    display: flex; 
+    align-items: center; 
+    gap: 15px; 
+    margin-bottom: 12px; 
+    flex-wrap: wrap; 
+}
+
+/* 1. Stacks the title and paragraph */
+.page-header .header-titles {
+    display: flex;
+    flex-direction: column;
+}
+
+/* 2. Formats the H1 */
+.page-header .header-titles h1 {
+    margin: 0;
+    font-family: 'Nunito', sans-serif;
+    font-size: 24px;
+    font-weight: 800;
+    color: var(--green-dark);
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+
+/* 3. Forces the icon to be bright green! */
+.page-header .header-titles h1 i {
+    color: var(--green-bright);
+    font-size: 22px;
+}
+
+/* 4. Formats the gray subtitle */
+.page-header .header-titles p {
+    color: var(--text-muted);
+    font-size: 13.5px;
+    margin-top: 2px;
+    margin-bottom: 0;
+    font-weight: 500;
+    font-family: 'Nunito Sans', sans-serif;
+}
+
+/* (Leave your existing .total-badge and .stats-mini classes right below this) */
 .total-badge { background: var(--green-dark); color: var(--white); padding: 4px 14px; border-radius: 20px; font-size: 13px; font-weight: 700; font-family: 'Nunito Sans', sans-serif; }
 .stats-mini { display: flex; gap: 10px; flex-wrap: wrap; margin-right: auto; }
 .stat-mini { background: var(--surface); padding: 6px 14px; border-radius: 8px; border: 1px solid var(--border); display: flex; align-items: center; gap: 8px; font-size: 13px; font-weight: 600; font-family: 'Nunito Sans', sans-serif; }
@@ -60,8 +103,28 @@ hr { border: 0; height: 2px; background: linear-gradient(90deg, var(--green-dark
 
 /* Buttons */
 .btn-report, .btn-add-sched { padding: 9px 18px; border-radius: 8px; font-size: 13.5px; font-weight: 700; font-family: 'Nunito Sans', sans-serif; display: inline-flex; align-items: center; gap: 8px; cursor: pointer; transition: transform .2s, box-shadow .2s, background .2s; }
-.btn-report { background: var(--white); color: var(--green-dark); border: 2px solid var(--green-dark); }
-.btn-report:hover { background: var(--surface); transform: translateY(-2px); }
+.btn-report { 
+    padding: 9px 18px; 
+    background: #dcfce7;          /* Soft light green background */
+    color: #166534;               /* Signature dark green text for contrast */
+    border: 1.5px solid #bbf7d0;  /* Slightly darker green border */
+    border-radius: 8px; 
+    font-size: 13.5px; 
+    font-weight: 800; 
+    cursor: pointer; 
+    display: inline-flex; 
+    align-items: center; 
+    gap: 8px; 
+    transition: all .2s ease; 
+    font-family: 'Nunito Sans', sans-serif; 
+    margin-left: auto;            /* Keeps it grouped with the Add button */
+}
+
+.btn-report:hover { 
+    background: #bbf7d0;          /* Slightly darker pastel green on hover */
+    transform: translateY(-2px); 
+    box-shadow: 0 4px 12px rgba(22, 101, 52, 0.15); /* Soft green shadow */
+}
 .btn-add-sched { background: var(--green-dark); color: var(--white); border: none; }
 .btn-add-sched:hover { background: var(--green-mid); transform: translateY(-2px); box-shadow: var(--shadow-md); }
 
@@ -78,14 +141,50 @@ hr { border: 0; height: 2px; background: linear-gradient(90deg, var(--green-dark
 .btn-clear { height: 40px; padding: 0 16px; border-radius: 8px; background: var(--surface); color: var(--text-muted); border: 1px solid var(--border); font-family: 'Nunito Sans', sans-serif; font-weight: 600; font-size: 13px; cursor: pointer; transition: all .2s; }
 .btn-clear:hover { background: var(--hover-bg); color: var(--green-dark); }
 
-/* Table */
+
+/* ── Tables Container ── */
 .table-container { margin-top: 10px; }
-.data-table { width: 100%; border-collapse: collapse; background: var(--white); border-radius: var(--radius-lg); overflow: hidden; box-shadow: var(--shadow-sm); border: 1.5px solid var(--border); }
-.data-table thead { background: linear-gradient(90deg, #166534, #14532d); border-bottom: 1.5px solid var(--border); }
-.data-table th { padding: 14px 16px; text-align: left; font-family: 'Nunito Sans', sans-serif; color: var(--white); font-weight: 700; font-size: 12px; }
-.data-table td { padding: 14px 16px; text-align: left; border-bottom: 1px solid var(--border); font-size: 13px; vertical-align: middle; }
-.data-table tbody tr:last-child td { border-bottom: none; }
-.data-table tbody tr:hover { background: var(--off-white); }
+.data-table, .enroll-table { width: 100%; border-collapse: collapse; background: var(--white); border-radius: var(--radius-lg); overflow: hidden; box-shadow: var(--shadow-sm); border: 1.5px solid var(--border); }
+
+/* ── Standardized Table Headers & Cells (Main Schedules & Enroll Tables) ── */
+.data-table thead th,
+.enroll-table thead th {
+    background: linear-gradient(90deg, #166534, #14532d); 
+    color: #ffffff;
+    padding: 14px 18px; 
+    text-align: left; 
+    font-size: 12.5px; 
+    font-weight: 800;
+    text-transform: uppercase; 
+    letter-spacing: 0.5px; 
+    font-family: 'Nunito', sans-serif;
+    border-right: 1px solid rgba(255, 255, 255, 0.2); 
+    white-space: nowrap;
+    border-bottom: none;
+}
+.data-table thead th:last-child,
+.enroll-table thead th:last-child { 
+    border-right: none; 
+}
+
+.data-table tbody td,
+.enroll-table tbody td {
+    padding: 14px 18px; 
+    border-bottom: 1px solid var(--border);
+    font-size: 14px; 
+    color: var(--text-body); 
+    vertical-align: middle;
+    font-family: 'Nunito Sans', sans-serif;
+}
+.data-table tbody tr:last-child td,
+.enroll-table tbody tr:last-child td { 
+    border-bottom: none; 
+}
+.data-table tbody tr:hover,
+.enroll-table tbody tr:hover { 
+    background: var(--surface); 
+}
+
 
 /* Badges & Chips */
 .status-badge { display: inline-block; padding: 4px 12px; border-radius: 20px; font-size: 11.5px; font-weight: 700; font-family: 'Nunito Sans', sans-serif; text-transform: uppercase;}
@@ -167,11 +266,6 @@ hr { border: 0; height: 2px; background: linear-gradient(90deg, var(--green-dark
 .enroll-stat-item .stat-num.pending { color: #d97706; }
 .enroll-stat-item .stat-label { font-size: 13px; color: var(--text-muted); font-weight: 600; }
 
-.enroll-table { width: 100%; border-collapse: collapse; border: 1px solid var(--border); border-radius: 8px; overflow: hidden; }
-.enroll-table thead { background: var(--surface); border-bottom: 1.5px solid var(--border);}
-.enroll-table th { padding: 12px 14px; text-align: left; color: var(--green-dark); font-size: 11px; font-weight: 800; text-transform: uppercase; letter-spacing: 0.5px; }
-.enroll-table td { padding: 12px 14px; border-bottom: 1px solid var(--border); font-size: 13.5px; vertical-align: middle; }
-.enroll-table tbody tr:hover { background: var(--off-white); }
 /* ===============================
    Report Modal (Laboratories Theme)
 ================================ */
@@ -245,16 +339,28 @@ hr { border: 0; height: 2px; background: linear-gradient(90deg, var(--green-dark
 
 .rm-body { overflow-y: auto; flex: 1; background: white; }
 
+/* ── Standardized Table Headers (Report Modal) ── */
 .rm-table { width: 100%; border-collapse: collapse; font-size: 13px; font-family: 'Nunito Sans', sans-serif; }
 .rm-table thead th {
-    background: #166534; color: white; padding: 11px 14px;
-    text-align: left; font-size: 10.5px; font-weight: 700;
-    text-transform: uppercase; letter-spacing: .6px;
-    white-space: nowrap; position: sticky; top: 0; z-index: 2;
+    background: linear-gradient(90deg, #166534, #14532d); 
+    color: white; 
+    padding: 11px 14px;
+    text-align: left; 
+    font-size: 10.5px; 
+    font-weight: 800; 
+    text-transform: uppercase; 
+    letter-spacing: 0.6px;
+    white-space: nowrap; 
+    position: sticky; 
+    top: 0; 
+    z-index: 2;
     border-bottom: none;
-    border-right: 1px solid rgba(255,255,255,.2); /* Vertical white lines in header */
+    border-right: 1px solid rgba(255,255,255,.2); 
+    font-family: 'Nunito', sans-serif;
 }
-.rm-table thead th:last-child { border-right: none; }
+.rm-table thead th:last-child { 
+    border-right: none; 
+}
 
 .rm-table tbody tr { border-bottom: 1px solid #e5e7eb; transition: background .1s; } /* Crisp horizontal rows */
 .rm-table tbody tr:nth-child(even) { background: #f9fffe; }
@@ -269,6 +375,7 @@ hr { border: 0; height: 2px; background: linear-gradient(90deg, var(--green-dark
 .rm-badge.inactive { background: #fee2e2; color: #dc2626; }
 .rm-badge.registered     { background: #dcfce7; color: #166534; }
 .rm-badge.not-registered { background: #fef3c7; color: #92400e; }
+
 /* Toast */
 .toast { position: fixed; bottom: 30px; right: 30px; padding: 14px 24px; background: var(--green-dark); color: var(--white); border-radius: 12px; font-size: 14px; font-weight: 700; display: none; align-items: center; gap: 10px; z-index: 99999; box-shadow: var(--shadow-md); font-family: 'Nunito Sans', sans-serif;}
 .toast.on { display: flex; animation: slideUp 0.3s ease-out; }
@@ -279,5 +386,3 @@ hr { border: 0; height: 2px; background: linear-gradient(90deg, var(--green-dark
     .container { padding: 20px 16px 40px; } 
 }
 
-.data-table th { border-right: 1px solid rgba(255,255,255,.2); }
-.data-table th:last-child { border-right: none; }

@@ -116,7 +116,6 @@ async function lookupById(id) {
 async function getStudentStatus(student, today, currentDay, now) {
     const sid = student.student_id;
 
-    // Get enrolled schedules for today
     const { data: enrollments } = await supabaseClient
         .from('schedule_enrollments')
         .select('schedule_id')
@@ -128,6 +127,43 @@ async function getStudentStatus(student, today, currentDay, now) {
 
     const scheduleIds = enrollments.map(e => e.schedule_id);
 
+    // ── 1. Check for Active/Stuck Sessions from ANY Date ──
+    const { data: activeSessions } = await supabaseClient
+        .from('lab_sessions')
+        .select('session_id, schedule_id, status, actual_start_time, session_date')
+        .in('schedule_id', scheduleIds)
+        .in('status', ['ongoing', 'dismissing']);
+
+    if (activeSessions && activeSessions.length > 0) {
+        const sess = activeSessions[0]; 
+        const { data: schData } = await supabaseClient
+            .from('lab_schedules')
+            .select('subjects(subject_code), laboratory_rooms(lab_code)')
+            .eq('schedule_id', sess.schedule_id)
+            .single();
+        const schedInfo = `${schData?.subjects?.subject_code || '—'} - ${schData?.laboratory_rooms?.lab_code || '—'}`;
+
+        const { data: att } = await supabaseClient
+            .from('lab_attendance')
+            .select('attendance_id, time_in, time_out')
+            .eq('session_id', sess.session_id)
+            .eq('student_id', sid)
+            .maybeSingle();
+
+        if (att && att.time_in && !att.time_out) {
+            if (sess.status === 'ongoing') {
+                return { success: true, action: 'CANNOT_TIME_OUT', session_id: sess.session_id, schedule: schedInfo,
+                    message: 'Professor has not allowed dismissal yet. Please wait.' };
+            }
+            return { success: true, action: 'OUT', session_id: sess.session_id, schedule: schedInfo, is_late: false, late_minutes: 0,
+                message: 'Confirm to record TIME OUT.' };
+        } else if (!att) {
+            return { success: true, action: 'IN', session_id: sess.session_id, schedule: schedInfo, is_late: false, late_minutes: 0,
+                message: 'Session is currently active. Confirm to record TIME IN.' };
+        }
+    }
+
+    // ── 2. Normal Flow for TODAY's schedules ──
     const { data: schedules } = await supabaseClient
         .from('lab_schedules')
         .select('schedule_id, start_time, end_time, subjects(subject_code), laboratory_rooms(lab_code)')
@@ -139,7 +175,6 @@ async function getStudentStatus(student, today, currentDay, now) {
     if (!schedules || !schedules.length)
         return { success: true, action: 'NOT_ENROLLED', message: 'You are not enrolled in any subject with a schedule today.' };
 
-    // Get today's sessions for these schedules
     const { data: sessions } = await supabaseClient
         .from('lab_sessions')
         .select('session_id, schedule_id, status, actual_start_time')
@@ -149,7 +184,6 @@ async function getStudentStatus(student, today, currentDay, now) {
     const sessionMap = {};
     (sessions || []).forEach(s => { sessionMap[s.schedule_id] = s; });
 
-    // Find best schedule
     let best = null, priority = 99;
     for (const sch of schedules) {
         const sess   = sessionMap[sch.schedule_id];
@@ -167,15 +201,16 @@ async function getStudentStatus(student, today, currentDay, now) {
     let session_status = best.session_status;
     const schedInfo    = `${best.subjects?.subject_code || '—'} - ${best.laboratory_rooms?.lab_code || '—'}`;
 
-    // Create session if not yet created
     if (!session_id) {
         const { data: newSession } = await supabaseClient
             .from('lab_sessions')
             .insert({ schedule_id: best.schedule_id, session_date: today, status: 'scheduled', created_at: new Date().toISOString() })
             .select('session_id')
             .single();
-        session_id     = newSession.session_id;
-        session_status = 'scheduled';
+        if(newSession) {
+            session_id     = newSession.session_id;
+            session_status = 'scheduled';
+        }
     }
 
     if (['scheduled', 'not_created'].includes(session_status)) {
@@ -187,7 +222,6 @@ async function getStudentStatus(student, today, currentDay, now) {
     if (session_status === 'completed')
         return { success: true, action: 'SESSION_ENDED', session_id, schedule: schedInfo, message: 'The session has already ended.' };
 
-    // Late detection
     let is_late = false, late_minutes = 0;
     const actual_start = best.session?.actual_start_time;
     if (actual_start) {
@@ -199,7 +233,6 @@ async function getStudentStatus(student, today, currentDay, now) {
         }
     }
 
-    // Check attendance record
     const { data: att } = await supabaseClient
         .from('lab_attendance')
         .select('attendance_id, time_in, time_out')
@@ -224,53 +257,91 @@ async function getStudentStatus(student, today, currentDay, now) {
 }
 
 // ══════════════════════════════════════════════════════════════
-// PROFESSOR STATUS
+// PROFESSOR STATUS (FIXED FOR OVERTIME SESSIONS)
 // ══════════════════════════════════════════════════════════════
 async function getProfessorStatus(professor, today, currentDay, now) {
     const pid = professor.professor_id;
 
-    const { data: schedules } = await supabaseClient
+    // ── 1. Ghost & Overtime Session Recovery (Bypasses Time Checks) ──
+    const { data: stuckSessions, error: stuckErr } = await supabaseClient
+        .from('lab_sessions')
+        .select(`
+            session_id, status, actual_dismiss_time,
+            lab_schedules!inner (
+                schedule_id, section, day_of_week, professor_id,
+                subjects ( subject_code ),
+                laboratory_rooms ( lab_code )
+            )
+        `)
+        .eq('lab_schedules.professor_id', pid)
+        .in('status', ['ongoing', 'dismissing']);
+
+    if (stuckErr) console.error("Stuck Session Query Error:", stuckErr);
+
+    if (stuckSessions && stuckSessions.length > 0) {
+        const sess = stuckSessions[0];
+        const sch  = sess.lab_schedules;
+        const si   = sch
+            ? `${sch.subjects?.subject_code || '—'} (${sch.section}) - ${sch.laboratory_rooms?.lab_code || '—'}`
+            : 'Active Session';
+
+        let action = sess.status === 'ongoing' ? (sess.actual_dismiss_time ? 'END' : 'DISMISS') : 'END';
+        return { success: true, action, session_id: sess.session_id, schedule: si,
+            message: actionMessage(action, si) };
+    }
+
+    // ── 2. Normal Flow for TODAY's schedules ──
+    const { data: todaySchedules, error: schedErr } = await supabaseClient
         .from('lab_schedules')
-        .select('schedule_id, section, start_time, end_time, subjects(subject_code), laboratory_rooms(lab_code)')
+        .select('schedule_id, day_of_week, section, start_time, end_time, subjects(subject_code), laboratory_rooms(lab_code)')
         .eq('professor_id', pid)
         .eq('day_of_week', currentDay)
         .eq('status', 'active')
         .order('start_time');
 
-    if (!schedules || !schedules.length)
-        return { success: true, action: 'NO_SCHEDULE', message: 'You have no class scheduled today.' };
+    if (schedErr) console.error("Schedule Query Error:", schedErr);
 
-    // Get today's sessions
-    const schedIds = schedules.map(s => s.schedule_id);
-    const { data: sessions } = await supabaseClient
+    if (!todaySchedules || !todaySchedules.length) {
+         return { success: true, action: 'NO_SCHEDULE', message: 'You have no class scheduled today.' };
+    }
+
+    const todayIds = todaySchedules.map(s => s.schedule_id);
+    const { data: todaySessions, error: sessErr } = await supabaseClient
         .from('lab_sessions')
         .select('session_id, schedule_id, status, actual_dismiss_time')
-        .in('schedule_id', schedIds)
+        .in('schedule_id', todayIds)
         .eq('session_date', today);
 
+    if (sessErr) console.error("Sessions Query Error:", sessErr);
+
     const sessionMap = {};
-    (sessions || []).forEach(s => { sessionMap[s.schedule_id] = s; });
+    (todaySessions || []).forEach(s => { sessionMap[s.schedule_id] = s; });
 
     let closestFuture = null, closestTime = null;
 
-    for (const sched of schedules) {
-        const sess   = sessionMap[sched.schedule_id];
-        const status = sess ? sess.status : 'not_created';
-        const s      = secsToDateTime(today, tdToSecs(sched.start_time));
-        const e      = secsToDateTime(today, tdToSecs(sched.end_time));
-        const winOpen = new Date(s.getTime() - PROF_EARLY_WINDOW_MINS * 60000);
+    for (const sched of todaySchedules) {
+        const sess      = sessionMap[sched.schedule_id];
+        const status    = sess ? sess.status : 'not_created';
+        const s         = secsToDateTime(today, tdToSecs(sched.start_time));
+        const e         = secsToDateTime(today, tdToSecs(sched.end_time));
+        const winOpen   = new Date(s.getTime() - PROF_EARLY_WINDOW_MINS * 60000);
         const schedInfo = `${sched.subjects?.subject_code || '—'} (${sched.section}) - ${sched.laboratory_rooms?.lab_code || '—'}`;
 
         if (status === 'cancelled') continue;
 
+        // Too early?
         if (now < winOpen) {
             if (!closestTime || s < closestTime) { closestFuture = sched; closestTime = s; }
             continue;
         }
 
-        if (now > e) continue;
+        // CRITICAL BUG FIX: If it is past the end time (e.g. 10:06 PM > 9:00 PM), 
+        // we ONLY skip it if the session is NOT active. If it is active, keep processing!
+        if (now > e && !['ongoing', 'dismissing'].includes(status)) {
+            continue;
+        }
 
-        let session_id = sess ? sess.session_id : null;
+        let session_id  = sess ? sess.session_id : null;
         let sess_status = status;
 
         if (!session_id) {
@@ -279,8 +350,10 @@ async function getProfessorStatus(professor, today, currentDay, now) {
                 .insert({ schedule_id: sched.schedule_id, session_date: today, status: 'scheduled', created_at: new Date().toISOString() })
                 .select('session_id')
                 .single();
-            session_id  = newSession.session_id;
-            sess_status = 'scheduled';
+            if (newSession) {
+                session_id  = newSession.session_id;
+                sess_status = 'scheduled';
+            }
         }
 
         let action;
@@ -579,10 +652,14 @@ function resetForm() {
 }
 
 // ══════════════════════════════════════════════════════════════
-// HELPERS
+// HELPERS (With Timezone Fixes)
 // ══════════════════════════════════════════════════════════════
 function getTodayStr() {
-    return new Date().toISOString().split('T')[0];
+    const d = new Date();
+    const yr = d.getFullYear();
+    const mo = String(d.getMonth() + 1).padStart(2, '0');
+    const da = String(d.getDate()).padStart(2, '0');
+    return `${yr}-${mo}-${da}`;
 }
 
 function getDayName() {

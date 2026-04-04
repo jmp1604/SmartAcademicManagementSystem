@@ -585,3 +585,25 @@ hr {
     .lab-grid { grid-template-columns: 1fr; }
     .profile-mini { flex-direction: column; align-items: flex-start; gap: 10px; }
 }
+
+
+/* ── Page Header Titles (Stacking Fix) ── */
+.page-header .header-titles {
+    display: flex;
+    flex-direction: column;
+}
+
+.page-header .header-titles p {
+    color: var(--text-muted, #5a7265);
+    font-size: 13.5px;
+    margin-top: 2px;
+    margin-bottom: 0;
+    font-weight: 500;
+    font-family: 'Nunito Sans', sans-serif;
+}
+
+.page-header h1 i,
+.page-header .header-titles h1 i { 
+    color: var(--green-bright); /* Or #40916c if you prefer hex */
+    font-size: 22px; 
+}
