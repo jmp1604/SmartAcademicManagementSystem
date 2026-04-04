@@ -60,7 +60,7 @@ async function loadSidebar(activePage = '') {
 function logout() {
     // Clear any local session data here if using Supabase auth
     // e.g. supabaseClient.auth.signOut();
-    window.location.href = '../admin-login-system/login.html';
+    window.location.href = '../../auth/login.html';
 }
 
 /* ── Internal: live Manila clock ─────────────────────────────── */
