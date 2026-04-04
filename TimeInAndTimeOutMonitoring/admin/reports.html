@@ -13,7 +13,6 @@
 
     <link rel="stylesheet" href="../resc/css/header.css">
     <link rel="stylesheet" href="../resc/css/nav.css">
-
     <link rel="stylesheet" href="../resc/css/reports.css">
 
     <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
@@ -30,14 +29,14 @@
 
             <div class="page-header">
                 <div class="header-titles">
-                    <h1><i class="fa-solid fa-file-chart-column"></i> Reports</h1>
+                    <h1><i class="fa-solid fa-file-lines"></i> Reports</h1>
                     <p>All generated reports — sessions, attendance, professors, students, schedules, enrollment, labs, subjects.</p>
                 </div>
                 <button class="btn-report" onclick="openGenModal()">
-                    <i class="fa-solid fa-plus"></i> Generate New Report
+                    <i class="fa-solid fa-file-circle-plus"></i> Generate New Report
                 </button>
             </div>
-              <hr>
+            <hr>
             
             <div class="stats-row">
                 <div class="stat-card">
@@ -125,7 +124,8 @@
                 </button>
             </div>
 
-        </div></main>
+        </div>
+    </main>
 
     <div class="modal-overlay" id="genModal" onclick="if(event.target===this)closeGenModal()">
         <div class="modal lg">
@@ -164,7 +164,6 @@
             <div class="pm-section" id="gfSection" style="display:none;">
                 <div class="pm-section-title"><i class="fa-solid fa-sliders"></i> Optional Filters</div>
                 <div class="pm-fields">
-                    
                     <div class="pm-grid-2" id="gf-sa" style="display:none;">
                         <div class="pm-group"><label>Date From</label><input type="date" id="gf-date-from"></div>
                         <div class="pm-group"><label>Date To</label><input type="date" id="gf-date-to"></div>
@@ -182,19 +181,18 @@
                             </select>
                         </div>
                     </div>
-
                     <div class="pm-grid-2" id="gf-p" style="display:none;">
                         <div class="pm-group"><label>Professor</label><select id="gf-p-prof"><option value="">All</option></select></div>
-                        <div></div> <div class="pm-group"><label>Date From</label><input type="date" id="gf-p-from"></div>
+                        <div></div>
+                        <div class="pm-group"><label>Date From</label><input type="date" id="gf-p-from"></div>
                         <div class="pm-group"><label>Date To</label><input type="date" id="gf-p-to"></div>
                     </div>
-
                     <div class="pm-grid-2" id="gf-st" style="display:none;">
                         <div class="pm-group"><label>Subject</label><select id="gf-st-subj"><option value="">All</option></select></div>
-                        <div></div> <div class="pm-group"><label>Date From</label><input type="date" id="gf-st-from"></div>
+                        <div></div>
+                        <div class="pm-group"><label>Date From</label><input type="date" id="gf-st-from"></div>
                         <div class="pm-group"><label>Date To</label><input type="date" id="gf-st-to"></div>
                     </div>
-
                 </div>
             </div>
 
@@ -231,7 +229,6 @@
     <script src="../../config/.env.js"></script>
     <script src="../../config/config.js"></script>
     <script src="../includes/sidebar.js"></script>
-
     <script src="../resc/js/reports.js"></script>
 
     <script>

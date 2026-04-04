@@ -50,7 +50,50 @@ body {
 hr { border: 0; height: 2px; background: linear-gradient(90deg, var(--green-dark), var(--green-bright), transparent); margin: 0 0 28px; border-radius: 2px; }
 
 /* Header & Stats */
-.page-header { display: flex; align-items: center; gap: 15px; margin-bottom: 12px; flex-wrap: wrap; }
+.page-header { 
+    display: flex; 
+    align-items: center; 
+    gap: 15px; 
+    margin-bottom: 12px; 
+    flex-wrap: wrap; 
+}
+
+/* 1. Stacks the title and paragraph */
+.page-header .header-titles {
+    display: flex;
+    flex-direction: column;
+}
+
+/* 2. Formats the H1 */
+.page-header .header-titles h1 {
+    margin: 0;
+    font-family: 'Nunito', sans-serif;
+    font-size: 24px;
+    font-weight: 800;
+    color: var(--green-dark);
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+
+/* 3. Forces the icon to be bright green! */
+.page-header .header-titles h1 i {
+    color: var(--green-bright);
+    font-size: 22px;
+}
+
+/* 4. Formats the gray subtitle */
+.page-header .header-titles p {
+    color: var(--text-muted);
+    font-size: 13.5px;
+    margin-top: 2px;
+    margin-bottom: 0;
+    font-weight: 500;
+    font-family: 'Nunito Sans', sans-serif;
+}
+
+/* (Leave your existing .total-badge and .stats-mini classes right below this) */
+
 .stats-badges { display: flex; gap: 10px; flex-wrap: wrap; margin-right: auto; }
 .stat-badge { padding: 6px 16px; border-radius: 20px; font-size: 13px; font-weight: 700; display: flex; align-items: center; gap: 8px; font-family: 'Nunito Sans', sans-serif;}
 .stat-badge.total       { background: var(--green-dark); color: var(--white); }
@@ -248,17 +291,3 @@ hr { border: 0; height: 2px; background: linear-gradient(90deg, var(--green-dark
 .students-table th { border-right: 1px solid rgba(255,255,255,.2); }
 .students-table th:last-child { border-right: none; }
 
-/* ── Page Header Titles (Stacking Fix) ── */
-.page-header .header-titles {
-    display: flex;
-    flex-direction: column;
-}
-
-.page-header .header-titles p {
-    color: var(--text-muted, #5a7265);
-    font-size: 13.5px;
-    margin-top: 2px;
-    margin-bottom: 0;
-    font-weight: 500;
-    font-family: 'Nunito Sans', sans-serif;
-}

@@ -51,8 +51,52 @@ body {
 
 .container { background: var(--white); padding: 32px 36px 48px; min-height: 100%; width: 100%; }
 
-/* Page Header */
-.page-header { display: flex; align-items: flex-start; justify-content: space-between; flex-wrap: wrap; gap: 12px; margin-bottom: 28px; }
+/* ── Page Header ── */
+.page-header { 
+    display: flex; 
+    align-items: center; 
+    gap: 15px; 
+    margin-bottom: 20px; 
+    flex-wrap: wrap; 
+}
+
+/* 1. Stacks the title and paragraph */
+.page-header .header-titles { 
+    display: flex; 
+    flex-direction: column; 
+}
+
+/* 2. Formats the H1 */
+.page-header .header-titles h1 { 
+    font-family: 'Nunito', sans-serif; 
+    font-size: 24px; 
+    font-weight: 800; 
+    color: var(--green-dark, #1a4731); 
+    margin: 0; 
+    display: flex; 
+    align-items: center; 
+    gap: 10px; 
+}
+
+/* 3. Forces the icon to be bright green! */
+/* ── Force Icon Visibility and Color ── */
+.page-header .header-titles h1 i {
+    color: var(--green-bright, #40916c) !important; 
+    font-size: 22px !important;
+    display: inline-block !important; /* Ensures the icon has dimensions */
+    visibility: visible !important;
+    margin-right: 10px;
+}
+
+/* 4. Formats the gray subtitle */
+.page-header .header-titles p {
+    color: var(--text-muted, #5a7265); 
+    font-size: 13.5px; 
+    margin-top: 2px; 
+    margin-bottom: 0;
+    font-weight: 500; 
+    font-family: 'Nunito Sans', sans-serif;
+}
 .header-titles h1 { font-family: 'Nunito', sans-serif; font-size: 24px; font-weight: 700; color: var(--green-dark); margin: 0; display: flex; align-items: center; gap: 10px; }
 .header-titles p { color: var(--text-muted); font-size: 14px; margin: 5px 0 0 0; font-family: 'Nunito Sans', sans-serif;}
 

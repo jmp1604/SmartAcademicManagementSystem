@@ -601,3 +601,9 @@ hr {
     font-weight: 500;
     font-family: 'Nunito Sans', sans-serif;
 }
+
+.page-header h1 i,
+.page-header .header-titles h1 i { 
+    color: var(--green-bright); /* Or #40916c if you prefer hex */
+    font-size: 22px; 
+}

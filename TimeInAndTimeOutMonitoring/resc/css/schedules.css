@@ -50,7 +50,50 @@ body {
 hr { border: 0; height: 2px; background: linear-gradient(90deg, var(--green-dark), var(--green-bright), transparent); margin: 0 0 28px; border-radius: 2px; }
 
 /* Header & Stats */
-.page-header { display: flex; align-items: center; gap: 15px; margin-bottom: 12px; flex-wrap: wrap; }
+/* Header & Stats */
+.page-header { 
+    display: flex; 
+    align-items: center; 
+    gap: 15px; 
+    margin-bottom: 12px; 
+    flex-wrap: wrap; 
+}
+
+/* 1. Stacks the title and paragraph */
+.page-header .header-titles {
+    display: flex;
+    flex-direction: column;
+}
+
+/* 2. Formats the H1 */
+.page-header .header-titles h1 {
+    margin: 0;
+    font-family: 'Nunito', sans-serif;
+    font-size: 24px;
+    font-weight: 800;
+    color: var(--green-dark);
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+
+/* 3. Forces the icon to be bright green! */
+.page-header .header-titles h1 i {
+    color: var(--green-bright);
+    font-size: 22px;
+}
+
+/* 4. Formats the gray subtitle */
+.page-header .header-titles p {
+    color: var(--text-muted);
+    font-size: 13.5px;
+    margin-top: 2px;
+    margin-bottom: 0;
+    font-weight: 500;
+    font-family: 'Nunito Sans', sans-serif;
+}
+
+/* (Leave your existing .total-badge and .stats-mini classes right below this) */
 .total-badge { background: var(--green-dark); color: var(--white); padding: 4px 14px; border-radius: 20px; font-size: 13px; font-weight: 700; font-family: 'Nunito Sans', sans-serif; }
 .stats-mini { display: flex; gap: 10px; flex-wrap: wrap; margin-right: auto; }
 .stat-mini { background: var(--surface); padding: 6px 14px; border-radius: 8px; border: 1px solid var(--border); display: flex; align-items: center; gap: 8px; font-size: 13px; font-weight: 600; font-family: 'Nunito Sans', sans-serif; }
@@ -343,18 +386,3 @@ hr { border: 0; height: 2px; background: linear-gradient(90deg, var(--green-dark
     .container { padding: 20px 16px 40px; } 
 }
 
-
-/* ── Page Header Titles (Stacking Fix) ── */
-.page-header .header-titles {
-    display: flex;
-    flex-direction: column;
-}
-
-.page-header .header-titles p {
-    color: var(--text-muted, #5a7265);
-    font-size: 13.5px;
-    margin-top: 2px;
-    margin-bottom: 0;
-    font-weight: 500;
-    font-family: 'Nunito Sans', sans-serif;
-}
