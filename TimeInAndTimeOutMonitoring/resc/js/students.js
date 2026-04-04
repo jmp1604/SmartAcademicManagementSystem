@@ -122,14 +122,7 @@ function renderTable(students) {
                 }
             </td>
             <td style="font-size:12.5px">${dateReg}</td>
-            <td>
-                <button class="btn-edit-student" onclick="openEditModal('${s.student_id}')" title="Edit Student">
-                    <i class="fa-solid fa-pen-to-square"></i>
-                </button>
-                <button class="btn-danger" onclick="removeStudent('${s.student_id}')" title="Remove Student">
-                    <i class="fa-solid fa-trash"></i>
-                </button>
-            </td>
+          
         </tr>`;
     }).join('');
 }

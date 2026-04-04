@@ -37,7 +37,7 @@
             <div class="page-header">
                 <div class="header-titles">
                     <h1><i class="fa-solid fa-users"></i> Students List</h1>
-                    <p>Manage student records, course enrollments, and facial recognition profiles</p>
+                    <p>View student records, course enrollments, and facial recognition profiles</p>
                 </div>
 
                 <div class="stats-badges">
@@ -45,15 +45,10 @@
                     <span class="stat-badge registered"><i class="fa-solid fa-check-circle"></i> <span id="statRegistered">0</span> Face Registered</span>
                     <span class="stat-badge pending"><i class="fa-solid fa-exclamation-circle"></i> <span id="statPending">0</span> Pending Face</span>
                 </div>
+
                 <div class="header-actions">
                     <button class="btn-report" onclick="openReportModal()">
                         <i class="fa-solid fa-file-chart-column"></i> Generate Report
-                    </button>
-                    <button class="btn-add" onclick="openModal('addStudentModal')">
-                        <i class="fa-solid fa-user-plus"></i> Add Student
-                    </button>
-                    <button class="btn-add btn-add--dark" onclick="openModal('importModal')">
-                        <i class="fa-solid fa-file-excel"></i> Import Students
                     </button>
                     <button class="btn-add btn-add--amber" onclick="openModal('faceRegModal')">
                         <i class="fa-solid fa-camera"></i> Register Face
@@ -119,12 +114,11 @@
                             <th>Email</th>
                             <th>Face Status</th>
                             <th>Date Registered</th>
-                            <th>Actions</th>
                         </tr>
                     </thead>
                     <tbody id="studentsTableBody">
                         <tr id="loadingRow">
-                            <td colspan="10" style="text-align:center;padding:40px;color:#5a7265">
+                            <td colspan="9" style="text-align:center;padding:40px;color:#5a7265">
                                 <i class="fa-solid fa-spinner fa-spin"></i> Loading students...
                             </td>
                         </tr>
@@ -134,142 +128,6 @@
 
         </div><!-- /.container -->
     </main>
-
-    <!-- ══ ADD STUDENT MODAL ══ -->
-    <div id="addStudentModal" class="modal-overlay">
-        <div class="modal-content" style="max-width:650px">
-            <div class="modal-header">
-                <h2><i class="fa-solid fa-user-plus"></i> Add Student</h2>
-                <button class="close-modal" onclick="closeModal('addStudentModal')">&times;</button>
-            </div>
-            <form id="addStudentForm">
-                <div class="form-section">
-                    <h4><i class="fa-solid fa-id-card"></i> Student ID &amp; Status</h4>
-                    <div class="form-row-2">
-                        <div class="form-group">
-                            <label>Student ID <span class="required-star">*</span></label>
-                            <input type="text" name="id_number" id="field_id_number"
-                              required placeholder="e.g., 23-00221" autocomplete="off"  maxlength="8">
-                             <div class="dup-msg" id="dup_id_number"></div>
-                        </div>
-                        <div class="form-group">
-                            <label>Status</label>
-                            <select name="status">
-                                <option value="active" selected>Active</option>
-                                <option value="inactive">Inactive</option>
-                                <option value="graduated">Graduated</option>
-                            </select>
-                        </div>
-                    </div>
-                </div>
-
-                <div class="form-section">
-                    <h4><i class="fa-solid fa-user"></i> Personal Information</h4>
-                    <div class="form-row-3">
-                        <div class="form-group">
-                            <label>First Name <span class="required-star">*</span></label>
-                            <input type="text" name="first_name" id="field_first_name" required placeholder="First name" autocomplete="off">
-                        </div>
-                        <div class="form-group">
-                            <label>Middle Name</label>
-                            <input type="text" name="middle_name" placeholder="Middle name" autocomplete="off">
-                        </div>
-                        <div class="form-group">
-                            <label>Last Name <span class="required-star">*</span></label>
-                            <input type="text" name="last_name" id="field_last_name" required placeholder="Last name" autocomplete="off">
-                            <div class="dup-msg" id="dup_full_name"></div>
-                        </div>
-                    </div>
-                </div>
-
-                <div class="form-section">
-                    <h4><i class="fa-solid fa-graduation-cap"></i> Academic Information</h4>
-                    <div class="form-row-2">
-                       <div class="form-group">
-                     <label>Course</label>
-                     <input type="text" name="course" placeholder="e.g., BSIT"
-                       autocomplete="off">
-                            </div>
-                       <div class="form-group">
-                         <label>Section</label>
-                  <input type="text" name="section" placeholder="e.g., E"
-                     autocomplete="off"
-                maxlength="1">
-                  </div>
-                    </div>
-                    <div class="form-group" style="margin-bottom:0">
-                        <label>Year Level</label>
-                        <select name="year_level">
-                            <option value="">-- Select Year --</option>
-                            <option value="1">1st Year</option>
-                            <option value="2">2nd Year</option>
-                            <option value="3">3rd Year</option>
-                            <option value="4">4th Year</option>
-                        </select>
-                    </div>
-                </div>
-
-                <div class="form-section">
-                    <h4><i class="fa-solid fa-address-book"></i> Contact Information</h4>
-                    <div class="form-group" style="margin-bottom:0">
-                        <label>Email</label>
-                        <input type="text" name="email" id="field_email"
-                            placeholder="e.g. larga_johnsebastian@plpasig.edu.ph" autocomplete="off">
-                        <div class="dup-msg" id="dup_email"></div>
-                    </div>
-                </div>
-
-                <button type="submit" class="btn-modal-primary" id="addStudentBtn">
-                    <i class="fa-solid fa-save"></i> Save Student
-                </button>
-            </form>
-        </div>
-    </div>
-
-    <!-- ══ IMPORT MODAL ══ -->
-    <div id="importModal" class="modal-overlay">
-        <div class="modal-content">
-            <div class="modal-header">
-                <h2><i class="fa-solid fa-file-excel"></i> Import Students from Excel</h2>
-                <button class="close-modal" onclick="closeModal('importModal')">&times;</button>
-            </div>
-
-            <!-- Download Template Button — mirrors original PHP version -->
-            <button class="btn-download-template" onclick="downloadExcelTemplate()">
-                <i class="fa-solid fa-download"></i> Download Excel Template
-            </button>
-
-            <div class="form-group">
-                <label for="excelFile">Select Excel File (.xlsx / .xls)</label>
-                <input type="file" id="excelFile" accept=".xlsx,.xls">
-            </div>
-
-            <div class="file-info">
-                <strong>Excel Format Requirements:</strong>
-                <ul>
-                    <li><strong>Column A:</strong> Student ID (7 digits)</li>
-                    <li><strong>Column B:</strong> First Name</li>
-                    <li><strong>Column C:</strong> Middle Name</li>
-                    <li><strong>Column D:</strong> Last Name</li>
-                    <li><strong>Column E:</strong> Course</li>
-                    <li><strong>Column F:</strong> Year Level (1-5)</li>
-                    <li><strong>Column G:</strong> Section</li>
-                    <li><strong>Column H:</strong> Email</li>
-                </ul>
-                <p style="margin-top:10px;color:#dc3545">
-                    <i class="fa-solid fa-exclamation-triangle"></i> First row = headers. Data starts row 2.
-                </p>
-            </div>
-
-            <div class="import-progress" id="importProgress">
-                <div class="progress-bar"><div class="progress-fill" id="progressFill">0%</div></div>
-                <div class="import-summary" id="importSummary"></div>
-            </div>
-            <button class="btn-modal-primary" id="importBtn" onclick="handleImport()">
-                <i class="fa-solid fa-upload"></i> Import Students
-            </button>
-        </div>
-    </div>
 
     <!-- ══ FACE REG MODAL ══ -->
     <div id="faceRegModal" class="modal-overlay">
