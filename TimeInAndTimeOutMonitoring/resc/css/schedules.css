@@ -342,3 +342,19 @@ hr { border: 0; height: 2px; background: linear-gradient(90deg, var(--green-dark
     .main-content { margin-left: 0; margin-top: 0; }
     .container { padding: 20px 16px 40px; } 
 }
+
+
+/* ── Page Header Titles (Stacking Fix) ── */
+.page-header .header-titles {
+    display: flex;
+    flex-direction: column;
+}
+
+.page-header .header-titles p {
+    color: var(--text-muted, #5a7265);
+    font-size: 13.5px;
+    margin-top: 2px;
+    margin-bottom: 0;
+    font-weight: 500;
+    font-family: 'Nunito Sans', sans-serif;
+}
