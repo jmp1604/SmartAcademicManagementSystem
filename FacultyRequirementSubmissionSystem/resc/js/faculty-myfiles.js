@@ -589,12 +589,23 @@ async function deleteSubmission(submissionId) {
     }
 
     try {
+        // Capture submission record before deletion for audit log
+        const { data: submissionToDelete } = await supabaseClient
+            .from('submissions')
+            .select('*')
+            .eq('id', submissionId)
+            .single();
+
         const { error } = await supabaseClient
             .from('submissions')
             .delete()
             .eq('id', submissionId);
 
         if (error) throw error;
+
+        // AUDIT: log submission deletion
+        const submissionName = `Submission ${submissionId}`;
+        await auditLog('DELETE_SUBMISSION', 'submissions', submissionId, submissionName, submissionToDelete || null, null);
 
         // Reload files
         await loadMyFiles();

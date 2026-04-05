@@ -163,8 +163,12 @@ function loadSidebar(activePage) {
             <svg viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="12" y1="11" x2="8" y2="11"/><line x1="12" y1="15" x2="8" y2="15"/></svg>
             Submission Approval
         </a>
+        <a href="admin-reports.html" class="nav-item ${activePage === 'admin-reports' ? 'active' : ''}">
+            <svg viewBox="0 0 24 24"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></svg>
+            Admin Reports
+        </a>
         ${systemSettingsLink}
-        <a href="audit-logs.html" class="nav-item ${activePage === 'audit-logs' ? 'active' : ''}">
+        <a href="admin-audit-logs.html" class="nav-item ${activePage === 'audit-logs' ? 'active' : ''}">
             <svg viewBox="0 0 24 24"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
             Audit Logs
         </a>

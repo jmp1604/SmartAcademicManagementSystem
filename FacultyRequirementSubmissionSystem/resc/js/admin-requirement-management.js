@@ -447,22 +447,40 @@ async function handleSaveRequirement(e) {
     try {
         let result;
         if (currentEditId) {
+            // Capture old value before update
+            const oldRequirement = requirements.find(r => r.id === currentEditId);
             // Update existing requirement (don't change department_id)
             const { department_id, ...updateData } = requirementData;
             result = await supabaseClient
                 .from('requirements')
                 .update(updateData)
                 .eq('id', currentEditId);
+
+            if (result.error) throw result.error;
+
+            // AUDIT: log requirement update
+            await auditLog('UPDATE_REQUIREMENT', 'requirements', currentEditId, title,
+                oldRequirement || null,
+                updateData
+            );
         } else {
             // Create new requirement
             requirementData.created_by = user.id;
             
             result = await supabaseClient
                 .from('requirements')
-                .insert([requirementData]);
-        }
+                .insert([requirementData])
+                .select();
 
-        if (result.error) throw result.error;
+            if (result.error) throw result.error;
+
+            // AUDIT: log requirement creation
+            const created = result.data?.[0];
+            await auditLog('CREATE_REQUIREMENT', 'requirements', created?.id, title,
+                null,
+                created || requirementData
+            );
+        }
 
         showNotification(
             currentEditId ? 'Requirement updated successfully' : 'Requirement created successfully',
@@ -505,12 +523,21 @@ async function handleDeleteRequirement() {
     if (!currentDeleteId) return;
 
     try {
+        const requirementToDelete = requirements.find(r => r.id === currentDeleteId);
+
         const { error } = await supabaseClient
             .from('requirements')
             .delete()
             .eq('id', currentDeleteId);
 
         if (error) throw error;
+
+        // AUDIT: log requirement deletion
+        await auditLog('DELETE_REQUIREMENT', 'requirements', currentDeleteId,
+            requirementToDelete?.name || 'Unknown',
+            requirementToDelete || null,
+            null
+        );
 
         showNotification('Requirement deleted successfully', 'success');
         closeDeleteModal();
@@ -574,7 +601,6 @@ function escapeHtml(text) {
 }
 
 function showNotification(message, type = 'info') {
-    // Simple alert for now - you can enhance this with a toast notification
     if (type === 'error') {
         alert('Error: ' + message);
     } else {

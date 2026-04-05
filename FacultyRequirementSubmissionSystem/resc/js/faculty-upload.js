@@ -342,6 +342,16 @@ async function submitAll() {
         return;
     }
 
+    // AUDIT: log submission creation
+    const submissionName = `Submission for ${requirement.id} - ${sessionUser.firstName || sessionUser.email}`;
+    await auditLog('SUBMIT_FILE', 'submissions', submission.id, submissionName, null, {
+        status: submission.status,
+        professor_id: sessionUser.id,
+        requirement_id: requirement.id,
+        semester_id: activeSemesterId,
+        submitted_at: submission.submitted_at
+    });
+
     let successCount = 0, failCount = 0;
 
     for (const item of queued) {
