@@ -154,7 +154,22 @@ hr { border: 0; height: 2px; background: linear-gradient(90deg, var(--green-dark
 .btn-go:hover { background: var(--hover-bg); }
 .btn-reset { background: var(--white); color: var(--text-muted); border: 1px solid var(--border); }
 .btn-reset:hover { background: var(--surface); color: var(--text-dark); }
-.btn-danger-outline { padding: 9px 18px; border-radius: 8px; background: var(--white); color: var(--red); border: 1px solid #fecaca; font-weight: 700; font-family: 'Nunito Sans', sans-serif; cursor: pointer; transition: .2s; }
+.btn-danger-outline { 
+    padding: 9px 18px; 
+    border-radius: 8px; 
+    background: var(--white); 
+    color: var(--red); 
+    border: 1px solid #fecaca; 
+    font-weight: 700; 
+    font-family: 'Nunito Sans', sans-serif; 
+    cursor: pointer; 
+    transition: .2s; 
+    
+    /* THE FIX: These 3 lines align the icon perfectly with the text and add spacing */
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+}
 .btn-danger-outline:hover { background: var(--red-bg); }
 .btn-danger { background: var(--red); color: var(--white); }
 .btn-danger:hover { background: #b91c1c; }
