@@ -1,19 +1,3 @@
-/**
- * admin-reports.js — Fixed version
- *
- * Fixes applied:
- *  1. Professor filter now queries the `professors` table directly with
- *     `department_id` and `first_name / last_name` columns (matches DB schema).
- *  2. Report type keys unified: HTML data-report-type values now match the
- *     JS switch cases ('overview', 'professor-performance' → 'performance',
- *     'submission-status' → 'status', 'compliance').
- *  3. Button label map covers all four keys so text restores correctly after
- *     PDF generation.
- *  4. generateReport() now accepts both hyphenated aliases and bare keys.
- *  5. Minor: department filter applied to submissions query via joined professors.
- */
-
-/* ── State ───────────────────────────────────────────────────────────────── */
 let activeSemesterId   = null;
 let activeSemesterName = null;
 let allSubmissions     = [];
@@ -24,7 +8,6 @@ let activeDepartmentName = null;
 let activeDepartmentLogoBase64 = null;
 let plpLogoBase64      = null;
 
-/* ── Bootstrap ───────────────────────────────────────────────────────────── */
 document.addEventListener('DOMContentLoaded', async () => {
     const userStr = sessionStorage.getItem('user');
     if (!userStr) { window.location.href = '../../auth/login.html'; return; }
@@ -55,7 +38,6 @@ document.addEventListener('DOMContentLoaded', async () => {
     });
 });
 
-/* ── Data loaders ────────────────────────────────────────────────────────── */
 async function loadAllSemesters() {
     try {
         const { data: sems, error } = await supabaseClient
@@ -83,12 +65,6 @@ async function loadAllSemesters() {
     }
 }
 
-/**
- * FIX: Query the `professors` table directly.
- * The DB schema (image 4) shows professors has: professor_id, first_name,
- * middle_name, last_name, department_id — NOT firstName/lastName.
- * The previous version incorrectly queried a `users` table.
- */
 async function loadProfessors() {
     if (!activeDepartmentId) {
         console.warn('loadProfessors: no activeDepartmentId, skipping');
