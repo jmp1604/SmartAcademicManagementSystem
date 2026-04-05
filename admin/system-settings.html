@@ -13,7 +13,6 @@
 <body>
 
 <div id="header-container"></div>
-
 <div id="sidebar-container"></div>
 
 <main class="main-content">
@@ -26,62 +25,135 @@
     </div>
 
     <div class="settings-container anim anim-2">
-        
-        <!-- Academic Calendar -->
+
+        <!-- ── Academic Calendar ── -->
         <div class="settings-section">
             <div class="settings-header">
                 <h2>Academic Calendar</h2>
-                <p>Set academic year and semester dates</p>
+                <p>Manage semesters and set the active semester used across all modules</p>
             </div>
-            
+
             <div class="settings-form">
-                <div class="row">
-                    <div class="col-md-6">
-                        <div class="form-group">
-                            <label for="academicYear" class="form-label">Current Academic Year</label>
-                            <input type="text" class="form-control" id="academicYear" placeholder="e.g., 2025-2026"/>
+
+                <!-- Active semester banner -->
+                <div id="activeSemesterBanner" class="active-semester-banner" style="display:none;">
+                    <span class="banner-badge">ACTIVE</span>
+                    <span id="activeSemesterLabel"></span>
+                </div>
+
+                <!-- Tab switcher -->
+                <div class="calendar-tabs">
+                    <button class="cal-tab active" id="tabSetActive" onclick="switchCalTab('set')">Set Active Semester</button>
+                    <button class="cal-tab" id="tabCreate" onclick="switchCalTab('create')">Create New Semester</button>
+                </div>
+
+                <!-- SET ACTIVE panel -->
+                <div id="panelSetActive">
+                    <div class="form-group">
+                        <label for="activeSemester" class="form-label">Select Semester to Activate</label>
+                        <select class="form-control" id="activeSemester">
+                            <option value="">— choose a semester —</option>
+                        </select>
+                        <small class="form-text text-muted">This semester will be used by all modules (grading, submissions, violations, etc.)</small>
+                    </div>
+
+                    <!-- Read-only details of selected semester -->
+                    <div id="semesterPreview" class="semester-preview" style="display:none;">
+                        <div class="row">
+                            <div class="col-sm-4">
+                                <span class="preview-label">Start Date</span>
+                                <span class="preview-value" id="previewStart"></span>
+                            </div>
+                            <div class="col-sm-4">
+                                <span class="preview-label">End Date</span>
+                                <span class="preview-value" id="previewEnd"></span>
+                            </div>
+                            <div class="col-sm-4">
+                                <span class="preview-label">Status</span>
+                                <span class="preview-value" id="previewStatus"></span>
+                            </div>
                         </div>
                     </div>
-                    <div class="col-md-6">
-                        <div class="form-group">
-                            <label for="currentSemester" class="form-label">Current Semester</label>
-                            <select class="form-control" id="currentSemester">
-                                <option value="">Select Semester</option>
-                                <option value="1">1st Semester</option>
-                                <option value="2">2nd Semester</option>
-                                <option value="3">Summer</option>
-                            </select>
-                        </div>
+
+                    <div class="button-group" style="display: flex; gap: 0.5rem;">
+                        <button class="btn btn-primary" id="saveAcademicSettings">Activate Semester</button>
+                        <button class="btn btn-secondary" id="inactivateSemesterBtn">Inactivate Semester</button>
                     </div>
                 </div>
 
-                <div class="form-group">
-                    <label for="semesterStartDate" class="form-label">Semester Start Date</label>
-                    <input type="date" class="form-control" id="semesterStartDate"/>
+                <!-- CREATE NEW panel -->
+                <div id="panelCreate" style="display:none;">
+                    <div class="row">
+                        <div class="col-md-6">
+                            <div class="form-group">
+                                <label for="newSemName" class="form-label">Semester Name</label>
+                                <input type="text" class="form-control" id="newSemName" placeholder="e.g., 1st Semester 2025-2026"/>
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="form-group">
+                                <label for="newSemType" class="form-label">Semester Type</label>
+                                <select class="form-control" id="newSemType">
+                                    <option value="">Select type…</option>
+                                    <option value="1st Semester">1st Semester</option>
+                                    <option value="2nd Semester">2nd Semester</option>
+                                    <option value="Summer">Summer</option>
+                                </select>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="row">
+                        <div class="col-md-6">
+                            <div class="form-group">
+                                <label for="newSemStart" class="form-label">Start Date</label>
+                                <input type="date" class="form-control" id="newSemStart"/>
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="form-group">
+                                <label for="newSemEnd" class="form-label">End Date</label>
+                                <input type="date" class="form-control" id="newSemEnd"/>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="form-group activate-on-create-row">
+                        <div class="form-check">
+                            <input class="form-check-input" type="checkbox" id="activateOnCreate" checked/>
+                            <label class="form-check-label" for="activateOnCreate">
+                                Set as active semester immediately
+                            </label>
+                        </div>
+                    </div>
+                    <button class="btn btn-primary" id="createSemesterBtn">Create Semester</button>
                 </div>
 
-                <div class="form-group">
-                    <label for="semesterEndDate" class="form-label">Semester End Date</label>
-                    <input type="date" class="form-control" id="semesterEndDate"/>
-                </div>
-
-                <button class="btn btn-primary" id="saveAcademicSettings">Save Changes</button>
             </div>
         </div>
 
-        <!-- Grading System -->
+        <div class="settings-section">
+            <div class="settings-header">
+                <h2>Data Migration</h2>
+                <p>Backfill existing requirements and submissions with semester IDs</p>
+            </div>
+            <div class="settings-form">
+                <div class="alert alert-info" role="alert">
+                    <strong>ℹ️ Important:</strong> This will assign all requirements and submissions without a semester ID to the currently active semester. Run this after setting an active semester.
+                </div>
+                <button class="btn btn-warning" id="migrateDataBtn">Backfill Semester Data</button>
+            </div>
+        </div>
+
+        <!-- ── Grading System ── -->
         <div class="settings-section">
             <div class="settings-header">
                 <h2>Grading System</h2>
                 <p>Configure grading scales and policies</p>
             </div>
-            
             <div class="settings-form">
                 <div class="form-group">
                     <label for="passingGrade" class="form-label">Passing Grade</label>
                     <input type="number" class="form-control" id="passingGrade" placeholder="e.g., 60" min="0" max="100"/>
                 </div>
-
                 <div class="form-group">
                     <label for="gradeMode" class="form-label">Grade Display Mode</label>
                     <select class="form-control" id="gradeMode">
@@ -90,18 +162,16 @@
                         <option value="weighted">Weighted Scale</option>
                     </select>
                 </div>
-
                 <button class="btn btn-primary" id="saveGradingSettings">Save Changes</button>
             </div>
         </div>
 
-        <!-- System Features -->
+        <!-- ── System Features ── -->
         <div class="settings-section">
             <div class="settings-header">
                 <h2>System Features</h2>
                 <p>Enable or disable system modules</p>
             </div>
-            
             <div class="settings-form">
                 <div class="feature-toggles">
                     <div class="feature-item">
@@ -113,7 +183,6 @@
                             <input class="form-check-input" type="checkbox" id="facultyRequirements" checked/>
                         </div>
                     </div>
-
                     <div class="feature-item">
                         <div class="feature-info">
                             <label for="timeMonitoring" class="form-check-label">Time In/Out Monitoring</label>
@@ -123,17 +192,15 @@
                             <input class="form-check-input" type="checkbox" id="timeMonitoring" checked/>
                         </div>
                     </div>
-
                     <div class="feature-item">
                         <div class="feature-info">
-                            <label for="thesisArchiving" class="form-check-label">Thesis & Capstone Archiving</label>
+                            <label for="thesisArchiving" class="form-check-label">Thesis &amp; Capstone Archiving</label>
                             <small>Store and manage thesis/capstone projects</small>
                         </div>
                         <div class="form-check form-switch">
                             <input class="form-check-input" type="checkbox" id="thesisArchiving" checked/>
                         </div>
                     </div>
-
                     <div class="feature-item">
                         <div class="feature-info">
                             <label for="studentViolations" class="form-check-label">Student Violation Management</label>
@@ -144,18 +211,16 @@
                         </div>
                     </div>
                 </div>
-
                 <button class="btn btn-primary" id="saveFeatureSettings">Save Changes</button>
             </div>
         </div>
 
-        <!-- Department Management -->
+        <!-- ── Department Management ── -->
         <div class="settings-section">
             <div class="settings-header">
                 <h2>Department Management</h2>
                 <p>Manage college departments and upload department logos</p>
             </div>
-            
             <div class="settings-form">
                 <div class="form-group">
                     <label for="departmentSelect" class="form-label">Select Department</label>
@@ -165,7 +230,7 @@
                     <small class="form-text text-muted">Select a department to view and manage its logo</small>
                 </div>
 
-                <div id="departmentDetailsContainer" style="display: none; border: 1px solid #dee2e6; border-radius: 0.375rem; padding: 1.5rem; margin-top: 1.5rem; background-color: #f8f9fa;">
+                <div id="departmentDetailsContainer" style="display:none; border:1px solid #dee2e6; border-radius:0.375rem; padding:1.5rem; margin-top:1.5rem; background-color:#f8f9fa;">
                     <div class="row">
                         <div class="col-md-6">
                             <div class="form-group">
@@ -180,9 +245,9 @@
                         <div class="col-md-6">
                             <div class="form-group">
                                 <label class="form-label">Current Logo</label>
-                                <div id="currentLogoPreview" style="background-color: white; border: 1px solid #dee2e6; border-radius: 0.375rem; padding: 1rem; height: 150px; display: flex; align-items: center; justify-content: center;">
-                                    <img id="currentDeptLogo" src="" alt="Department Logo" style="max-width: 100%; max-height: 100%; object-fit: contain; display: none;"/>
-                                    <span id="noLogoText" style="color: #6c757d;">No logo uploaded</span>
+                                <div id="currentLogoPreview" style="background-color:white; border:1px solid #dee2e6; border-radius:0.375rem; padding:1rem; height:150px; display:flex; align-items:center; justify-content:center;">
+                                    <img id="currentDeptLogo" src="" alt="Department Logo" style="max-width:100%; max-height:100%; object-fit:contain; display:none;"/>
+                                    <span id="noLogoText" style="color:#6c757d;">No logo uploaded</span>
                                 </div>
                             </div>
                         </div>
@@ -193,9 +258,9 @@
                         <div class="file-upload-group">
                             <input type="file" class="form-control" id="departmentLogoFile" accept="image/png,image/jpeg,image/jpg,image/webp,image/svg+xml"/>
                             <small class="form-text text-muted">PNG, JPG, WEBP, or SVG (Max 2 MB)</small>
-                            <div id="newLogoPreview" style="margin-top: 1rem; display: none;">
-                                <p style="font-weight: 500; margin-bottom: 0.5rem;">Preview:</p>
-                                <img id="newDeptLogo" src="" alt="New Department Logo" style="max-width: 150px; max-height: 150px; border-radius: 0.5rem;"/>
+                            <div id="newLogoPreview" style="margin-top:1rem; display:none;">
+                                <p style="font-weight:500; margin-bottom:0.5rem;">Preview:</p>
+                                <img id="newDeptLogo" src="" alt="New Department Logo" style="max-width:150px; max-height:150px; border-radius:0.5rem;"/>
                             </div>
                         </div>
                     </div>
@@ -207,7 +272,6 @@
         </div>
 
     </div>
-
 </main>
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>

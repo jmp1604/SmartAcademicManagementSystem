@@ -2,6 +2,10 @@ let requirements = [];
 let categories = [];
 let currentEditId = null;
 let currentDeleteId = null;
+let activeSemesterId = null;
+let activeSemesterName = null;
+let userDepartmentId = null;
+let userDepartmentName = null;
 
 document.addEventListener('DOMContentLoaded', async () => {
     const userStr = sessionStorage.getItem('user');
@@ -11,14 +15,17 @@ document.addEventListener('DOMContentLoaded', async () => {
         return;
     }
     
+    let user;
     try {
-        const user = JSON.parse(userStr);
+        user = JSON.parse(userStr);
         if (user.userType !== 'admin') {
             console.log('Access denied: User is not an admin');
             alert('Access denied. Admin privileges required.');
             window.location.href = '../../portal/portal.html';
             return;
         }
+        // Store user's department ID
+        userDepartmentId = user.departmentId;
     } catch (error) {
         console.error('Error parsing user session:', error);
         window.location.href = '../../auth/login.html';
@@ -33,19 +40,83 @@ document.addEventListener('DOMContentLoaded', async () => {
             item.classList.add('active');
         }
     });
-
+    
+    await loadActiveSemester();
     await loadCategories();
+    await loadSemesters();
+    await loadDepartments();
+    await loadUserDepartmentName();
     await loadRequirements();
     initializeEventListeners();
 });
 
+async function loadActiveSemester() {
+    try {
+        const { data: sem, error } = await supabaseClient
+            .from('semesters')
+            .select('id, name')
+            .eq('is_active', true)
+            .limit(1)
+            .single();
+        
+        if (error || !sem) {
+            console.error('No active semester found');
+            return false;
+        }
+        activeSemesterId = sem.id;
+        activeSemesterName = sem.name;
+        const semesterEl = document.getElementById('requirement-current-semester');
+        if (semesterEl) semesterEl.textContent = activeSemesterName;
+        
+        return true;
+    } catch (e) {
+        console.error('loadActiveSemester error:', e);
+        return false;
+    }
+}
+
+async function loadUserDepartmentName() {
+    try {
+        if (!userDepartmentId) {
+            console.warn('No department ID found for user');
+            userDepartmentName = 'Unknown Department';
+            return;
+        }
+        
+        const { data, error } = await supabaseClient
+            .from('departments')
+            .select('department_name')
+            .eq('id', userDepartmentId)
+            .single();
+        
+        if (error || !data) {
+            console.warn('Could not find department:', userDepartmentId);
+            userDepartmentName = 'Unknown Department';
+            return;
+        }
+        
+        userDepartmentName = data.department_name || 'Unknown Department';
+        console.log('User department loaded:', userDepartmentName);
+    } catch (e) {
+        console.error('loadUserDepartmentName error:', e);
+        userDepartmentName = 'Unknown Department';
+    }
+}
+
 async function loadCategories() {
     try {
-        const { data, error } = await supabaseClient
+        const currentUser = getCurrentUser();
+        let query = supabaseClient
             .from('categories')
             .select('*')
-            .eq('status', 'active')
-            .order('name', { ascending: true });
+            .eq('status', 'active');
+        
+        // Filter by department if user has one
+        if (currentUser?.departmentId) {
+            query = query.eq('department_id', currentUser.departmentId);
+        }
+        
+        const { data, error } = await query.order('name', { ascending: true });
 
         if (error) throw error;
 
@@ -74,7 +145,45 @@ function populateCategoryDropdowns() {
     }
 }
 
-async function loadRequirements() {
+async function loadSemesters() {
+    try {
+        const { data, error } = await supabaseClient
+            .from('semesters')
+            .select('id, name')
+            .order('name', { ascending: true });
+
+        if (error) throw error;
+
+        const semesterSelect = document.getElementById('requirementSemester');
+        if (semesterSelect && data) {
+            semesterSelect.innerHTML = '<option value="">Select Semester</option>' +
+                data.map(sem => `<option value="${sem.id}">${escapeHtml(sem.name)}</option>`).join('');
+        }
+    } catch (error) {
+        console.error('Error loading semesters:', error);
+    }
+}
+
+async function loadDepartments() {
+    try {
+        const { data, error } = await supabaseClient
+            .from('departments')
+            .select('id, department_name')
+            .eq('is_active', true)
+            .order('department_name', { ascending: true });
+
+        if (error) throw error;
+
+        departments = data || [];
+        const departmentSelect = document.getElementById('requirementDepartment');
+        if (departmentSelect && departments.length > 0) {
+            departmentSelect.innerHTML = '<option value="">Select Department</option>' +
+                departments.map(dept => `<option value="${dept.id}">${escapeHtml(dept.department_name)}</option>`).join('');
+        }
+    } catch (error) {
+        console.error('Error loading departments:', error);
+    }
+}async function loadRequirements() {
     try {
         if (!supabaseClient) {
             console.error('Supabase client not initialized');
@@ -114,6 +223,7 @@ async function loadRequirements() {
                 )
             `)
             .eq('department_id', departmentId)
+            .eq('semester_id', activeSemesterId)
             .order('created_at', { ascending: false });
 
         if (error) throw error;
@@ -248,9 +358,15 @@ function openCreateModal() {
     document.getElementById('modalTitle').textContent = 'Create New Requirement';
     document.getElementById('requirementForm').reset();
     document.getElementById('requirementId').value = '';
-    
-    // Set active status by default
     document.querySelector('input[name="requirementStatus"][value="active"]').checked = true;
+    
+    // Auto-select active semester
+    if (activeSemesterId) {
+        document.getElementById('requirementSemester').value = activeSemesterId;
+    }
+    
+    // Display user's department (read-only)
+    document.getElementById('requirementDepartment').value = userDepartmentName;
     
     document.getElementById('requirementModal').style.display = 'flex';
 }
@@ -274,9 +390,8 @@ async function editRequirement(id) {
     document.getElementById('requirementTitle').value = requirement.name || '';
     document.getElementById('requirementDescription').value = requirement.description || '';
     document.getElementById('requirementCategory').value = requirement.category_id || '';
-    document.getElementById('requirementDepartment').value = requirement.department || '';
-    document.getElementById('requirementSemester').value = requirement.semester || '';
-    document.getElementById('requirementAcademicYear').value = requirement.academic_year || '';
+    document.getElementById('requirementDepartment').value = userDepartmentName;
+    document.getElementById('requirementSemester').value = requirement.semester_id || '';
     
     // Format deadline for datetime-local input
     if (requirement.deadline) {
@@ -299,9 +414,7 @@ async function handleSaveRequirement(e) {
     const title = document.getElementById('requirementTitle').value.trim();
     const description = document.getElementById('requirementDescription').value.trim();
     const categoryId = document.getElementById('requirementCategory').value;
-    const department = document.getElementById('requirementDepartment').value.trim();
     const semester = document.getElementById('requirementSemester').value;
-    const academicYear = document.getElementById('requirementAcademicYear').value.trim();
     const deadline = document.getElementById('requirementDeadline').value;
     const isMandatory = document.getElementById('requirementMandatory').checked;
     const status = document.querySelector('input[name="requirementStatus"]:checked').value;
@@ -324,10 +437,8 @@ async function handleSaveRequirement(e) {
         name: title,  // Map 'title' to 'name' column
         description: description || null,
         category_id: categoryId,
-        department: department || null,
-        department_id: user.departmentId,  // Add department_id
-        semester: semester || null,
-        academic_year: academicYear || null,
+        department_id: user.departmentId,  // Always use user's department
+        semester_id: semester || null,
         deadline: deadline || null,
         is_mandatory: isMandatory,
         status

@@ -13,14 +13,19 @@
 <body>
 
 <div id="header-container"></div>
-
 <div id="sidebar-container"></div>
 
 <main class="main-content">
 
     <div class="page-header anim anim-1">
-        <h1>Upload Files</h1>
-        <p>Submit your faculty requirements to the College of Computer Studies</p>
+        <div>
+            <h1>Upload Files</h1>
+            <p>Submit your faculty requirements to the College of Computer Studies</p>
+        </div>
+        <div class="semester-badge">
+            <span class="semester-label">Current Semester:</span>
+            <span class="semester-name" id="upload-current-semester">Loading…</span>
+        </div>
     </div>
 
     <div class="stat-cards anim anim-2">
@@ -46,19 +51,14 @@
             </div>
             <div class="panel-body">
                 <div class="category-grid" id="categoriesGridUpload">
-                    <!-- Categories will be loaded dynamically from database -->
-                    <div class="loading-spinner" style="text-align: center; padding: 3rem; grid-column: 1/-1;">
-                        <p style="color: var(--text-muted);">Loading categories...</p>
+                    <div class="cat-loading">
+                        <p>Loading categories…</p>
                     </div>
                 </div>
-                
-                <!-- Empty state when no categories -->
-                <div id="noCategoriesMessage" style="display:none; text-align: center; padding: 3rem; grid-column: 1/-1;">
-                    <svg viewBox="0 0 24 24" style="width: 48px; height: 48px; stroke: var(--text-muted); fill: none; margin: 0 auto 1rem;">
-                        <path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/>
-                    </svg>
-                    <h3 style="color: var(--text-main); margin-bottom: .5rem;">No Categories Available</h3>
-                    <p style="color: var(--text-muted);">Please contact the system administrator to create requirement categories.</p>
+                <div id="noCategoriesMessage" style="display:none;" class="cat-empty">
+                    <svg viewBox="0 0 24 24"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/></svg>
+                    <h3>No Categories Available</h3>
+                    <p>Please contact the system administrator to create requirement categories.</p>
                 </div>
             </div>
         </div>
@@ -68,7 +68,7 @@
         <div class="panel">
             <div class="panel-header">
                 <svg viewBox="0 0 24 24"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
-                Step 2: Upload File — <span id="selected-category-name" style="font-style:italic;font-weight:400;opacity:.85;"></span>
+                Step 2: Upload File(s) — <span id="selected-category-name"></span>
             </div>
             <div class="panel-body">
                 <form id="upload-form" novalidate>
@@ -77,40 +77,52 @@
                         <div class="dropzone-icon">
                             <svg viewBox="0 0 24 24"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
                         </div>
-                        <div class="dropzone-title">Drag &amp; drop your file here</div>
-                        <div class="dropzone-sub">Supports PDF, DOCX, XLSX, PPT — Max 25MB</div>
-                        <button type="button" class="btn-browse" id="browse-btn">Browse File</button>
-                        <input type="file" id="file-input" style="display:none;"
-                            accept=".pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx"/>
+                        <div class="dropzone-title">Drag &amp; drop file(s) here</div>
+                        <div class="dropzone-sub">Single or multiple — PDF, DOCX, XLSX, PPT · Max 25 MB each</div>
+                        <button type="button" class="btn-browse" id="browse-btn">Browse Files</button>
+                        <input type="file" id="file-input" style="display:none;" multiple
+                               accept=".pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx"/>
                     </div>
 
-                    <div class="file-preview" id="file-preview">
-                        <svg viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
-                        <span class="file-preview-name" id="preview-name"></span>
-                        <span class="file-preview-size" id="preview-size"></span>
-                        <button type="button" class="file-preview-remove" id="remove-file">
-                            <svg viewBox="0 0 24 24"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+                    <div id="file-queue-wrap" class="file-queue-wrap">
+                        <div class="queue-header">
+                            <span class="queue-header-label">
+                                <svg viewBox="0 0 24 24"><path d="M13 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V9z"/><polyline points="13 2 13 9 20 9"/></svg>
+                                Selected Files
+                            </span>
+                            <span class="queue-count" id="queue-count">0</span>
+                        </div>
+                        <div class="file-queue" id="file-queue"></div>
+                        <button type="button" class="btn-add-more" id="btn-add-more">
+                            <svg viewBox="0 0 24 24"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+                            Add More Files
                         </button>
                     </div>
+
+                    <!-- Post-upload result summary -->
+                    <div id="upload-summary" class="upload-summary"></div>
 
                     <div class="upload-meta">
                         <input type="hidden" id="selected-category-id" value=""/>
                         <div>
                             <label class="form-label">Selected Requirement</label>
-                            <input type="text" id="file-category" class="form-control" readonly style="background:#f5f5f5;"/>
+                            <input type="text" id="file-category" class="form-control" readonly/>
                         </div>
                         <div>
-                            <label class="form-label" for="file-description">Description/Notes <span style="font-weight:400;text-transform:none;letter-spacing:0;color:#8faa93;">(optional)</span></label>
+                            <label class="form-label" for="file-description">
+                                Description / Notes
+                                <span class="form-label-optional">(optional — applies to all files)</span>
+                            </label>
                             <textarea id="file-description" class="form-control" rows="2"
-                                placeholder="Add any notes or comments about this submission..."></textarea>
+                                placeholder="Add any notes or comments about this submission…"></textarea>
                         </div>
                     </div>
 
                     <div class="step-actions">
                         <button type="button" class="btn-outline" id="btn-back-step">← Back to Categories</button>
-                        <button type="submit" class="btn-primary">
+                        <button type="submit" class="btn-primary" id="submit-btn">
                             <svg viewBox="0 0 24 24"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
-                            Submit File
+                            <span id="submit-btn-label">Submit File</span>
                         </button>
                     </div>
 
@@ -132,8 +144,8 @@
 <script src="../resc/js/faculty-specific.js"></script>
 <script src="../resc/js/faculty-upload.js"></script>
 <script>
-loadHeader();
-loadSidebar('faculty-upload');
+    loadHeader();
+    loadSidebar('faculty-upload');
 </script>
 </body>
 </html>

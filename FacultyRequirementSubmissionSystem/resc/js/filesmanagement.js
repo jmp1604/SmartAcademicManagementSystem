@@ -2,6 +2,8 @@ let allSubmissions = [];
 let currentSubmissionId = null;
 let currentFileUrl = null;
 let currentFileName = null;
+let activeSemesterId = null;
+let activeSemesterName = null;
 
 async function resolveFileUrl(raw, fileName) {
     if (!raw) { console.warn('No file URL for:', fileName); return null; }
@@ -51,17 +53,45 @@ async function resolveFileUrl(raw, fileName) {
     return raw;
 }
 
-document.addEventListener('DOMContentLoaded', function () {
+document.addEventListener('DOMContentLoaded', async function () {
     if (!isAdmin()) {
         window.location.href = '../../auth/login.html';
         return;
     }
 
+    await loadActiveSemester();
     loadSubmissions();
     setupEventListeners();
     populateDeptFilter();
     populateCatFilter();
 });
+
+async function loadActiveSemester() {
+    try {
+        const { data: sem, error } = await supabaseClient
+            .from('semesters')
+            .select('id, name')
+            .eq('is_active', true)
+            .limit(1)
+            .single();
+        
+        if (error || !sem) {
+            console.error('No active semester found');
+            return false;
+        }
+        activeSemesterId = sem.id;
+        activeSemesterName = sem.name;
+        
+        // Display the semester in the page
+        const semesterEl = document.getElementById('filesmanagement-current-semester');
+        if (semesterEl) semesterEl.textContent = activeSemesterName;
+        
+        return true;
+    } catch (e) {
+        console.error('loadActiveSemester error:', e);
+        return false;
+    }
+}
 
 function setupEventListeners() {
     const searchInput = document.querySelector('.search-input');
@@ -124,10 +154,11 @@ async function populateDeptFilter() {
 
 async function populateCatFilter() {
     try {
+        // Get all categories, not just active ones
+        // This ensures submissions referencing inactive categories can still be filtered
         const { data: cats } = await supabaseClient
             .from('categories')
             .select('id, name')
-            .eq('status', 'active')
             .order('name');
 
         if (!cats || cats.length === 0) return;
@@ -155,8 +186,39 @@ async function loadSubmissions() {
             showPlaceholderData();
             return;
         }
+        const currentUser = getCurrentUser();
+        if (!currentUser?.departmentId) {
+            console.warn('No department context for current admin');
+            showPlaceholderData();
+            return;
+        }
 
-        console.log('Loading submissions...');
+        console.log('Loading submissions for department:', currentUser.departmentId, 'semester:', activeSemesterId);
+        
+        // First, get requirements for this department and semester to know which submissions to load
+        const { data: deptRequirements, error: reqError } = await supabaseClient
+            .from('requirements')
+            .select('id')
+            .eq('department_id', currentUser.departmentId)
+            .eq('semester_id', activeSemesterId);
+
+        if (reqError) {
+            console.error('Error loading requirements:', reqError);
+            showPlaceholderData();
+            return;
+        }
+
+        const requirementIds = deptRequirements?.map(r => r.id) || [];
+        if (requirementIds.length === 0) {
+            console.log('No requirements found for this department/semester');
+            allSubmissions = [];
+            await enrichSubmissionsData();
+            updateStatistics();
+            renderSubmissions();
+            return;
+        }
+
+        // Now load submissions only for these requirements
         const { data: submissions, error } = await supabaseClient
             .from('submissions')
             .select(`
@@ -179,6 +241,8 @@ async function loadSubmissions() {
                     uploaded_at
                 )
             `)
+            .eq('semester_id', activeSemesterId)
+            .in('requirement_id', requirementIds)
             .order('submitted_at', { ascending: false });
 
         if (error) {
@@ -188,7 +252,7 @@ async function loadSubmissions() {
         }
 
         allSubmissions = submissions || [];
-        console.log('✓ Submissions loaded:', allSubmissions.length, 'records');
+        console.log('✓ Submissions loaded:', allSubmissions.length, 'records for department:', currentUser.departmentId);
         if (allSubmissions.length > 0) console.log('Sample submission:', allSubmissions[0]);
 
         await enrichSubmissionsData();
@@ -204,6 +268,10 @@ async function loadSubmissions() {
 
 async function enrichSubmissionsData() {
     try {
+        const currentUser = getCurrentUser();
+        const userDepartmentId = currentUser?.departmentId;
+
+        // Load only professors from the current admin's department
         const { data: professors, error: profError } = await supabaseClient
             .from('professors')
             .select(`
@@ -214,7 +282,8 @@ async function enrichSubmissionsData() {
                 employee_id,
                 department_id,
                 departments(department_name, department_code)
-            `);
+            `)
+            .eq('department_id', userDepartmentId);
 
         if (profError) console.warn('Professors query error:', profError);
 
@@ -223,9 +292,10 @@ async function enrichSubmissionsData() {
             professors.forEach(prof => {
                 professorMap[prof.professor_id] = prof;
             });
-            console.log('✓ Professors loaded:', professors.length);
+            console.log('✓ Professors loaded:', professors.length, 'from department:', userDepartmentId);
         }
 
+        // Load only requirements for the current semester and department
         const { data: requirements, error: reqError } = await supabaseClient
             .from('requirements')
             .select(`
@@ -234,7 +304,9 @@ async function enrichSubmissionsData() {
                 title,
                 category_id,
                 categories(name)
-            `);
+            `)
+            .eq('semester_id', activeSemesterId)
+            .eq('department_id', userDepartmentId);
 
         if (reqError) console.warn('Requirements query error:', reqError);
 
@@ -243,7 +315,7 @@ async function enrichSubmissionsData() {
             requirements.forEach(req => {
                 requirementMap[req.id] = req;
             });
-            console.log('✓ Requirements loaded:', requirements.length);
+            console.log('✓ Requirements loaded:', requirements.length, 'for semester:', activeSemesterId, 'department:', userDepartmentId);
         }
 
         // Enrich each submission

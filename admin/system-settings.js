@@ -1,42 +1,51 @@
+/* =========================================================
+   system-settings.js
+   ========================================================= */
+
 document.addEventListener('DOMContentLoaded', async () => {
     checkSupabaseConnection();
     await loadSystemSettings();
     setupEventListeners();
 });
 
+/* ── Event Listeners ── */
 function setupEventListeners() {
     document.getElementById('saveAcademicSettings').addEventListener('click', saveAcademicSettings);
+    document.getElementById('inactivateSemesterBtn').addEventListener('click', inactivateSemester);
+    document.getElementById('createSemesterBtn').addEventListener('click', createSemester);
     document.getElementById('saveGradingSettings').addEventListener('click', saveGradingSettings);
     document.getElementById('saveFeatureSettings').addEventListener('click', saveFeatureSettings);
+    document.getElementById('migrateDataBtn').addEventListener('click', migrateDataToActiveSemester);
+
+    // Show semester details when user picks one from the dropdown
+    document.getElementById('activeSemester').addEventListener('change', previewSemester);
 
     const departmentSelect = document.getElementById('departmentSelect');
-    if (departmentSelect) {
-        departmentSelect.addEventListener('change', loadDepartmentDetails);
-    }
+    if (departmentSelect) departmentSelect.addEventListener('change', loadDepartmentDetails);
 
     const departmentLogoFile = document.getElementById('departmentLogoFile');
-    if (departmentLogoFile) {
-        departmentLogoFile.addEventListener('change', previewDepartmentLogo);
-    }
+    if (departmentLogoFile) departmentLogoFile.addEventListener('change', previewDepartmentLogo);
 
     const saveDepartmentLogo = document.getElementById('saveDepartmentLogo');
-    if (saveDepartmentLogo) {
-        saveDepartmentLogo.addEventListener('click', saveDepartmentLogoHandler);
-    }
+    if (saveDepartmentLogo) saveDepartmentLogo.addEventListener('click', saveDepartmentLogoHandler);
 
     const clearDepartmentLogoBtn = document.getElementById('clearDepartmentLogoBtn');
-    if (clearDepartmentLogoBtn) {
-        clearDepartmentLogoBtn.addEventListener('click', clearDepartmentSelection);
-    }
+    if (clearDepartmentLogoBtn) clearDepartmentLogoBtn.addEventListener('click', clearDepartmentSelection);
 }
 
+/* ── Tab switcher ── */
+function switchCalTab(tab) {
+    const isCreate = tab === 'create';
+    document.getElementById('panelSetActive').style.display = isCreate ? 'none' : 'flex';
+    document.getElementById('panelCreate').style.display  = isCreate ? 'flex' : 'none';
+    document.getElementById('tabSetActive').classList.toggle('active', !isCreate);
+    document.getElementById('tabCreate').classList.toggle('active',  isCreate);
+}
 
+/* ── Load everything on page boot ── */
 async function loadSystemSettings() {
     try {
-        if (!supabaseClient) {
-            console.error('Supabase client not initialized');
-            return;
-        }
+        if (!supabaseClient) { console.error('Supabase client not initialized'); return; }
 
         const { data, error } = await supabaseClient
             .from('system_settings')
@@ -46,63 +55,21 @@ async function loadSystemSettings() {
         if (error && error.code !== 'PGRST116') throw error;
         if (data) populateSettings(data);
 
-        // Load departments
+        await loadSemesters(data?.active_semester_id ?? null);
         await loadDepartments();
     } catch (error) {
         console.error('Error loading system settings:', error);
     }
 }
 
-async function loadDepartments() {
-    try {
-        if (!supabaseClient) {
-            console.error('Supabase client not initialized');
-            return;
-        }
-
-        const { data: departments, error } = await supabaseClient
-            .from('departments')
-            .select('id, department_name, department_code, logo_url, is_active')
-            .eq('is_active', true)
-            .order('department_name', { ascending: true });
-
-        if (error) throw error;
-
-        const departmentSelect = document.getElementById('departmentSelect');
-        if (departmentSelect && departments && departments.length > 0) {
-            // Clear existing options except the first one
-            while (departmentSelect.children.length > 1) {
-                departmentSelect.removeChild(departmentSelect.lastChild);
-            }
-
-            departments.forEach(dept => {
-                const option = document.createElement('option');
-                option.value = dept.id;
-                option.textContent = `${dept.department_name} (${dept.department_code})`;
-                option.dataset.deptName = dept.department_name;
-                option.dataset.deptCode = dept.department_code;
-                option.dataset.logoUrl = dept.logo_url || '';
-                departmentSelect.appendChild(option);
-            });
-        }
-    } catch (error) {
-        console.error('Error loading departments:', error);
-        showAlert('Error loading departments: ' + error.message, 'danger');
-    }
-}
-
+/* ── Populate form from DB row ── */
 function populateSettings(settings) {
-    if (settings.academic_year) document.getElementById('academicYear').value = settings.academic_year;
-    if (settings.current_semester) document.getElementById('currentSemester').value = settings.current_semester;
-    if (settings.semester_start_date) document.getElementById('semesterStartDate').value = settings.semester_start_date;
-    if (settings.semester_end_date) document.getElementById('semesterEndDate').value = settings.semester_end_date;
-    if (settings.passing_grade) document.getElementById('passingGrade').value = settings.passing_grade;
-    if (settings.grade_display_mode) document.getElementById('gradeMode').value = settings.grade_display_mode;
+    if (settings.passing_grade)     document.getElementById('passingGrade').value = settings.passing_grade;
+    if (settings.grade_display_mode) document.getElementById('gradeMode').value    = settings.grade_display_mode;
 
     if (settings.features) {
         const features = typeof settings.features === 'string'
-            ? JSON.parse(settings.features)
-            : settings.features;
+            ? JSON.parse(settings.features) : settings.features;
 
         if (features.faculty_requirements !== undefined)
             document.getElementById('facultyRequirements').checked = features.faculty_requirements;
@@ -115,34 +82,266 @@ function populateSettings(settings) {
     }
 }
 
-const COLLEGE_LOGO_BUCKET = 'dept-logos';
+/* ── Load semesters into the dropdown ── */
+async function loadSemesters(activeSemesterId = null) {
+    try {
+        if (!supabaseClient) { console.error('Supabase client not initialized'); return; }
+
+        const { data: semesters, error } = await supabaseClient
+            .from('semesters')
+            .select('*')
+            .order('start_date', { ascending: false });
+
+        if (error) throw error;
+
+        const semesterSelect = document.getElementById('activeSemester');
+        // Remove all options except placeholder
+        while (semesterSelect.children.length > 1) semesterSelect.removeChild(semesterSelect.lastChild);
+
+        let activeRecord = null;
+
+        if (semesters && semesters.length > 0) {
+            semesters.forEach(sem => {
+                const option = document.createElement('option');
+                option.value = sem.id;
+                option.textContent = sem.name;
+                option.dataset.startDate = sem.start_date;
+                option.dataset.endDate   = sem.end_date;
+                option.dataset.isActive  = sem.is_active;
+                semesterSelect.appendChild(option);
+
+                if (sem.is_active || sem.id === activeSemesterId) activeRecord = sem;
+            });
+            if (activeRecord) {
+                semesterSelect.value = activeRecord.id;
+                previewSemester();      
+                showActiveBanner(activeRecord);
+            } else {
+                semesterSelect.value = '';
+                document.getElementById('semesterPreview').style.display = 'none';
+                showActiveBanner(null);
+            }
+        } else {
+            semesterSelect.value = '';
+            document.getElementById('semesterPreview').style.display = 'none';
+            showActiveBanner(null);
+        }
+    } catch (error) {
+        console.error('Error loading semesters:', error);
+        showAlert('Error loading semesters: ' + error.message, 'danger');
+    }
+}
+
+function previewSemester() {
+    const select  = document.getElementById('activeSemester');
+    const preview = document.getElementById('semesterPreview');
+    const opt     = select.options[select.selectedIndex];
+
+    if (!opt || !opt.value) { preview.style.display = 'none'; return; }
+
+    document.getElementById('previewStart').textContent  = formatDate(opt.dataset.startDate);
+    document.getElementById('previewEnd').textContent    = formatDate(opt.dataset.endDate);
+    document.getElementById('previewStatus').innerHTML   =
+        opt.dataset.isActive === 'true'
+            ? '<span class="status-badge active">Active</span>'
+            : '<span class="status-badge inactive">Inactive</span>';
+
+    preview.style.display = 'block';
+}
+
+function showActiveBanner(sem) {
+    const banner = document.getElementById('activeSemesterBanner');
+    const label  = document.getElementById('activeSemesterLabel');
+    if (!sem) { banner.style.display = 'none'; return; }
+    label.textContent = `${sem.name}  ·  ${formatDate(sem.start_date)} → ${formatDate(sem.end_date)}`;
+    banner.style.display = 'flex';
+}
 
 async function saveAcademicSettings() {
     try {
-        const settingsData = {
-            academic_year: document.getElementById('academicYear').value,
-            current_semester: document.getElementById('currentSemester').value,
-            semester_start_date: document.getElementById('semesterStartDate').value,
-            semester_end_date: document.getElementById('semesterEndDate').value,
-            updated_at: new Date().toISOString()
-        };
-        await updateSystemSettings(settingsData);
-        showAlert('Academic settings saved successfully', 'success');
+        const selectedSemesterId = document.getElementById('activeSemester').value;
+        if (!selectedSemesterId) { showAlert('Please select a semester to activate.', 'warning'); return; }
+
+        await activateSemester(selectedSemesterId);
+        showAlert('Active semester updated successfully.', 'success');
+        await loadSemesters(selectedSemesterId);
     } catch (error) {
         console.error('Error saving academic settings:', error);
         showAlert('Error saving academic settings: ' + error.message, 'danger');
     }
 }
 
+async function inactivateSemester() {
+    try {
+        const { data: activeSem, error: findError } = await supabaseClient
+            .from('semesters')
+            .select('id, name')
+            .eq('is_active', true)
+            .single();
+
+        if (findError || !activeSem) { showAlert('No active semester to inactivate.', 'warning'); return; }
+
+        const { error: updateError } = await supabaseClient
+            .from('semesters')
+            .update({ is_active: false })
+            .eq('id', activeSem.id);
+        if (updateError) throw updateError;
+
+        await updateSystemSettings({
+            active_semester_id : null,
+            updated_at         : new Date().toISOString()
+        });
+
+        showAlert(`Semester "${activeSem.name}" has been inactivated.`, 'success');
+        await loadSemesters(null);
+    } catch (error) {
+        console.error('Error inactivating semester:', error);
+        showAlert('Error inactivating semester: ' + error.message, 'danger');
+    }
+}
+
+/* ── Data Migration: Backfill semester_id ── */
+async function migrateDataToActiveSemester() {
+    try {
+        // Get active semester
+        const { data: activeSem, error: semError } = await supabaseClient
+            .from('semesters')
+            .select('id, name')
+            .eq('is_active', true)
+            .single();
+
+        if (semError || !activeSem) {
+            showAlert('No active semester set. Please activate a semester first.', 'warning');
+            return;
+        }
+
+        if (!confirm(`Backfill all records without a semester ID to "${activeSem.name}"? This cannot be undone.`)) {
+            return;
+        }
+
+        const migrateBtn = document.getElementById('migrateDataBtn');
+        const originalText = migrateBtn.textContent;
+        migrateBtn.disabled = true;
+        migrateBtn.textContent = 'Migrating...';
+
+        let reqCount = 0, subCount = 0;
+
+        const { error: reqError, count: reqUpdateCount } = await supabaseClient
+            .from('requirements')
+            .update({ semester_id: activeSem.id, updated_at: new Date().toISOString() })
+            .is('semester_id', null);
+
+        if (!reqError) {
+            const { count } = await supabaseClient
+                .from('requirements')
+                .select('id', { count: 'exact', head: true })
+                .eq('semester_id', activeSem.id)
+                .is('updated_at', null);
+            reqCount = count || 0;
+        }
+        const { error: subError } = await supabaseClient
+            .from('submissions')
+            .update({ semester_id: activeSem.id, updated_at: new Date().toISOString() })
+            .is('semester_id', null);
+
+        if (!subError) {
+            const { count } = await supabaseClient
+                .from('submissions')
+                .select('id', { count: 'exact', head: true })
+                .eq('semester_id', activeSem.id);
+            subCount = count || 0;
+        }
+
+        migrateBtn.disabled = false;
+        migrateBtn.textContent = originalText;
+
+        showAlert(`✓ Migration complete! Updated submissions and requirements with semester "${activeSem.name}".`, 'success');
+    } catch (error) {
+        console.error('Error during migration:', error);
+        showAlert('Error during migration: ' + error.message, 'danger');
+        const migrateBtn = document.getElementById('migrateDataBtn');
+        migrateBtn.disabled = false;
+        migrateBtn.textContent = 'Backfill Semester Data';
+    }
+}
+
+async function createSemester() {
+    try {
+        const name      = document.getElementById('newSemName').value.trim();
+        const startDate = document.getElementById('newSemStart').value;
+        const endDate   = document.getElementById('newSemEnd').value;
+        const activate  = document.getElementById('activateOnCreate').checked;
+
+        if (!name)      { showAlert('Please enter a semester name.',       'warning'); return; }
+        if (!startDate) { showAlert('Please choose a start date.',         'warning'); return; }
+        if (!endDate)   { showAlert('Please choose an end date.',          'warning'); return; }
+        if (endDate <= startDate) { showAlert('End date must be after start date.', 'warning'); return; }
+
+        const { data: newSem, error: insertError } = await supabaseClient
+            .from('semesters')
+            .insert([{
+                name,
+                start_date : startDate,
+                end_date   : endDate,
+                is_active  : false,
+                created_at : new Date().toISOString()
+            }])
+            .select()
+            .single();
+
+        if (insertError) throw insertError;
+
+        if (activate) {
+            await activateSemester(newSem.id);
+            showAlert(`Semester "${name}" created and set as active.`, 'success');
+        } else {
+            showAlert(`Semester "${name}" created successfully.`, 'success');
+        }
+
+        // Clear create form
+        document.getElementById('newSemName').value  = '';
+        document.getElementById('newSemType').value  = '';
+        document.getElementById('newSemStart').value = '';
+        document.getElementById('newSemEnd').value   = '';
+        document.getElementById('activateOnCreate').checked = true;
+
+        // Switch back to "Set Active" tab and reload list
+        switchCalTab('set');
+        await loadSemesters(activate ? newSem.id : null);
+    } catch (error) {
+        console.error('Error creating semester:', error);
+        showAlert('Error creating semester: ' + error.message, 'danger');
+    }
+}
+
+async function activateSemester(semesterId) {
+    const { error: resetError } = await supabaseClient
+        .from('semesters')
+        .update({ is_active: false })
+        .gte('created_at', '1970-01-01');
+    if (resetError) throw resetError;
+
+    const { error: updateError } = await supabaseClient
+        .from('semesters')
+        .update({ is_active: true })
+        .eq('id', semesterId);
+    if (updateError) throw updateError;
+
+    await updateSystemSettings({
+        active_semester_id : semesterId,
+        updated_at         : new Date().toISOString()
+    });
+}
+
 async function saveGradingSettings() {
     try {
         const settingsData = {
-            passing_grade: parseFloat(document.getElementById('passingGrade').value),
-            grade_display_mode: document.getElementById('gradeMode').value,
-            updated_at: new Date().toISOString()
+            passing_grade      : parseFloat(document.getElementById('passingGrade').value),
+            grade_display_mode : document.getElementById('gradeMode').value,
+            updated_at         : new Date().toISOString()
         };
         await updateSystemSettings(settingsData);
-        showAlert('Grading settings saved successfully', 'success');
+        showAlert('Grading settings saved successfully.', 'success');
     } catch (error) {
         console.error('Error saving grading settings:', error);
         showAlert('Error saving grading settings: ' + error.message, 'danger');
@@ -152,17 +351,13 @@ async function saveGradingSettings() {
 async function saveFeatureSettings() {
     try {
         const features = {
-            faculty_requirements: document.getElementById('facultyRequirements').checked,
-            time_monitoring: document.getElementById('timeMonitoring').checked,
-            thesis_archiving: document.getElementById('thesisArchiving').checked,
-            student_violations: document.getElementById('studentViolations').checked
+            faculty_requirements : document.getElementById('facultyRequirements').checked,
+            time_monitoring      : document.getElementById('timeMonitoring').checked,
+            thesis_archiving     : document.getElementById('thesisArchiving').checked,
+            student_violations   : document.getElementById('studentViolations').checked
         };
-        const settingsData = {
-            features: JSON.stringify(features),
-            updated_at: new Date().toISOString()
-        };
-        await updateSystemSettings(settingsData);
-        showAlert('Feature settings saved successfully', 'success');
+        await updateSystemSettings({ features: JSON.stringify(features), updated_at: new Date().toISOString() });
+        showAlert('Feature settings saved successfully.', 'success');
     } catch (error) {
         console.error('Error saving feature settings:', error);
         showAlert('Error saving feature settings: ' + error.message, 'danger');
@@ -172,72 +367,126 @@ async function saveFeatureSettings() {
 async function updateSystemSettings(settingsData) {
     if (!supabaseClient) throw new Error('Supabase client not initialized');
 
-    const { data: existingSettings, error: checkError } = await supabaseClient
+    const { data: existing, error: checkError } = await supabaseClient
         .from('system_settings')
         .select('id')
         .single();
+    if (checkError && checkError.code !== 'PGRST116') {
+        console.warn('Warning querying system_settings:', checkError);
+    }
 
-    if (existingSettings) {
+    if (existing) {
         const { error } = await supabaseClient
             .from('system_settings')
             .update(settingsData)
-            .eq('id', existingSettings.id);
+            .eq('id', existing.id);
         if (error) throw error;
     } else {
         const { error } = await supabaseClient
             .from('system_settings')
-            .insert([{ ...settingsData, created_at: new Date().toISOString() }]);
+            .insert([settingsData]);
         if (error) throw error;
     }
 }
 
-// Department Management Functions
-function loadDepartmentDetails(event) {
-    const selectedDeptId = event.target.value;
-    const detailsContainer = document.getElementById('departmentDetailsContainer');
-    
-    if (!selectedDeptId) {
-        detailsContainer.style.display = 'none';
-        clearDepartmentSelection();
-        return;
+async function getActiveSemester() {
+    try {
+        if (!supabaseClient) throw new Error('Supabase not initialised');
+        const { data: settings } = await supabaseClient
+            .from('system_settings')
+            .select('active_semester_id')
+            .single();
+
+        if (settings?.active_semester_id) {
+            const { data: sem, error } = await supabaseClient
+                .from('semesters')
+                .select('*')
+                .eq('id', settings.active_semester_id)
+                .single();
+            if (!error && sem) return sem;
+        }
+        const { data: fallback, error: fbErr } = await supabaseClient
+            .from('semesters')
+            .select('*')
+            .eq('is_active', true)
+            .single();
+
+        if (!fbErr && fallback) return fallback;
+
+        return null;  
+    } catch (err) {
+        console.error('getActiveSemester error:', err);
+        return null;
     }
+}
+
+async function loadDepartments() {
+    try {
+        if (!supabaseClient) { console.error('Supabase client not initialized'); return; }
+
+        const { data: departments, error } = await supabaseClient
+            .from('departments')
+            .select('id, department_name, department_code, logo_url, is_active')
+            .eq('is_active', true)
+            .order('department_name', { ascending: true });
+
+        if (error) throw error;
+
+        const departmentSelect = document.getElementById('departmentSelect');
+        if (departmentSelect && departments && departments.length > 0) {
+            while (departmentSelect.children.length > 1)
+                departmentSelect.removeChild(departmentSelect.lastChild);
+
+            departments.forEach(dept => {
+                const option = document.createElement('option');
+                option.value = dept.id;
+                option.textContent = `${dept.department_name} (${dept.department_code})`;
+                option.dataset.deptName = dept.department_name;
+                option.dataset.deptCode = dept.department_code;
+                option.dataset.logoUrl  = dept.logo_url || '';
+                departmentSelect.appendChild(option);
+            });
+        }
+    } catch (error) {
+        console.error('Error loading departments:', error);
+        showAlert('Error loading departments: ' + error.message, 'danger');
+    }
+}
+
+function loadDepartmentDetails(event) {
+    const selectedDeptId  = event.target.value;
+    const detailsContainer = document.getElementById('departmentDetailsContainer');
+
+    if (!selectedDeptId) { detailsContainer.style.display = 'none'; clearDepartmentSelection(); return; }
 
     const selectedOption = event.target.options[event.target.selectedIndex];
-    
     document.getElementById('deptName').value = selectedOption.dataset.deptName;
     document.getElementById('deptCode').value = selectedOption.dataset.deptCode;
-    
-    const logoUrl = selectedOption.dataset.logoUrl;
+
+    const logoUrl     = selectedOption.dataset.logoUrl;
     const currentLogo = document.getElementById('currentDeptLogo');
-    const noLogoText = document.getElementById('noLogoText');
-    
+    const noLogoText  = document.getElementById('noLogoText');
+
     if (logoUrl && logoUrl !== '') {
         currentLogo.src = logoUrl;
         currentLogo.style.display = 'block';
-        noLogoText.style.display = 'none';
+        noLogoText.style.display  = 'none';
     } else {
         currentLogo.style.display = 'none';
-        noLogoText.style.display = 'block';
+        noLogoText.style.display  = 'block';
     }
-    
-    // Reset the file input
+
     document.getElementById('departmentLogoFile').value = '';
     document.getElementById('newLogoPreview').style.display = 'none';
-    
     detailsContainer.style.display = 'block';
 }
 
 function previewDepartmentLogo(event) {
     const file = event.target.files[0];
     if (!file) return;
-    
     const preview = document.getElementById('newLogoPreview');
-    const img = document.getElementById('newDeptLogo');
-    
-    if (preview && img) {
-        img.src = URL.createObjectURL(file);
-        preview.style.display = 'block';
-    }
+    const img     = document.getElementById('newDeptLogo');
+    if (preview && img) { img.src = URL.createObjectURL(file); preview.style.display = 'block'; }
 }
 
 function clearDepartmentSelection() {
@@ -252,97 +501,63 @@ const DEPARTMENT_LOGO_BUCKET = 'dept-logos';
 async function saveDepartmentLogoHandler() {
     try {
         const departmentSelect = document.getElementById('departmentSelect');
-        const selectedDeptId = departmentSelect.value;
-        
-        if (!selectedDeptId) {
-            showAlert('Please select a department first', 'warning');
-            return;
-        }
+        const selectedDeptId   = departmentSelect.value;
+        if (!selectedDeptId) { showAlert('Please select a department first.', 'warning'); return; }
 
         const departmentLogoFile = document.getElementById('departmentLogoFile').files[0];
-        
-        if (!departmentLogoFile) {
-            showAlert('Please select a logo file to upload', 'warning');
-            return;
-        }
+        if (!departmentLogoFile) { showAlert('Please select a logo file to upload.', 'warning'); return; }
 
         const MAX_SIZE = 2 * 1024 * 1024;
-        const ALLOWED = ['image/png', 'image/jpeg', 'image/jpg', 'image/webp', 'image/svg+xml'];
+        const ALLOWED  = ['image/png','image/jpeg','image/jpg','image/webp','image/svg+xml'];
+        if (!ALLOWED.includes(departmentLogoFile.type)) { showAlert('Invalid file type. Please upload PNG, JPG, WEBP, or SVG.', 'warning'); return; }
+        if (departmentLogoFile.size > MAX_SIZE)          { showAlert('File too large. Maximum allowed size is 2 MB.', 'warning'); return; }
 
-        if (!ALLOWED.includes(departmentLogoFile.type)) {
-            showAlert('Invalid file type. Please upload PNG, JPG, WEBP, or SVG.', 'warning');
-            return;
-        }
-        if (departmentLogoFile.size > MAX_SIZE) {
-            showAlert('File too large. Maximum allowed size is 2 MB.', 'warning');
-            return;
-        }
-
-        const ext = departmentLogoFile.name.split('.').pop().toLowerCase();
+        const ext      = departmentLogoFile.name.split('.').pop().toLowerCase();
         const filePath = `departments/${selectedDeptId}/logo.${ext}`;
-        
-        // Upload the file
-        const { error: uploadError } = await supabaseClient
-            .storage
+
+        const { error: uploadError } = await supabaseClient.storage
             .from(DEPARTMENT_LOGO_BUCKET)
-            .upload(filePath, departmentLogoFile, {
-                cacheControl: '3600',
-                upsert: true,
-                contentType: departmentLogoFile.type
-            });
-        
+            .upload(filePath, departmentLogoFile, { cacheControl: '3600', upsert: true, contentType: departmentLogoFile.type });
         if (uploadError) throw uploadError;
-        
-        // Get the public URL
-        const { data: urlData } = supabaseClient
-            .storage
-            .from(DEPARTMENT_LOGO_BUCKET)
-            .getPublicUrl(filePath);
-        
+
+        const { data: urlData } = supabaseClient.storage.from(DEPARTMENT_LOGO_BUCKET).getPublicUrl(filePath);
         const logoUrl = urlData.publicUrl;
-        
-        // Update the department record in the database
+
         const { error: updateError } = await supabaseClient
             .from('departments')
-            .update({ 
-                logo_url: logoUrl,
-                updated_at: new Date().toISOString()
-            })
+            .update({ logo_url: logoUrl, updated_at: new Date().toISOString() })
             .eq('id', selectedDeptId);
-        
         if (updateError) throw updateError;
 
-        // Reload departments to update the dropdown
         await loadDepartments();
-        
-        // Show the updated logo
+
         const currentLogo = document.getElementById('currentDeptLogo');
-        const noLogoText = document.getElementById('noLogoText');
+        const noLogoText  = document.getElementById('noLogoText');
         currentLogo.src = logoUrl;
         currentLogo.style.display = 'block';
-        noLogoText.style.display = 'none';
+        noLogoText.style.display  = 'none';
 
-        // Reset file input and preview
         document.getElementById('departmentLogoFile').value = '';
         document.getElementById('newLogoPreview').style.display = 'none';
-
-        showAlert('Department logo uploaded successfully', 'success');
+        showAlert('Department logo uploaded successfully.', 'success');
     } catch (error) {
         console.error('Error saving department logo:', error);
         showAlert('Error saving department logo: ' + error.message, 'danger');
     }
 }
 
+function formatDate(dateStr) {
+    if (!dateStr) return '—';
+    const d = new Date(dateStr + 'T00:00:00');  
+    return d.toLocaleDateString('en-PH', { year:'numeric', month:'short', day:'numeric' });
+}
+
 function showAlert(message, type = 'info') {
     const alertDiv = document.createElement('div');
     alertDiv.className = `alert alert-${type} alert-dismissible fade show`;
     alertDiv.setAttribute('role', 'alert');
-    alertDiv.innerHTML = `
-        ${message}
-        <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
-    `;
+    alertDiv.innerHTML = `${message}<button type="button" class="btn-close" data-bs-dismiss="alert"></button>`;
     const mainContent = document.querySelector('.main-content');
     mainContent.insertBefore(alertDiv, mainContent.firstChild);
     setTimeout(() => alertDiv.remove(), 5000);
 }
-

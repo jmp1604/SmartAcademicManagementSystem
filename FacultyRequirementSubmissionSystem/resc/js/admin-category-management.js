@@ -46,9 +46,17 @@ async function loadCategories() {
             return;
         }
         
+        const currentUser = JSON.parse(sessionStorage.getItem('user'));
+        if (!currentUser?.departmentId) {
+            showNotification('Error: No department assigned to your account', 'error');
+            showEmptyState();
+            return;
+        }
+
         const { data, error } = await supabaseClient
             .from('categories')
             .select('*')
+            .eq('department_id', currentUser.departmentId)
             .order('created_at', { ascending: false });
 
         if (error) throw error;
@@ -255,16 +263,13 @@ async function saveCategory() {
             showNotification('Category name is required', 'error');
             return;
         }
-
-        // Get user from session
         const userStr = sessionStorage.getItem('user');
         if (!userStr) {
             throw new Error('User not authenticated');
         }
         
         const currentUser = JSON.parse(userStr);
-        
-        // Check if user has a department assigned
+
         if (!currentUser.departmentId) {
             showNotification('Error: Your account is not assigned to a department', 'error');
             return;
@@ -279,7 +284,6 @@ async function saveCategory() {
         };
 
         if (categoryId) {
-            // Update existing category (don't change department_id)
             const { department_id, ...updateData } = categoryData;
             const { error } = await supabaseClient
                 .from('categories')
@@ -292,7 +296,6 @@ async function saveCategory() {
             if (error) throw error;
             showNotification('Category updated successfully', 'success');
         } else {
-            // Create new category with department_id
             console.log('Current user ID:', currentUser.id);
             
             const insertData = {
