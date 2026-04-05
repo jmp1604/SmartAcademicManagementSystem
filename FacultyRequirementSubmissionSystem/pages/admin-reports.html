@@ -1,0 +1,130 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Admin Reports - Faculty Requirement Submission System</title>
+    <link href="https://fonts.googleapis.com/css2?family=Merriweather:wght@400;700&family=Source+Sans+3:wght@400;500;600&display=swap" rel="stylesheet"/>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css"/>
+    <link rel="stylesheet" href="../../shared/global.css"/>
+    <link rel="stylesheet" href="../resc/css/faculty-specific.css"/>
+    <link rel="stylesheet" href="../resc/css/admin-category-management.css">
+</head>
+<body>
+
+<div id="header-container"></div>
+
+<div id="sidebar-container"></div>
+
+<main class="main-content">
+    <div class="page-header anim anim-1">
+        <h1>Admin Reports</h1>
+        <p>Generate reports for all faculty submissions in your department</p>
+    </div>
+
+    <div class="filter-panel anim anim-2">
+        <div class="filter-panel-title">
+            <svg viewBox="0 0 24 24"><polygon points="22 3 2 3 10 12.46 10 19 14 21 14 12.46 22 3"/></svg>
+            Filter Reports
+        </div>
+        <div class="filter-panel-sub">Filter your report by semester, professor, category, and status</div>
+        <div class="filter-grid">
+            <div class="filter-group">
+                <label>Semester</label>
+                <div class="filter-select-wrap">
+                    <select id="filter-semester"><option value="">Loading…</option></select>
+                    <svg viewBox="0 0 24 24"><polyline points="6 9 12 15 18 9"/></svg>
+                </div>
+            </div>
+            <div class="filter-group">
+                <label>Professor</label>
+                <div class="filter-select-wrap">
+                    <select id="filter-professor"><option value="">All Professors</option></select>
+                    <svg viewBox="0 0 24 24"><polyline points="6 9 12 15 18 9"/></svg>
+                </div>
+            </div>
+            <div class="filter-group">
+                <label>Category</label>
+                <div class="filter-select-wrap">
+                    <select id="filter-category"><option value="">All Categories</option></select>
+                    <svg viewBox="0 0 24 24"><polyline points="6 9 12 15 18 9"/></svg>
+                </div>
+            </div>
+            <div class="filter-group">
+                <label>Status</label>
+                <div class="filter-select-wrap">
+                    <select id="filter-status"><option value="">All Statuses</option></select>
+                    <svg viewBox="0 0 24 24"><polyline points="6 9 12 15 18 9"/></svg>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="report-actions-grid anim anim-3" style="margin-top: 30px;">
+
+        <div class="report-action-card">
+            <div class="rac-header">
+                <svg viewBox="0 0 24 24"><path d="M3 3h18v18H3z" fill="none" stroke="currentColor" stroke-width="2"/><path d="M3 9h18M3 15h18M9 3v18"/></svg>
+                <span class="rac-title">Department Overview</span>
+            </div>
+            <div class="rac-desc">A full breakdown of all submissions across the department — totals, approval rates, and per-professor summary.</div>
+            <button class="btn-generate" data-report-type="overview">
+                <svg viewBox="0 0 24 24"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+                Generate Overview Report
+            </button>
+        </div>
+
+        <div class="report-action-card">
+            <div class="rac-header">
+                <svg viewBox="0 0 24 24"><circle cx="12" cy="8" r="4"/><path d="M4 20c0-4 3.6-7 8-7s8 3 8 7"/></svg>
+                <span class="rac-title">Professor Performance</span>
+            </div>
+            <div class="rac-desc">Ranks each professor by approval rate, showing total, approved, pending, and rejected submissions.</div>
+            <button class="btn-generate" data-report-type="professor-performance">
+                <svg viewBox="0 0 24 24"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+                Generate Performance Report
+            </button>
+        </div>
+
+        <div class="report-action-card">
+            <div class="rac-header">
+                <svg viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg>
+                <span class="rac-title">Submission Status</span>
+            </div>
+            <div class="rac-desc">A chronological listing of every submission with professor, requirement, category, status, and review date.</div>
+            <button class="btn-generate" data-report-type="submission-status">
+                <svg viewBox="0 0 24 24"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+                Generate Status Report
+            </button>
+        </div>
+
+        <div class="report-action-card">
+            <div class="rac-header">
+                <svg viewBox="0 0 24 24"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>
+                <span class="rac-title">Compliance Report</span>
+            </div>
+            <div class="rac-desc">Shows whether each professor is compliant — flags anyone with pending or rejected submissions for the selected semester.</div>
+            <button class="btn-generate" data-report-type="compliance">
+                <svg viewBox="0 0 24 24"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+                Generate Compliance Report
+            </button>
+        </div>
+
+    </div>
+</main>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <script src="../../config/.env.js"></script>
+    <script src="../../config/config.js"></script>
+    <script src="../resc/js/faculty-specific.js"></script>
+    <script src="includes/sidebar.js"></script>
+    <script src="../resc/js/admin-reports.js"></script>
+    
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            loadHeader();
+            loadSidebar('admin-reports');
+        });
+    </script>
+</body>
+</html>

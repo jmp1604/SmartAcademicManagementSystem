@@ -592,10 +592,21 @@ async function handleReviewSubmission(action) {
         if (error) throw error;
         console.log('✓ Submission status updated');
 
+        // AUDIT: log submission approval/rejection
+        const submission = allSubmissions.find(s => s.id === currentSubmissionId);
+        const submissionName = `Submission for requirement ${submission?.requirement_id}` || `Submission ${currentSubmissionId}`;
+        const oldStatus = { status: 'pending' };
+        const newStatus = { status: action, reviewed_by: user?.id, reviewed_at: new Date().toISOString(), remarks: remarks };
+        const auditAction = action === 'approved' ? 'APPROVE_SUBMISSION' : 'REJECT_SUBMISSION';
+        await auditLog(auditAction, 'submissions', currentSubmissionId, submissionName, oldStatus, newStatus);
+
+        console.log('✓ Submission status updated');
+
         try {
             const submission = allSubmissions.find(s => s.id === currentSubmissionId);
             const fileName   = submission?.submission_files?.[0]?.file_name || 'document.pdf';
 
+            // Legacy audit log entry (keeping for backward compatibility)
             await supabaseClient
                 .from('audit_logs')
                 .insert({

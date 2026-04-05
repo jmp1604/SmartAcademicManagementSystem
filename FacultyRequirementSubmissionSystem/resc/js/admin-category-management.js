@@ -284,6 +284,7 @@ async function saveCategory() {
         };
 
         if (categoryId) {
+            const oldCategory = categories.find(c => c.id === categoryId);
             const { department_id, ...updateData } = categoryData;
             const { error } = await supabaseClient
                 .from('categories')
@@ -294,6 +295,8 @@ async function saveCategory() {
                 .eq('id', categoryId);
 
             if (error) throw error;
+            // AUDIT: log category update
+            await auditLog('UPDATE_CATEGORY', 'categories', categoryId, name, oldCategory || null, { ...updateData });
             showNotification('Category updated successfully', 'success');
         } else {
             console.log('Current user ID:', currentUser.id);
@@ -323,6 +326,9 @@ async function saveCategory() {
                 });
                 throw error;
             }
+            // AUDIT: log category creation
+            const created = data?.[0];
+            await auditLog('CREATE_CATEGORY', 'categories', created?.id, insertData.name, null, created || insertData);
             showNotification('Category created successfully', 'success');
         }
 
@@ -361,6 +367,11 @@ async function toggleCategoryStatus(categoryId) {
 
         if (error) throw error;
 
+        // AUDIT: log status toggle
+        await auditLog('TOGGLE_CATEGORY_STATUS', 'categories', categoryId, category.name,
+            { status: category.status },
+            { status: newStatus }
+        );
         showNotification(`Category ${newStatus === 'active' ? 'activated' : 'deactivated'} successfully`, 'success');
         await loadCategories();
 
@@ -404,12 +415,21 @@ async function deleteCategory() {
             return;
         }
 
+        const categoryToDelete = categories.find(c => c.id === currentDeleteId);
+
         const { error } = await supabaseClient
             .from('categories')
             .delete()
             .eq('id', currentDeleteId);
 
         if (error) throw error;
+
+        // AUDIT: log category deletion
+        await auditLog('DELETE_CATEGORY', 'categories', currentDeleteId,
+            categoryToDelete?.name || 'Unknown',
+            categoryToDelete || null,
+            null
+        );
 
         showNotification('Category deleted successfully', 'success');
         closeDeleteModal();

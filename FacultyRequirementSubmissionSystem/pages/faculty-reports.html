@@ -6,7 +6,6 @@
     <title>My Reports — CCS Faculty Portal</title>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet"/>
     <link href="https://fonts.googleapis.com/css2?family=Merriweather:wght@400;700&family=Source+Sans+3:wght@400;500;600&display=swap" rel="stylesheet"/>
-    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.min.css"/>
     <link rel="stylesheet" href="../../shared/global.css"/>
     <link rel="stylesheet" href="../resc/css/faculty-specific.css"/>
 </head>
@@ -28,27 +27,13 @@
             <svg viewBox="0 0 24 24"><polygon points="22 3 2 3 10 12.46 10 19 14 21 14 12.46 22 3"/></svg>
             Filter Reports
         </div>
-        <div class="filter-panel-sub">Select criteria to filter your submissions</div>
+        <div class="filter-panel-sub">Filter your report by semester, category, and status</div>
         <div class="filter-grid">
-            <div class="filter-group">
-                <label>Academic Year</label>
-                <div class="filter-select-wrap">
-                    <select id="filter-year">
-                        <option>2023-2024</option>
-                        <option>2024-2025</option>
-                        <option>2025-2026</option>
-                    </select>
-                    <svg viewBox="0 0 24 24"><polyline points="6 9 12 15 18 9"/></svg>
-                </div>
-            </div>
             <div class="filter-group">
                 <label>Semester</label>
                 <div class="filter-select-wrap">
                     <select id="filter-semester">
-                        <option>All Semesters</option>
-                        <option>1st Semester</option>
-                        <option>2nd Semester</option>
-                        <option>Summer</option>
+                        <option value="">Loading...</option>
                     </select>
                     <svg viewBox="0 0 24 24"><polyline points="6 9 12 15 18 9"/></svg>
                 </div>
@@ -57,13 +42,7 @@
                 <label>Category</label>
                 <div class="filter-select-wrap">
                     <select id="filter-category">
-                        <option>All Categories</option>
-                        <option>Syllabus</option>
-                        <option>Grade Sheets</option>
-                        <option>Lecture Notes</option>
-                        <option>Attendance Records</option>
-                        <option>Assessment Tools</option>
-                        <option>Research Papers</option>
+                        <option value="">All Categories</option>
                     </select>
                     <svg viewBox="0 0 24 24"><polyline points="6 9 12 15 18 9"/></svg>
                 </div>
@@ -72,10 +51,7 @@
                 <label>Status</label>
                 <div class="filter-select-wrap">
                     <select id="filter-status">
-                        <option>All Status</option>
-                        <option>Approved</option>
-                        <option>Pending</option>
-                        <option>Rejected</option>
+                        <option value="">All Statuses</option>
                     </select>
                     <svg viewBox="0 0 24 24"><polyline points="6 9 12 15 18 9"/></svg>
                 </div>
@@ -83,26 +59,7 @@
         </div>
     </div>
 
-    <div class="summary-cards anim anim-3">
-        <div class="summary-card white">
-            <div class="summary-label">Total Submissions</div>
-            <div class="summary-value" id="stat-total">0</div>
-        </div>
-        <div class="summary-card green">
-            <div class="summary-label">Approved</div>
-            <div class="summary-value" id="stat-approved">0</div>
-        </div>
-        <div class="summary-card yellow">
-            <div class="summary-label">Pending</div>
-            <div class="summary-value" id="stat-pending">0</div>
-        </div>
-        <div class="summary-card red">
-            <div class="summary-label">Rejected</div>
-            <div class="summary-value" id="stat-rejected">0</div>
-        </div>
-    </div>
-
-    <div class="report-actions-grid anim anim-3">
+    <div class="report-actions-grid anim anim-3" style="margin-top: 30px;">
 
         <div class="report-action-card">
             <div class="rac-header">
@@ -110,7 +67,7 @@
                 <span class="rac-title">Submission Summary Report</span>
             </div>
             <div class="rac-desc">Generate a comprehensive summary of all your submissions including status, dates, and categories</div>
-            <button class="btn-generate" onclick="generateReport('summary')">
+            <button class="btn-generate" data-report-type="summary">
                 <svg viewBox="0 0 24 24"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
                 Generate Summary Report
             </button>
@@ -122,7 +79,7 @@
                 <span class="rac-title">Timeline Report</span>
             </div>
             <div class="rac-desc">View a chronological timeline of your submission activities and approval history</div>
-            <button class="btn-generate" onclick="generateReport('timeline')">
+            <button class="btn-generate" data-report-type="timeline">
                 <svg viewBox="0 0 24 24"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
                 Generate Timeline Report
             </button>
@@ -134,7 +91,7 @@
                 <span class="rac-title">Category Breakdown Report</span>
             </div>
             <div class="rac-desc">Get a detailed breakdown of your submissions organized by document category</div>
-            <button class="btn-generate" onclick="generateReport('category')">
+            <button class="btn-generate" data-report-type="category">
                 <svg viewBox="0 0 24 24"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
                 Generate Category Report
             </button>
@@ -146,7 +103,7 @@
                 <span class="rac-title">Semester Report</span>
             </div>
             <div class="rac-desc">Generate a semester-specific report showing all submissions for the selected period</div>
-            <button class="btn-generate" onclick="generateReport('semester')">
+            <button class="btn-generate" data-report-type="semester">
                 <svg viewBox="0 0 24 24"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
                 Generate Semester Report
             </button>
@@ -154,32 +111,15 @@
 
     </div>
 
-    <div class="submissions-panel anim anim-4">
-        <div class="submissions-panel-title">Filtered Submissions (<span id="filtered-count">0</span>)</div>
-        <div class="submissions-panel-sub">Preview of submissions based on your selected filters</div>
-
-        <table class="sub-table">
-            <thead>
-                <tr>
-                    <th>File Name</th>
-                    <th>Category</th>
-                    <th>Semester</th>
-                    <th>Upload Date</th>
-                    <th>Status</th>
-                </tr>
-            </thead>
-            <tbody id="submissions-tbody">
-                <!-- Submissions will be loaded dynamically -->
-            </tbody>
-        </table>
-    </div>
-
 </main>
 
 <button class="help-btn">?</button>
 
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="../../config/.env.js"></script>
+<script src="../../config/config.js"></script>
 <script src="includes/sidebar.js"></script>
 <script src="../resc/js/faculty-specific.js"></script>
 <script src="../resc/js/faculty-reports.js"></script>

@@ -1,0 +1,250 @@
+/* ===================================================
+   admin-audit-logs.css
+   Styles specific to the Audit Logs page.
+   Shared modal/table/stat-card styles come from
+   admin-category-management.css
+=================================================== */
+
+/* Red stat card variant */
+.stat-card.red .stat-value {
+    color: #ef4444;
+}
+
+/* Action badge pill */
+.action-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: .35rem;
+    padding: .3rem .7rem;
+    border-radius: 2rem;
+    font-size: .75rem;
+    font-weight: 700;
+    letter-spacing: .04em;
+    text-transform: uppercase;
+    white-space: nowrap;
+}
+
+.action-badge.create {
+    background: #d1fae5;
+    color: #065f46;
+}
+
+.action-badge.update {
+    background: #dbeafe;
+    color: #1e40af;
+}
+
+.action-badge.delete {
+    background: #fee2e2;
+    color: #991b1b;
+}
+
+.action-badge.toggle {
+    background: #fef3c7;
+    color: #92400e;
+}
+
+.action-badge svg {
+    width: 12px;
+    height: 12px;
+    stroke: currentColor;
+    fill: none;
+    stroke-width: 2.5;
+    stroke-linecap: round;
+    stroke-linejoin: round;
+    flex-shrink: 0;
+}
+
+/* Table badge for target_table */
+.table-badge {
+    display: inline-block;
+    padding: .2rem .55rem;
+    border-radius: .35rem;
+    font-size: .72rem;
+    font-weight: 600;
+    background: #f3f4f6;
+    color: #374151;
+    text-transform: lowercase;
+    letter-spacing: .02em;
+}
+
+/* "View changes" link */
+.btn-view-diff {
+    display: inline-flex;
+    align-items: center;
+    gap: .35rem;
+    font-size: .8rem;
+    font-weight: 600;
+    color: var(--green-mid, #145a2e);
+    background: none;
+    border: 1.5px solid var(--green-mid, #145a2e);
+    border-radius: .45rem;
+    padding: .3rem .7rem;
+    cursor: pointer;
+    transition: all .2s;
+}
+
+.btn-view-diff:hover {
+    background: var(--green-mid, #145a2e);
+    color: #fff;
+}
+
+.btn-view-diff svg {
+    width: 13px;
+    height: 13px;
+    stroke: currentColor;
+    fill: none;
+    stroke-width: 2;
+}
+
+.no-changes {
+    font-size: .8rem;
+    color: #9ca3af;
+    font-style: italic;
+}
+
+/* Timestamp cell */
+.timestamp-cell {
+    display: flex;
+    flex-direction: column;
+    gap: .15rem;
+}
+
+.timestamp-date {
+    font-size: .85rem;
+    font-weight: 600;
+    color: var(--text-main);
+}
+
+.timestamp-time {
+    font-size: .75rem;
+    color: var(--text-muted);
+}
+
+/* Target record cell */
+.record-cell strong {
+    display: block;
+    font-size: .88rem;
+    color: var(--text-main);
+}
+
+.record-cell small {
+    font-size: .75rem;
+    color: var(--text-muted);
+    font-family: monospace;
+}
+
+/* ---- Diff Modal ---- */
+.diff-container {
+    display: flex;
+    flex-direction: column;
+    gap: 1rem;
+}
+
+.diff-section {
+    border-radius: .55rem;
+    overflow: hidden;
+    border: 1.5px solid var(--border);
+}
+
+.diff-section-title {
+    padding: .5rem 1rem;
+    font-size: .75rem;
+    font-weight: 700;
+    letter-spacing: .06em;
+    text-transform: uppercase;
+}
+
+.diff-section.before .diff-section-title {
+    background: #fee2e2;
+    color: #991b1b;
+}
+
+.diff-section.after .diff-section-title {
+    background: #d1fae5;
+    color: #065f46;
+}
+
+.diff-section.info .diff-section-title {
+    background: #dbeafe;
+    color: #1e40af;
+}
+
+.diff-body {
+    padding: .75rem 1rem;
+    background: #f9fafb;
+}
+
+.diff-row {
+    display: grid;
+    grid-template-columns: 140px 1fr;
+    gap: .5rem;
+    padding: .35rem 0;
+    border-bottom: 1px solid #f3f4f6;
+    font-size: .85rem;
+}
+
+.diff-row:last-child {
+    border-bottom: none;
+}
+
+.diff-key {
+    font-weight: 600;
+    color: var(--text-muted);
+    text-transform: capitalize;
+}
+
+.diff-val {
+    color: var(--text-main);
+    word-break: break-word;
+}
+
+/* Pagination */
+.pagination-bar {
+    display: flex;
+    align-items: center;
+    justify-content: flex-end;
+    gap: .5rem;
+    padding: 1.25rem 0 .25rem;
+    flex-wrap: wrap;
+}
+
+.page-btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-width: 34px;
+    height: 34px;
+    padding: 0 .6rem;
+    border-radius: .45rem;
+    border: 1.5px solid var(--border);
+    background: transparent;
+    color: var(--text-main);
+    font-size: .85rem;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all .2s;
+    font-family: 'Source Sans 3', sans-serif;
+}
+
+.page-btn:hover:not(:disabled) {
+    border-color: var(--green-mid, #145a2e);
+    color: var(--green-mid, #145a2e);
+}
+
+.page-btn.active {
+    background: var(--green-mid, #145a2e);
+    border-color: var(--green-mid, #145a2e);
+    color: #fff;
+}
+
+.page-btn:disabled {
+    opacity: .4;
+    cursor: not-allowed;
+}
+
+.page-info {
+    font-size: .82rem;
+    color: var(--text-muted);
+    margin-right: .5rem;
+}
