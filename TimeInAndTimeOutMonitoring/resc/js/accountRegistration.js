@@ -176,21 +176,21 @@ function startProgressPolling() {
     }, 800);
 }
 
-async function waitForFlask(retries = 25, delayMs = 1500) {
+async function waitForFlask(retries = 30, delayMs = 1500) {
     for (let i = 0; i < retries; i++) {
         try {
-            const res = await fetch('http://localhost:5000/video_feed', { method: 'HEAD' });
-            if (res.ok || res.status === 200) return true;
+            const res = await fetch('http://localhost:5000/status', {
+                method: 'GET',
+                signal: AbortSignal.timeout(1000)
+            });
+            if (res.ok) return true;
         } catch (_) {}
 
-        // Update status message so user knows it's still loading
-        captureStatus.innerHTML = `<i class="fa-solid fa-circle-notch fa-spin"></i> Loading camera engine... (${i + 1}/${retries})`;
-
+        captureStatus.innerHTML = `<i class="fa-solid fa-circle-notch fa-spin"></i> Starting camera engine... (${i + 1}/${retries})`;
         await new Promise(r => setTimeout(r, delayMs));
     }
-    throw new Error("Engine did not respond after " + retries + " attempts.");
+    throw new Error("Engine did not respond after " + retries + " attempts. Try running START_ENGINE.bat manually.");
 }
-
 // ═══════════════════════════════════════════
 // STUDENT ID INPUT LOGIC
 // ═══════════════════════════════════════════

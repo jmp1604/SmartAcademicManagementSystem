@@ -182,7 +182,7 @@ def generate_frames():
                     cv2.putText(display, f"PHOTO {session['count']+1}/5", (l, t-10),
                                 cv2.FONT_HERSHEY_SIMPLEX, 0.7, (0, 255, 0), 2)
 
-                    if time.time() - session.get("last_t", 0) > 1.5:
+                    if time.time() - session.get("last_t", 0) > 0.6:
                         for _ in range(3): cap.grab() 
                         
                         _, fresh_frame = cap.read()
@@ -271,6 +271,10 @@ def shutdown():
     print("--- Engine shutting down ---")
     os.kill(os.getpid(), signal.SIGTERM)
     return jsonify({"status": "shutting down"})
+
+@app.route('/')
+def index():
+    return jsonify({"status": "running", "message": "Face Capture Engine is active"})
 
 if __name__ == "__main__":
     app.run(host='0.0.0.0', port=5000, threaded=True)
