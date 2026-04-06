@@ -900,6 +900,67 @@ def shutdown():
     except Exception as e:
         print(f"Error during shutdown: {e}")
         return jsonify({"success": False, "error": str(e)})
+    
+
+def session_cleaner_worker():
+    """Background thread to auto-end expired sessions every 60 seconds."""
+    while True:
+        try:
+            now_store, now_local = get_now()
+            today = datetime.date.today()
+            current_time_str = now_local.strftime("%H:%M:%S")
+
+            # 1. Find sessions that are 'ongoing' or 'dismissing' for today
+            res = supabase.table("lab_sessions")\
+                .select("session_id, lab_schedules(end_time)")\
+                .eq("session_date", str(today))\
+                .in_("status", ["ongoing", "dismissing"])\
+                .execute()
+
+            for sess in (res.data or []):
+                end_time = sess.get("lab_schedules", {}).get("end_time")
+                
+                # 2. If current time is past the scheduled end_time, terminate it
+                if end_time and current_time_str > end_time:
+                    session_id = sess["session_id"]
+                    
+                    # Mark session completed
+                    supabase.table("lab_sessions").update({
+                        "status": "completed",
+                        "actual_end_time": end_time,
+                        "notes": "System Auto-End: Schedule time elapsed",
+                        "updated_at": now_store.isoformat()
+                    }).eq("session_id", session_id).execute()
+
+                    # Auto time-out students still 'IN'
+                    att_res = supabase.table("lab_attendance")\
+                        .select("attendance_id, time_in")\
+                        .eq("session_id", session_id)\
+                        .is_("time_out", "null")\
+                        .execute()
+
+                    for att in (att_res.data or []):
+                        # Calculate duration based on the scheduled end time
+                        time_in_dt = parse_dt(att["time_in"])
+                        # Create a datetime for today at the scheduled end_time
+                        end_dt = datetime.datetime.combine(today, datetime.time.fromisoformat(end_time))
+                        duration = int((end_dt - time_in_dt).total_seconds() / 60)
+                        
+                        supabase.table("lab_attendance").update({
+                            "time_out": end_dt.isoformat(),
+                            "duration_minutes": max(0, duration),
+                            "updated_at": now_store.isoformat()
+                        }).eq("attendance_id", att["attendance_id"]).execute()
+                    
+                    print(f"Cleanup: Auto-ended expired session {session_id}")
+
+        except Exception as e:
+            print(f"Cleaner Error: {e}")
+        
+        time.sleep(60) # Run once per minute
+
+# Start the cleaner thread at the bottom of your file (before app.run)
+threading.Thread(target=session_cleaner_worker, daemon=True).start()
 
 # ─────────────────────────────────────────────
 # Scanner UI

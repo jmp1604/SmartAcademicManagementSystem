@@ -3,16 +3,16 @@ C:\Users\PLPASIG\pythonnn\Lib\site-packages\face_recognition_models\__init__.py:
 ✓ Supabase client ready (Loaded from .env)
 
 ── Students with facial path: 2
-    ✗ No files in: students/student_23-12345
-    [✗ 0 enc] Juan  Dela Cruz → students/student_23-12345
-    [✓ 3 enc] Maria  Cruz → students/student_23-22222
+    ✗ No images in: students/student_23-22222
+    [✗ 0 enc] Maria  Cruz → students/student_23-22222
+    [✓ 3 enc] Juan  Dela Cruz → students/student_23-12345
 
 ── Professors with facial path: 1
     [✓ 3 enc] Prof. Juanito  Alvarez → professors/professor_443562323
 
 ✓ Total encodings loaded: 6
 ============================================================
-✓ Session cache refreshed: 0 sessions
+✓ Session cache refreshed: 2 sessions
 ============================================================
 Lab Attendance — Supabase Edition ✓
 Encodings loaded  : 6
