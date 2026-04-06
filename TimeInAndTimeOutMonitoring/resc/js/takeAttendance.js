@@ -295,22 +295,28 @@ case 'SESSION_VOIDED':
             break;
 
         case 'IN':
-            showNotif({ icon: d.is_late ? '⚠️' : '🟢',
-                title: d.is_late ? 'Time IN — Late' : 'Time IN',
+            // ── TOUCHLESS AUTO-CONFIRM ──
+            showNotif({ 
+                icon: d.is_late ? '⚠️' : '🟢',
+                title: d.is_late ? 'Saving Time IN — Late...' : 'Saving Time IN...',
                 msg: `${name}\nTime: ${time}`,
                 lateTxt: d.is_late ? `You are LATE by ${d.late_minutes} minute${d.late_minutes !== 1 ? 's' : ''}` : null,
-                buttons: [
-                    { label: '✅ Confirm Time IN', color: d.is_late ? 'orange' : 'green', action: () => confirmStudent(d) },
-                    { label: 'Cancel', color: 'gray', action: null }
-                ] });
+                buttons: [],   // No manual buttons!
+                autoDismiss: 2 // Closes screen in 2 seconds for the next person
+            });
+            confirmStudent(d); // Automatically fires the database save!
             break;
 
         case 'OUT':
-            showNotif({ icon: '🔵', title: 'Time OUT', msg: `${name}\nTime: ${time}`,
-                buttons: [
-                    { label: '✅ Confirm Time OUT', color: 'blue', action: () => confirmStudent(d) },
-                    { label: 'Cancel', color: 'gray', action: null }
-                ] });
+            // ── TOUCHLESS AUTO-CONFIRM ──
+            showNotif({ 
+                icon: '🔵', 
+                title: 'Saving Time OUT...', 
+                msg: `${name}\nTime: ${time}`,
+                buttons: [],   // No manual buttons!
+                autoDismiss: 2 // Closes screen in 2 seconds
+            });
+            confirmStudent(d); // Automatically fires the database save!
             break;
     }
 }
