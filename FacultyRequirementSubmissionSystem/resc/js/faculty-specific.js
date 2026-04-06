@@ -83,33 +83,8 @@ function loadUserInfo() {
 }
 
 function initUserDropdown() {
-    const userMenuToggle = document.getElementById('userMenuToggle');
-    const userDropdown = document.getElementById('userDropdown');
     const logoutBtn = document.getElementById('logoutBtn');
-    const viewProfile = document.getElementById('viewProfile');
-    const accountSettings = document.getElementById('accountSettings');
     
-    console.log('initUserDropdown called', {
-        userMenuToggle: !!userMenuToggle,
-        userDropdown: !!userDropdown,
-        logoutBtn: !!logoutBtn
-    });
-    
-    if (!userMenuToggle || !userDropdown) {
-        console.log('Missing required elements - initUserDropdown aborted');
-        return;
-    }
-    userMenuToggle.addEventListener('click', function(e) {
-        e.stopPropagation();
-        console.log('User menu toggle clicked');
-        userDropdown.classList.toggle('show');
-        console.log('Dropdown classes after toggle:', userDropdown.className);
-    });
-    document.addEventListener('click', function(e) {
-        if (!userMenuToggle.contains(e.target) && !userDropdown.contains(e.target)) {
-            userDropdown.classList.remove('show');
-        }
-    });
     if (logoutBtn) {
         logoutBtn.addEventListener('click', function(e) {
             e.preventDefault();
@@ -118,21 +93,6 @@ function initUserDropdown() {
                 sessionStorage.clear();
                 window.location.href = '../../auth/login.html';
             }
-        });
-    }
-    if (viewProfile) {
-        viewProfile.addEventListener('click', function(e) {
-            e.preventDefault();
-            alert('Profile page coming soon!');
-            userDropdown.classList.remove('show');
-        });
-    }
-
-    if (accountSettings) {
-        accountSettings.addEventListener('click', function(e) {
-            e.preventDefault();
-            alert('Account settings coming soon!');
-            userDropdown.classList.remove('show');
         });
     }
 }
