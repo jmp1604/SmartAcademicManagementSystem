@@ -1,15 +1,47 @@
 /* ============================================================
    takeAttendance.js
    Path: TimeInAndTimeOutMonitoring/resc/js/takeAttendance.js
-
-   Pattern applied (mirrors accountRegistration.js):
-   ─ start_takeattendance.php  → waitForFlask() + direct video feed
-   ─ stop_takeattendance.php   → fetch('http://127.0.0.1:5000/shutdown')
-   ─ Engine status polling     → shows/hides Stop Engine button
-   ============================================================ */
+============================================================ */
 
 // ══════════════════════════════════════════════════
-// Real-time clock
+// GLOBAL ELEMENTS & STATE
+// ══════════════════════════════════════════════════
+const bootEngineBtn = document.getElementById('bootEngineBtn');
+const startBtn      = document.getElementById('startBtn');
+const stopBtn       = document.getElementById('stopBtn');
+const stopEngineBtn = document.getElementById('stopEngineBtn'); // In the nav bar
+const videoWrap     = document.getElementById('videoWrap');
+const videoStream   = document.getElementById('videoStream');
+const stripStatus   = document.getElementById('stripStatus');
+const sessionState  = document.getElementById('sessionState');
+
+let isBooting = false; 
+let isEngineOnline = false;
+
+// ══════════════════════════════════════════════════
+// NEW: DYNAMIC BUTTON CONTROLLER
+// ══════════════════════════════════════════════════
+function updateSessionButtonState() {
+    // If the session is already running (button hidden), don't change anything
+    if (startBtn.style.display === 'none') return;
+
+    if (isBooting) {
+        startBtn.disabled = true;
+        startBtn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Engine Booting...';
+    } else if (!isEngineOnline) {
+        startBtn.disabled = true;
+        startBtn.innerHTML = '<i class="fa-solid fa-power-off" style="color:#fca5a5;"></i> Please Start Engine First';
+    } else {
+        startBtn.disabled = false;
+        startBtn.innerHTML = '<i class="fa-solid fa-play"></i> Start Session';
+    }
+}
+
+// Set the initial state as soon as the page loads
+updateSessionButtonState();
+
+// ══════════════════════════════════════════════════
+// Real-time clock & Output Box
 // ══════════════════════════════════════════════════
 function updateTime() {
     const now = new Date();
@@ -20,9 +52,6 @@ function updateTime() {
 setInterval(updateTime, 1000);
 updateTime();
 
-// ══════════════════════════════════════════════════
-// Output box helper
-// ══════════════════════════════════════════════════
 function setOutput(type, icon, msg) {
     const box = document.getElementById('outputBox');
     box.className = 'output-box show ' + type;
@@ -31,133 +60,142 @@ function setOutput(type, icon, msg) {
 }
 
 // ══════════════════════════════════════════════════
-// Engine status polling
-// Mirrors accountRegistration.js: polls every 3s,
-// shows/hides the Stop Engine button based on Flask availability.
+// ENGINE POLLING & STOP
 // ══════════════════════════════════════════════════
-const stopEngineBtn = document.getElementById('stopEngineBtn');
-
 setInterval(async () => {
-    try {
-        const res = await fetch('http://127.0.0.1:5000/video_feed', { method: 'HEAD' });
-        if (stopEngineBtn) stopEngineBtn.style.display = res.ok ? 'inline-flex' : 'none';
-    } catch (_) {
-        if (stopEngineBtn) stopEngineBtn.style.display = 'none';
+    if (isBooting) {
+        updateSessionButtonState();
+        return; 
     }
+
+    try {
+        const res = await fetch('http://127.0.0.1:5000/', { method: 'GET' });
+        isEngineOnline = (res.ok || res.status === 200);
+        
+        if (isEngineOnline) {
+            if (stopEngineBtn) stopEngineBtn.style.display = 'inline-flex';
+            bootEngineBtn.style.display = 'none';
+        }
+    } catch (_) {
+        isEngineOnline = false;
+        if (stopEngineBtn) stopEngineBtn.style.display = 'none';
+        
+        // Force reset the boot button to original state if engine dies
+        bootEngineBtn.style.display = 'inline-flex';
+        bootEngineBtn.disabled = false;
+        bootEngineBtn.innerHTML = '<i class="fa-solid fa-power-off"></i> Start Engine';
+        
+        // If the engine crashes while a session is running, force stop the session
+        if (startBtn.style.display === 'none') {
+            stopAttendanceSession();
+        }
+    }
+    
+    updateSessionButtonState(); // Update the "Start Session" button every 3 seconds
 }, 3000);
 
+// Hardware Boot Listener
+bootEngineBtn.addEventListener('click', async () => {
+    isBooting = true;
+    updateSessionButtonState(); // Forces "Booting..." state on the Start Session button
+    
+    bootEngineBtn.disabled = true;
+    bootEngineBtn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Booting Engine...';
+    setOutput('info', 'fa-solid fa-microchip fa-spin', '<span class="spin"></span> Starting Facial Recognition Engine...');
+
+    try {
+        await fetch('http://localhost/INTEG%20SYSTEM/SmartAcademicManagementSystem/TimeInAndTimeOutMonitoring/students/trigger_attendance.php', { method: 'POST' });
+        
+        await waitForFlask(60, 1000); 
+
+        bootEngineBtn.style.display = 'none';
+        setOutput('success', 'fa-solid fa-check', 'Engine Online! You can now start the session.');
+        if (stopEngineBtn) stopEngineBtn.style.display = 'inline-flex';
+    } catch (err) {
+        if (bootEngineBtn.disabled) {
+            alert("Failed to start engine: " + err.message);
+        }
+        setOutput('error', 'fa-solid fa-circle-exclamation', '❌ ' + err.message);
+        bootEngineBtn.disabled = false;
+        bootEngineBtn.innerHTML = '<i class="fa-solid fa-power-off"></i> Start Engine';
+    } finally {
+        isBooting = false;
+        updateSessionButtonState(); // Unlocks the Start Session button
+    }
+});
+
+// Manual Stop Engine Function
 async function stopEngine() {
-    const confirmed = confirm('Are you sure you want to stop the attendance engine?');
+    const confirmed = confirm('Are you sure you want to stop the engine?');
     if (!confirmed) return;
+
+    isBooting = false; 
 
     try {
         await fetch('http://127.0.0.1:5000/shutdown', { method: 'POST' });
-    } catch (_) {
-        // Fetch error is expected — server shuts down mid-response
-    }
+    } catch (_) {}
 
     if (stopEngineBtn) stopEngineBtn.style.display = 'none';
-
-    // Reset UI to idle state
-    videoStream.src = '';
-    videoWrap.style.display  = 'none';
-    startBtn.style.display   = 'inline-flex';
-    startBtn.disabled        = false;
-    stopBtn.style.display    = 'none';
-    sessionState.textContent = 'Idle';
-    stripStatus.innerHTML    = '<div class="pulse"></div>Ready';
-    setOutput('warn', 'fa-circle-info', 'Engine stopped. Run START_ENGINE.bat to restart.');
+    bootEngineBtn.style.display = 'inline-flex';
+    bootEngineBtn.disabled = false;
+    bootEngineBtn.innerHTML = '<i class="fa-solid fa-power-off"></i> Start Engine';
+    
+    stopAttendanceSession(); // Resets the UI if a session was active
+    isEngineOnline = false;
+    updateSessionButtonState(); 
 }
 
-// ══════════════════════════════════════════════════
-// waitForFlask
-// Mirrors accountRegistration.js: polls /video_feed HEAD
-// until Flask responds, then resolves.
-// ══════════════════════════════════════════════════
-async function waitForFlask(retries = 15, delayMs = 800) {
+async function waitForFlask(retries = 60, delayMs = 1000) {
     for (let i = 0; i < retries; i++) {
         try {
-            const res = await fetch('http://127.0.0.1:5000/video_feed', { method: 'HEAD' });
+            const res = await fetch('http://127.0.0.1:5000/', { method: 'GET' });
             if (res.ok || res.status === 200) return true;
-        } catch (_) {
-            // Still booting, keep waiting
-        }
+        } catch (_) {}
+        
+        const msg = `<span class="spin"></span> Downloading database & starting camera... (${i + 1}/${retries})`;
+        setOutput('info', 'fa-solid fa-circle-notch fa-spin', msg);
         await new Promise(r => setTimeout(r, delayMs));
     }
-    throw new Error('Engine did not respond after ' + retries + ' attempts. Make sure you ran START_ENGINE.bat');
+    throw new Error('Engine did not respond. Check Task Manager for pythonw.exe');
 }
 
 // ══════════════════════════════════════════════════
-// Start / Stop session
+// Start / Stop Class Session
 // ══════════════════════════════════════════════════
-const startBtn     = document.getElementById('startBtn');
-const stopBtn      = document.getElementById('stopBtn');
-const videoWrap    = document.getElementById('videoWrap');
-const videoStream  = document.getElementById('videoStream');
-const stripStatus  = document.getElementById('stripStatus');
-const sessionState = document.getElementById('sessionState');
-
 startBtn.addEventListener('click', async () => {
+    if (!isEngineOnline) return;
+
     startBtn.disabled = true;
-    sessionState.textContent = 'Initializing…';
-    setOutput('info', 'fa-solid fa-microchip fa-spin', '<span class="spin"></span> Starting Facial Recognition Engine…');
-
-    try {
-        // STEP 1: Launch Python automatically via PHP
-        await fetch('http://localhost/INTEG%20SYSTEM/SmartAcademicManagementSystem/TimeInAndTimeOutMonitoring/students/trigger_attendance.php', {
-            method: 'POST'
-        });
-
-        // STEP 2: Wait for Flask to boot up
-        // flash_attendance.py takes a few seconds to load faces from Supabase
-        setOutput('info', 'fa-solid fa-circle-notch fa-spin', '<span class="spin"></span> Downloading face database from Supabase…');
-        await waitForFlask(20, 1000); // Increased retries because loading faces is slow
-
-        // STEP 3: Connect the stream
-        videoWrap.style.display  = 'block';
-        videoStream.src = 'http://127.0.0.1:5000/video_feed?t=' + Date.now();
-        
-        startBtn.style.display   = 'none';
-        stopBtn.style.display    = 'inline-flex';
-        sessionState.textContent = 'Active';
-        stripStatus.innerHTML    = '<div class="pulse"></div>Live';
-        
-        if (stopEngineBtn) stopEngineBtn.style.display = 'inline-flex';
-        
-        setOutput('success', 'fa-solid fa-circle-check', 'Attendance engine is live! Ready for scans.');
-
-    } catch (err) {
-        setOutput('error', 'fa-solid fa-circle-exclamation', '❌ ' + err.message);
-        sessionState.textContent = 'Idle';
-        startBtn.disabled = false;
-    }
+    sessionState.textContent = 'Active';
+    
+    videoWrap.style.display  = 'block';
+    videoStream.src = 'http://127.0.0.1:5000/video_feed?t=' + Date.now();
+    
+    startBtn.style.display   = 'none';
+    stopBtn.style.display    = 'inline-flex';
+    stripStatus.innerHTML    = '<div class="pulse"></div>Live';
+    
+    setOutput('success', 'fa-solid fa-circle-check', 'Attendance session is live! Ready for scans.');
 });
 
 stopBtn.addEventListener('click', () => {
-    if (!confirm('Are you sure you want to stop the attendance session?')) return;
-
-    setOutput('info', 'fa-circle-notch fa-spin', '<span class="spin"></span> Stopping session…');
-
-    // Mirrors accountRegistration stopEngine — direct Flask shutdown call
-    fetch('http://127.0.0.1:5000/shutdown', { method: 'POST' })
-        .catch(() => {
-            // Expected — server shuts down mid-response
-        })
-        .finally(() => {
-            videoStream.src          = '';
-            videoWrap.style.display  = 'none';
-            startBtn.style.display   = 'inline-flex';
-            startBtn.disabled        = false;
-            stopBtn.style.display    = 'none';
-            sessionState.textContent = 'Idle';
-            stripStatus.innerHTML    = '<div class="pulse"></div>Ready';
-            if (stopEngineBtn) stopEngineBtn.style.display = 'none';
-            setOutput('warn', 'fa-circle-info', 'Session stopped. Run START_ENGINE.bat to start a new session.');
-        });
+    if (!confirm('Stop the current attendance session? Camera will close.')) return;
+    stopAttendanceSession();
+    setOutput('info', 'fa-solid fa-circle-info', 'Session ended. Click Start to resume.');
 });
 
+function stopAttendanceSession() {
+    videoWrap.style.display = 'none';
+    videoStream.src = "";
+    stopBtn.style.display = 'none';
+    startBtn.style.display = 'inline-flex';
+    sessionState.textContent = 'Idle';
+    stripStatus.innerHTML = 'Ready';
+    updateSessionButtonState(); // Ensures the button resets to the correct text
+}
+
 // ══════════════════════════════════════════════════
-// Notification helpers
+// NOTIFICATION HELPERS & SSE
 // ══════════════════════════════════════════════════
 const overlay           = document.getElementById('notifOverlay');
 const notifIcon         = document.getElementById('notifIcon');
@@ -207,13 +245,17 @@ function showNotif({ icon, title, msg, lateTxt, dismissTxt, cannotTimeOutTxt, bu
     });
 
     let remaining = autoDismiss;
-    notifCountdown.textContent = `Auto-dismiss in ${remaining}s`;
-    countdownInterval = setInterval(() => {
-        remaining--;
-        notifCountdown.textContent = remaining > 0 ? `Auto-dismiss in ${remaining}s` : '';
-        if (remaining <= 0) clearInterval(countdownInterval);
-    }, 1000);
-    autoDismissTimer = setTimeout(closeNotif, autoDismiss * 1000);
+    if (remaining > 0) {
+        notifCountdown.textContent = `Auto-dismiss in ${remaining}s`;
+        countdownInterval = setInterval(() => {
+            remaining--;
+            notifCountdown.textContent = remaining > 0 ? `Auto-dismiss in ${remaining}s` : '';
+            if (remaining <= 0) clearInterval(countdownInterval);
+        }, 1000);
+        autoDismissTimer = setTimeout(closeNotif, autoDismiss * 1000);
+    } else {
+        notifCountdown.textContent = '';
+    }
 
     overlay.classList.add('show');
 }
@@ -227,233 +269,96 @@ function closeNotif() {
 
 overlay.addEventListener('click', e => { if (e.target === overlay) closeNotif(); });
 
-// ══════════════════════════════════════════════════
-// SSE — listen to face recognition events
-// ══════════════════════════════════════════════════
+// Listen to Face Recognition Events
 if (window.EventSource) {
-    const src  = new EventSource('http://127.0.0.1:5000/attendee_stream');
-    src.onmessage = function (e) {
+    const src = new EventSource('http://127.0.0.1:5000/attendee_stream');
+    src.onmessage = (e) => {
         try {
             const d = JSON.parse(e.data);
             d.role === 'student' ? handleStudentEvent(d) : handleProfessorEvent(d);
-        } catch (err) { console.error('SSE parse error:', err, e.data); }
+        } catch (err) { console.error('SSE parse error:', err); }
     };
-    src.onerror = () => console.warn('SSE connection error — is face_recognize_lab.py running?');
 }
 
 // ══════════════════════════════════════════════════
-// STUDENT events
+// STUDENT & PROFESSOR HANDLERS
 // ══════════════════════════════════════════════════
 function handleStudentEvent(d) {
     const name = d.name || 'Student';
     const time = new Date().toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: true });
 
-   switch (d.action) {
-    case 'NOT_ENROLLED':
-        showNotif({ icon: '📋', title: 'Not Enrolled',
-            msg: d.error || 'You are not enrolled in any subject with a schedule today.',
-            buttons: [{ label: 'OK', color: 'gray', action: null }] });
-        break;
-
-   case 'SESSION_NOT_STARTED':
-    
-    showNotif({ icon: '⏳', title: 'Session Not Started Yet',
-        msg: d.error || 'Your professor has not started the session yet. Please wait.',
-        buttons: [{ label: 'OK', color: 'orange', action: null }] });
-    break;
-
-       case 'SESSION_CANCELLED':
-    showNotif({ icon: '🚫', title: 'Session Cancelled',
-        msg: d.error || 'This session has been cancelled or voided.',
-        buttons: [{ label: 'OK', color: 'gray', action: null }] });
-    break;
-
-case 'SESSION_VOIDED':
-    showNotif({ icon: '⏰', title: 'Session Voided',
-        msg: d.error || `Professor did not start within the required time window. Session has been voided.`,
-        buttons: [{ label: 'OK', color: 'orange', action: null }] });
-    break;
-
-        case 'SESSION_ENDED':
-            showNotif({ icon: '🔒', title: 'Session Already Ended',
-                msg: d.error || 'The session has already ended.',
-                buttons: [{ label: 'OK', color: 'gray', action: null }] });
-            break;
-
-        case 'COMPLETED':
-            showNotif({ icon: '✅', title: 'Attendance Complete',
-                msg: `${name}\nYou have already completed your attendance for this session.`,
-                buttons: [{ label: 'OK', color: 'gray', action: null }] });
-            break;
-
-        case 'CANNOT_TIME_OUT':
-            showNotif({ icon: '🔐', title: 'Cannot Time Out Yet', msg: name,
-                cannotTimeOutTxt:
-                    `<strong>⏳ Professor has not allowed dismissal yet.</strong><br><br>` +
-                    `Please wait for your professor to scan their face to allow students to leave.`,
-                buttons: [{ label: 'OK', color: 'gray', action: null }], autoDismiss: 10 });
-            break;
-
+    switch (d.action) {
         case 'IN':
-            // ── TOUCHLESS AUTO-CONFIRM ──
             showNotif({ 
                 icon: d.is_late ? '⚠️' : '🟢',
                 title: d.is_late ? 'Saving Time IN — Late...' : 'Saving Time IN...',
                 msg: `${name}\nTime: ${time}`,
                 lateTxt: d.is_late ? `You are LATE by ${d.late_minutes} minute${d.late_minutes !== 1 ? 's' : ''}` : null,
-                buttons: [],   // No manual buttons!
-                autoDismiss: 2 // Closes screen in 2 seconds for the next person
+                buttons: [],   
+                autoDismiss: 2 
             });
-            confirmStudent(d); // Automatically fires the database save!
+            confirmStudent(d); 
             break;
-
         case 'OUT':
-            // ── TOUCHLESS AUTO-CONFIRM ──
             showNotif({ 
-                icon: '🔵', 
-                title: 'Saving Time OUT...', 
-                msg: `${name}\nTime: ${time}`,
-                buttons: [],   // No manual buttons!
-                autoDismiss: 2 // Closes screen in 2 seconds
+                icon: '🔵', title: 'Saving Time OUT...', msg: `${name}\nTime: ${time}`,
+                buttons: [], autoDismiss: 2 
             });
-            confirmStudent(d); // Automatically fires the database save!
+            confirmStudent(d); 
+            break;
+        case 'NOT_ENROLLED':
+            showNotif({ icon: '📋', title: 'Not Enrolled', msg: d.error, buttons: [{ label: 'OK', color: 'gray' }] });
+            break;
+        case 'SESSION_NOT_STARTED':
+            showNotif({ icon: '⏳', title: 'Session Not Started', msg: d.error, buttons: [{ label: 'OK', color: 'orange' }] });
+            break;
+        case 'CANNOT_TIME_OUT':
+            showNotif({ icon: '🔐', title: 'Cannot Time Out', msg: name, cannotTimeOutTxt: d.error, buttons: [{ label: 'OK', color: 'gray' }], autoDismiss: 8 });
             break;
     }
 }
 
-// ══════════════════════════════════════════════════
-// PROFESSOR events
-// ══════════════════════════════════════════════════
 function handleProfessorEvent(d) {
-    const name  = d.name || 'Professor';
-    const sched = d.schedule;
-    const time  = new Date().toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: true });
-    const info  = sched ? `${sched.subject_code} — ${sched.section} @ ${sched.lab_code}` : '';
-
+    const name = d.name || 'Professor';
+    const time = new Date().toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: true });
+    
     switch (d.action) {
-        case 'NO_SCHEDULE':
-            showNotif({ icon: '📅', title: 'No Class Today',
-                msg: `${name}\nYou have no class scheduled for today.`,
-                buttons: [{ label: 'OK', color: 'gray', action: null }] });
-            break;
-
-        case 'NO_VALID_SCHEDULE':
-            showNotif({ icon: '📋', title: 'No Valid Schedule',
-                msg: d.error || 'No valid schedule available.',
-                buttons: [{ label: 'OK', color: 'gray', action: null }] });
-            break;
-
-        case 'SESSION_VOIDED':
-            showNotif({ icon: '⚠️', title: 'Session Voided',
-                msg: d.error || 'The window to start this session has expired.',
-                buttons: [{ label: 'OK', color: 'orange', action: null }] });
-            break;
-
-        case 'SESSION_CANCELLED':
-            showNotif({ icon: '🚫', title: 'Session Cancelled',
-                msg: d.error || 'This session has been marked as cancelled.',
-                buttons: [{ label: 'OK', color: 'gray', action: null }] });
-            break;
-
-        case 'SESSION_ALREADY_ENDED':
-            showNotif({ icon: '🔒', title: 'Session Already Ended',
-                msg: d.error || 'This session has already been ended.',
-                buttons: [{ label: 'OK', color: 'gray', action: null }] });
-            break;
-
-        case 'TOO_EARLY': {
-            const schedInfo = sched ? `\n\nClass: ${sched.subject_code}\nSection: ${sched.section}\nLab: ${sched.lab_code}` : '';
-            showNotif({ icon: '⏰', title: 'Too Early to Start',
-                msg: (d.error || 'You can start your session up to 30 minutes before class time.') + schedInfo,
-                buttons: [{ label: 'OK', color: 'orange', action: null }] });
-            break;
-        }
-
-        case 'SCHEDULE_ENDED':
-            showNotif({ icon: '🔒', title: 'Class Schedule Ended',
-                msg: d.error || 'Your class schedule has already ended.',
-                buttons: [{ label: 'OK', color: 'gray', action: null }] });
-            break;
-
         case 'START':
-            showNotif({ icon: '🟣', title: 'Start Session',
-                msg: `${name}\n${info}\n\nTime: ${time}`,
-                buttons: [
-                    { label: '▶ Start Session', color: 'purple', action: () => confirmProfessor(d) },
-                    { label: 'Cancel', color: 'gray', action: null }
-                ] });
+            showNotif({ icon: '🟣', title: 'Start Session', msg: `${name}\nTime: ${time}`, 
+                buttons: [{ label: '▶ Start Session', color: 'purple', action: () => confirmProfessor(d) }, { label: 'Cancel', color: 'gray' }] 
+            });
             break;
-
         case 'DISMISS':
-            showNotif({ icon: '🚪', title: 'Allow Student Time Out',
-                msg: `${name}\n${info}\n\nTime: ${time}`,
-                dismissTxt:
-                    `✅ Students will be able to scan out and leave the lab.<br>` +
-                    `⚠️ New time-ins will still be allowed.<br>` +
-                    `📌 Scan your face again when ready to fully end the session.`,
-                buttons: [
-                    { label: '🚪 Allow Time Out', color: 'orange', action: () => confirmProfessor(d) },
-                    { label: 'Cancel', color: 'gray', action: null }
-                ] });
+            showNotif({ icon: '🚪', title: 'Allow Dismissal', msg: `${name}\nTime: ${time}`, 
+                buttons: [{ label: '🚪 Allow Time Out', color: 'orange', action: () => confirmProfessor(d) }, { label: 'Cancel', color: 'gray' }] 
+            });
             break;
-
         case 'END':
-            showNotif({ icon: '🔴', title: 'End Session',
-                msg: `${name}\n${info}\n\nTime: ${time}\n\nAll remaining students will be automatically timed out.`,
-                buttons: [
-                    { label: '⏹ End Session', color: 'red', action: () => confirmProfessor(d) },
-                    { label: 'Cancel', color: 'gray', action: null }
-                ] });
+            showNotif({ icon: '🔴', title: 'End Session', msg: `${name}\nTime: ${time}`, 
+                buttons: [{ label: '⏹ End Session', color: 'red', action: () => confirmProfessor(d) }, { label: 'Cancel', color: 'gray' }] 
+            });
             break;
     }
 }
 
-// ══════════════════════════════════════════════════
-// Confirm student attendance
-// ══════════════════════════════════════════════════
 function confirmStudent(d) {
     fetch('http://127.0.0.1:5000/confirm_attendance', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-            student_id:   d.student_id,
-            session_id:   d.session_id,
-            action:       d.action,
-            is_late:      d.is_late      || false,
-            late_minutes: d.late_minutes || 0,
-            error:        d.error        || ''
-        })
+        body: JSON.stringify(d)
     })
     .then(r => r.json())
-    .then(res => {
-        const isLate = d.is_late && d.action === 'IN';
-        const color  = isLate     ? 'amber'
-                     : d.action === 'IN'  ? 'green'
-                     : d.action === 'OUT' ? 'blue'
-                     : 'gray';
-        showToast(res.message || 'Done', color);
-    })
-    .catch(() => showToast('❌ Error recording attendance', 'red'));
+    .then(res => showToast(res.message, d.is_late ? 'amber' : 'green'))
+    .catch(() => showToast('❌ Error saving attendance', 'red'));
 }
 
-// ══════════════════════════════════════════════════
-// Confirm professor session
-// ══════════════════════════════════════════════════
 function confirmProfessor(d) {
     fetch('http://127.0.0.1:5000/confirm_session', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-            professor_id: d.professor_id,
-            session_id:   d.session_id,
-            action:       d.action,
-            error:        d.error || ''
-        })
+        body: JSON.stringify(d)
     })
     .then(r => r.json())
-    .then(res => {
-        const color = { START: 'purple', DISMISS: 'orange', END: 'red' }[d.action] || 'gray';
-        showToast(res.message || 'Done', color);
-    })
+    .then(res => showToast(res.message, 'purple'))
     .catch(() => showToast('❌ Error updating session', 'red'));
 }

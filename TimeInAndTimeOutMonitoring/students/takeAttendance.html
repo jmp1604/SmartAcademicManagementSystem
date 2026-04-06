@@ -270,15 +270,20 @@
         capturing attendance via facial recognition.<br>
         <span style="font-size:13px;color:#888;">
           <i class="fa-solid fa-circle-info"></i>
-          Make sure <strong>START_ENGINE.bat</strong> is running before clicking Start.
+          Make sure <strong> the ENGINE</strong> is running 
         </span>
       </p>
     </div>
 
-    <div class="btn-wrap">
-      <button class="btn btn-start" id="startBtn">
+   <div class="btn-wrap">
+      <button class="btn btn-boot" id="bootEngineBtn">
+        <i class="fa-solid fa-power-off"></i> Start Engine
+      </button>
+
+      <button class="btn btn-start" id="startBtn" disabled>
         <i class="fa-solid fa-play"></i> Start Session
       </button>
+      
       <button class="btn btn-stop" id="stopBtn" style="display:none">
         <i class="fa-solid fa-stop"></i> Stop Session
       </button>

@@ -1,7 +1,20 @@
-import sys, io
-sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding='utf-8')
+import sys, os
 
-import os, signal, warnings, datetime, queue, threading, json, time
+# 1. Define the exact folder path
+script_dir = os.path.dirname(os.path.abspath(__file__))
+
+# 2. THE MAGIC FIX: Redirect all "screen" text into a log file so pythonw.exe doesn't crash!
+log_path = os.path.join(script_dir, "engine_log.txt")
+sys.stdout = open(log_path, "w", encoding="utf-8")
+sys.stderr = sys.stdout # Send errors to the same file
+
+# 3. Load the hidden credentials
+from dotenv import load_dotenv
+env_path = os.path.join(script_dir, '.env')
+load_dotenv(env_path)
+
+# 4. Standard Imports (Cleaned up, no duplicates)
+import io, signal, warnings, datetime, queue, threading, json, time
 import numpy as np
 import cv2
 import face_recognition
@@ -14,15 +27,22 @@ from supabase import create_client, Client
 warnings.filterwarnings("ignore", category=UserWarning, module="pkg_resources")
 os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'
 
-# ==========================================
-# CONFIGURATION
-# ==========================================
-SUPABASE_URL = "https://wjyoruvcyjnwsimeqrgl.supabase.co"
-SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6IndqeW9ydXZjeWpud3NpbWVxcmdsIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc3MTc0MjExOCwiZXhwIjoyMDg3MzE4MTE4fQ.gWuZCPZeJmPy_hskmFkzNc9dHlGHKXDHDqyFNBciKKc"
-BUCKET_NAME = "facial_data"
+# 5. Disable Flask's aggressive logging that causes crashes in hidden mode
+import logging
+log = logging.getLogger('werkzeug')
+log.disabled = True
+
+# 6. Initialize Supabase
+SUPABASE_URL = os.getenv("SUPABASE_URL")
+SUPABASE_KEY = os.getenv("SUPABASE_KEY")
+BUCKET_NAME  = "facial_data"
+
+if not SUPABASE_URL or not SUPABASE_KEY:
+    print(f"CRITICAL ERROR: Could not load credentials from {env_path}")
+    sys.exit(1)
 
 supabase: Client = create_client(SUPABASE_URL, SUPABASE_KEY)
-print("✓ Supabase client ready")
+print("✓ Supabase client ready (Loaded from .env)")
 
 app = Flask(__name__)
 CORS(app)

@@ -351,6 +351,17 @@ nav a.active {
     box-shadow: 0 6px 18px rgba(26, 71, 49, .3);
 }
 
+.btn-boot {
+    background: var(--blue);
+    color: var(--white);
+    box-shadow: 0 3px 12px rgba(37, 99, 235, .22);
+}
+.btn-boot:hover:not(:disabled) {
+    background: #1d4ed8;
+    transform: translateY(-2px);
+    box-shadow: 0 6px 18px rgba(37, 99, 235, .3);
+}
+
 .btn-stop {
     background: var(--red);
     color: var(--white);
