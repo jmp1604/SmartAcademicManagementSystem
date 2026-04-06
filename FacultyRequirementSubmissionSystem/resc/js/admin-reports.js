@@ -141,22 +141,16 @@ async function loadReportData() {
         }
 
         let filtered = submissions || [];
-
-        // Filter to only professors in this department (when no specific prof selected)
         if (!selectedProfId && allProfessors.length > 0) {
             const deptProfIds = new Set(allProfessors.map(p => p.professor_id));
             filtered = filtered.filter(s => deptProfIds.has(s.professor_id));
         }
 
-        // Category filter (client-side — nested field)
         if (selectedCatId) {
             filtered = filtered.filter(s => s.requirements?.category_id === selectedCatId);
         }
-
         allSubmissions = filtered;
         console.log('✓ Submissions loaded:', allSubmissions.length);
-
-        // Load department name + logos once
         if (!activeDepartmentName && activeDepartmentId) {
             const { data: deptData } = await supabaseClient
                 .from('departments')

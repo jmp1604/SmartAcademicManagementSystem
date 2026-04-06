@@ -17,8 +17,14 @@ body {
 
 .bg-image {
     position: fixed;
-    inset: 0;
-    background: radial-gradient(ellipse at 30% 40%, #1e5c30 0%, #0d3b1e 55%, #081f10 100%);
+    top: 70px;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: linear-gradient(135deg, rgba(13, 59, 30, 0.85) 0%, rgba(8, 28, 14, 0.85) 100%), url('../auth/assets/plpbackground.png');
+    background-size: cover;
+    background-position: center;
+    background-attachment: fixed;
     z-index: 0;
 }
 
@@ -35,7 +41,7 @@ body {
     align-items: center;
     justify-content: space-between;
     padding: 1rem 2.5rem;
-    background: rgba(8, 28, 14, 0.55);
+    background: linear-gradient(135deg, rgba(13, 59, 30, 0.95) 0%, rgba(8, 28, 14, 0.95) 100%);
     border-bottom: 1px solid rgba(255,255,255,0.08);
     backdrop-filter: blur(10px);
     animation: fadeDown .5s ease both;
@@ -209,16 +215,47 @@ body {
 .system-card::before {
     content: '';
     position: absolute;
-    top: 0; left: 0; right: 0;
-    height: 4px;
+    top: 0; bottom: 0; left: 0;
+    width: 5px;
     background: var(--green-btn);
     transform: scaleX(0);
     transform-origin: left;
-    transition: transform .3s ease;
-    border-radius: 1.25rem 1.25rem 0 0;
+    transition: width .3s ease;
+    border-radius: 1.25rem 0 0 1.25rem;
 }
 
-.system-card:hover::before { transform: scaleX(1); }
+.system-card:hover::before {
+    width: 6px;
+}
+
+/* Unique colors for each card */
+.system-card:nth-child(1)::before { background: #4F46E5; }
+.system-card:nth-child(2)::before { background: #16A34A; }
+.system-card:nth-child(3)::before { background: #F59E0B; }
+.system-card:nth-child(4)::before { background: #A855F7; }
+
+/* Icon background colors matching left borders */
+.system-card:nth-child(1) .card-icon-wrap { background: #EEF2FF; }
+.system-card:nth-child(1) .card-icon-wrap svg { stroke: #4F46E5; }
+.system-card:nth-child(1):hover .card-icon-wrap { background: #DDD6FE; }
+
+.system-card:nth-child(2) .card-icon-wrap { background: #DCFCE7; }
+.system-card:nth-child(2) .card-icon-wrap svg { stroke: #16A34A; }
+.system-card:nth-child(2):hover .card-icon-wrap { background: #BBFBDC; }
+
+.system-card:nth-child(3) .card-icon-wrap { background: #FEF3C7; }
+.system-card:nth-child(3) .card-icon-wrap svg { stroke: #F59E0B; }
+.system-card:nth-child(3):hover .card-icon-wrap { background: #FDE68A; }
+
+.system-card:nth-child(4) .card-icon-wrap { background: #F3E8FF; }
+.system-card:nth-child(4) .card-icon-wrap svg { stroke: #A855F7; }
+.system-card:nth-child(4):hover .card-icon-wrap { background: #E9D5FF; }
+
+/* Update card label colors */
+.system-card:nth-child(1) .card-label { color: #4F46E5; }
+.system-card:nth-child(2) .card-label { color: #16A34A; }
+.system-card:nth-child(3) .card-label { color: #F59E0B; }
+.system-card:nth-child(4) .card-label { color: #A855F7; }
 
 .system-card:hover {
     transform: translateY(-6px) scale(1.01);
@@ -236,9 +273,7 @@ body {
     transition: background .25s;
 }
 
-.system-card:hover .card-icon-wrap {
-    background: #d4ead9;
-}
+/* Icon wrap hover handled by nth-child styles above */
 
 .card-icon-wrap svg {
     width: 26px;
