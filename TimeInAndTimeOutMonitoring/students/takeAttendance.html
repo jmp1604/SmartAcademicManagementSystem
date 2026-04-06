@@ -200,20 +200,32 @@
 <body>
 
 <!-- TOP BAR -->
-<div class="topbar">
-  <a href="accountRegistration.html" class="back-btn">
-    <i class="fa-solid fa-arrow-left"></i> Back
-  </a>
-  <div class="date-chip" id="timestamp"></div>
-  <button id="stopEngineBtn"
-          onclick="stopEngine()"
-          style="display:none; background:#c0392b; color:#fff; border:none;
-                 padding:8px 16px; border-radius:8px; cursor:pointer;
-                 font-family:'DM Sans',sans-serif; font-size:14px; font-weight:500;
-                 gap:6px; align-items:center;">
-    <i class="fa-solid fa-power-off"></i> Stop Engine
-  </button>
-</div>
+<header>
+    <a href="homepage.html" class="brand">
+        <div class="brand-logos">
+            <img src="../resc/assets/plp_logo.png" alt="PLP Logo">
+            <div class="logo-divider"></div>
+            <img src="../resc/assets/ccs_logo.png" alt="CCS Logo" onerror="this.style.display='none';this.previousElementSibling.style.display='none'">
+        </div>
+        <div class="brand-text">
+            <span class="sys-label">Monitoring System</span>
+            <h1>Time In &amp; Time Out</h1>
+        </div>
+    </a>
+
+    <div class="header-clock">
+        <i class="fa-regular fa-clock"></i>
+        <span id="timestamp">Loading time...</span>
+    </div>
+
+    <nav>
+        <a href="homepage.html"><i class="fa-solid fa-house"></i> Home</a>
+        <a href="accountRegistration.html"><i class="fa-solid fa-camera"></i> Register Face</a>
+        <button id="stopEngineBtn" onclick="stopEngine()" style="display:none; background:#dc2626; color:#fff; border:none; padding:7px 14px; border-radius:7px; cursor:pointer; font-family:'DM Sans',sans-serif; font-size:13.5px; font-weight:600; gap:6px; align-items:center;">
+            <i class="fa-solid fa-power-off"></i> Stop Engine
+        </button>
+    </nav>
+</header>
 
 <!-- PAGE HEADER -->
 <div class="page-header">
