@@ -133,14 +133,46 @@ header {
     letter-spacing: .4px;
     white-space: nowrap;
 }
-
-/* ── Right: Log Out ── */
+/* ── Right: Buttons ── */
 .header-right {
     display: flex;
     align-items: center;
+    gap: 12px; /* Added gap to separate the two buttons */
     flex-shrink: 0;
 }
 
+/* Homepage Button Styling */
+.header-home-btn {
+    background: transparent;
+    color: rgba(255,255,255,.85);
+    text-decoration: none;
+    border: 1.5px solid rgba(255,255,255,.16);
+    border-radius: 8px;
+    padding: 8px 18px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-family: 'Nunito', sans-serif;
+    font-weight: 700;
+    font-size: 13.5px;
+    cursor: pointer;
+    white-space: nowrap;
+    transition: background .2s, color .2s, border-color .2s, box-shadow .18s;
+    letter-spacing: .2px;
+}
+
+
+
+.header-home-btn i { font-size: 13px; }
+
+.header-home-btn:hover {
+    background: var(--green-bright);
+    color: var(--white);
+    border-color: var(--green-bright);
+    box-shadow: 0 4px 16px rgba(64,145,108,.35); /* Soft green glow */
+}
+
+/* Logout Button Styling */
 .header-logout {
     background: transparent;
     color: rgba(255,255,255,.65);
@@ -165,7 +197,36 @@ header {
     background: #ef4444;
     color: var(--white);
     border-color: #ef4444;
-    box-shadow: 0 4px 16px rgba(239,68,68,.35);
+    box-shadow: 0 4px 16px rgba(239,68,68,.35); /* Soft red glow */
+}
+
+/* Take Attendance Button Styling */
+.header-attendance-btn {
+    background: transparent;
+    color: rgba(255,255,255,.85);
+    text-decoration: none;
+    border: 1.5px solid rgba(255,255,255,.16);
+    border-radius: 8px;
+    padding: 8px 18px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-family: 'Nunito', sans-serif;
+    font-weight: 700;
+    font-size: 13.5px;
+    cursor: pointer;
+    white-space: nowrap;
+    transition: background .2s, color .2s, border-color .2s, box-shadow .18s;
+    letter-spacing: .2px;
+}
+
+.header-attendance-btn i { font-size: 13px; }
+
+.header-attendance-btn:hover {
+    background: var(--yellow); /* Bright yellow/amber hover */
+    color: var(--green-dark);  /* Dark text for contrast */
+    border-color: var(--yellow);
+    box-shadow: 0 4px 16px rgba(244, 196, 48, 0.35); /* Yellow glow */
 }
 
 /* ====== RESPONSIVE ====== */
@@ -192,3 +253,4 @@ header {
 
     .header-time .time-display { font-size: 20px; }
 }
+

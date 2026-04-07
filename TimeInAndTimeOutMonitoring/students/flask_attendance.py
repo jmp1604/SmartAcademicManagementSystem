@@ -1,7 +1,20 @@
-import sys, io
-sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding='utf-8')
+import sys, os
 
-import os, signal, warnings, datetime, queue, threading, json, time
+# 1. Define the exact folder path
+script_dir = os.path.dirname(os.path.abspath(__file__))
+
+# 2. THE MAGIC FIX: Redirect all "screen" text into a log file so pythonw.exe doesn't crash!
+log_path = os.path.join(script_dir, "engine_log.txt")
+sys.stdout = open(log_path, "w", encoding="utf-8")
+sys.stderr = sys.stdout # Send errors to the same file
+
+# 3. Load the hidden credentials
+from dotenv import load_dotenv
+env_path = os.path.join(script_dir, '.env')
+load_dotenv(env_path)
+
+# 4. Standard Imports (Cleaned up, no duplicates)
+import io, signal, warnings, datetime, queue, threading, json, time
 import numpy as np
 import cv2
 import face_recognition
@@ -14,22 +27,29 @@ from supabase import create_client, Client
 warnings.filterwarnings("ignore", category=UserWarning, module="pkg_resources")
 os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'
 
-# ==========================================
-# CONFIGURATION
-# ==========================================
-SUPABASE_URL = "https://wjyoruvcyjnwsimeqrgl.supabase.co"
-SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6IndqeW9ydXZjeWpud3NpbWVxcmdsIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc3MTc0MjExOCwiZXhwIjoyMDg3MzE4MTE4fQ.gWuZCPZeJmPy_hskmFkzNc9dHlGHKXDHDqyFNBciKKc"
-BUCKET_NAME = "facial_data"
+# 5. Disable Flask's aggressive logging that causes crashes in hidden mode
+import logging
+log = logging.getLogger('werkzeug')
+log.disabled = True
+
+# 6. Initialize Supabase
+SUPABASE_URL = os.getenv("SUPABASE_URL")
+SUPABASE_KEY = os.getenv("SUPABASE_KEY")
+BUCKET_NAME  = "facial_data"
+
+if not SUPABASE_URL or not SUPABASE_KEY:
+    print(f"CRITICAL ERROR: Could not load credentials from {env_path}")
+    sys.exit(1)
 
 supabase: Client = create_client(SUPABASE_URL, SUPABASE_KEY)
-print("✓ Supabase client ready")
+print("✓ Supabase client ready (Loaded from .env)")
 
 app = Flask(__name__)
 CORS(app)
 
 attendee_queue = queue.Queue()
 recently_seen  = {}
-COOLDOWN_SECS  = 15
+COOLDOWN_SECS  = 5
 
 PROFESSOR_START_WINDOW = 45
 STUDENT_GRACE_MINUTES  = 15
@@ -358,22 +378,27 @@ recognition_result = {"locations": [], "labels": [], "colors": []}
 # ─────────────────────────────────────────────
 # FIX 3: Recognition worker with frame skipping
 # ─────────────────────────────────────────────
+# ─────────────────────────────────────────────
+# FIX 3: Recognition worker with proper CPU Throttling
+# ─────────────────────────────────────────────
 def recognition_worker():
     global latest_frame
-    frame_skip = 0
+    
     while True:
+        # MAGIC FIX: Throttle AI to 5 Frames Per Second. 
+        # This stops the CPU from maxing out at 100%
+        time.sleep(0.1)
+        
         with frame_lock:
             if latest_frame is None:
                 continue
             frame = latest_frame.copy()
 
-        # FIX 3: Skip every other frame to reduce CPU load
-        frame_skip += 1
-        if frame_skip % 2 != 0:
-            continue
-
-        small = cv2.resize(frame, (0, 0), fx=0.2, fy=0.2)
+        # 1. Downscale frame to 1/4 size for lightning-fast processing
+        small = cv2.resize(frame, (0, 0), fx=0.25, fy=0.25)
         rgb   = cv2.cvtColor(small, cv2.COLOR_BGR2RGB)
+        
+        # 2. Find faces in the tiny image
         locs  = face_recognition.face_locations(rgb, model="hog")
 
         if not locs:
@@ -385,7 +410,8 @@ def recognition_worker():
         new_locs, new_labels, new_colors = [], [], []
 
         for (top, right, bottom, left), enc in zip(locs, encs):
-            top *= 5; right *= 5; bottom *= 5; left *= 5
+            # 3. Multiply coordinates by 4 to map the tiny box back to the high-res video
+            top *= 4; right *= 4; bottom *= 4; left *= 4
 
             if known_encodings_np is None or len(known_encodings_np) == 0:
                 new_locs.append((top, right, bottom, left))
@@ -874,6 +900,67 @@ def shutdown():
     except Exception as e:
         print(f"Error during shutdown: {e}")
         return jsonify({"success": False, "error": str(e)})
+    
+
+def session_cleaner_worker():
+    """Background thread to auto-end expired sessions every 60 seconds."""
+    while True:
+        try:
+            now_store, now_local = get_now()
+            today = datetime.date.today()
+            current_time_str = now_local.strftime("%H:%M:%S")
+
+            # 1. Find sessions that are 'ongoing' or 'dismissing' for today
+            res = supabase.table("lab_sessions")\
+                .select("session_id, lab_schedules(end_time)")\
+                .eq("session_date", str(today))\
+                .in_("status", ["ongoing", "dismissing"])\
+                .execute()
+
+            for sess in (res.data or []):
+                end_time = sess.get("lab_schedules", {}).get("end_time")
+                
+                # 2. If current time is past the scheduled end_time, terminate it
+                if end_time and current_time_str > end_time:
+                    session_id = sess["session_id"]
+                    
+                    # Mark session completed
+                    supabase.table("lab_sessions").update({
+                        "status": "completed",
+                        "actual_end_time": end_time,
+                        "notes": "System Auto-End: Schedule time elapsed",
+                        "updated_at": now_store.isoformat()
+                    }).eq("session_id", session_id).execute()
+
+                    # Auto time-out students still 'IN'
+                    att_res = supabase.table("lab_attendance")\
+                        .select("attendance_id, time_in")\
+                        .eq("session_id", session_id)\
+                        .is_("time_out", "null")\
+                        .execute()
+
+                    for att in (att_res.data or []):
+                        # Calculate duration based on the scheduled end time
+                        time_in_dt = parse_dt(att["time_in"])
+                        # Create a datetime for today at the scheduled end_time
+                        end_dt = datetime.datetime.combine(today, datetime.time.fromisoformat(end_time))
+                        duration = int((end_dt - time_in_dt).total_seconds() / 60)
+                        
+                        supabase.table("lab_attendance").update({
+                            "time_out": end_dt.isoformat(),
+                            "duration_minutes": max(0, duration),
+                            "updated_at": now_store.isoformat()
+                        }).eq("attendance_id", att["attendance_id"]).execute()
+                    
+                    print(f"Cleanup: Auto-ended expired session {session_id}")
+
+        except Exception as e:
+            print(f"Cleaner Error: {e}")
+        
+        time.sleep(60) # Run once per minute
+
+# Start the cleaner thread at the bottom of your file (before app.run)
+threading.Thread(target=session_cleaner_worker, daemon=True).start()
 
 # ─────────────────────────────────────────────
 # Scanner UI
@@ -954,6 +1041,7 @@ h2{color:#22c55e;font-size:1.25rem;letter-spacing:1px;display:flex;align-items:c
     <div id="countdown"></div>
   </div>
 </div>
+
 <script>
 let payload=null,timer=null,cd=null,remaining=0;
 const ERR_ACTIONS=new Set(['NO_SCHEDULE','NOT_ENROLLED','SESSION_NOT_STARTED','SESSION_ENDED',
@@ -1013,8 +1101,16 @@ function show(data) {
 
   document.getElementById('overlay').classList.add('on');
 
-  remaining = 4; updateCD();
-  cd = setInterval(() => { remaining--; updateCD(); if (remaining <= 0) dismiss(); }, 1000);
+  // ─── NEW: TOUCHLESS AUTO-CONFIRM FOR STUDENTS ───
+  if (!isErr && role === 'student' && (action === 'IN' || action === 'OUT')) {
+      btn.style.display = 'none'; // Hide manual button
+      document.getElementById('countdown').textContent = 'Saving to database...';
+      doConfirm(true); // Pass 'true' to trigger auto-confirm immediately
+  } else {
+      // Normal manual behavior for Errors or Professor Actions
+      remaining = 4; updateCD();
+      cd = setInterval(() => { remaining--; updateCD(); if (remaining <= 0) dismiss(); }, 1000);
+  }
 }
 
 function updateCD(){
@@ -1026,10 +1122,12 @@ function resolveMsg(d,isErr){
   d.late_minutes=d.late_minutes||document.getElementById('card').dataset.lateMinutes||0;
   if(d.error)return{txt:d.error,
     cls:(d.action==='SESSION_NOT_STARTED'||d.action==='CANNOT_TIME_OUT')?'mw':(isErr?'me':'mw')};
+  
+  // Updated text to reflect that it is saving automatically
   const map={
-    IN:{txt:d.is_late?`⚠ You are LATE by ${d.late_minutes} min. Tap Confirm to record TIME IN.`
-                     :'Tap Confirm to record TIME IN.',cls:d.is_late?'mw':'ms'},
-    OUT:{txt:'Tap Confirm to record TIME OUT.',cls:'ms'},
+    IN:{txt:d.is_late?`⚠ LATE by ${d.late_minutes} min. Saving Time IN...`
+                     :'Saving Time IN...',cls:d.is_late?'mw':'ms'},
+    OUT:{txt:'Saving Time OUT...',cls:'ms'},
     START:{txt:'Tap Confirm to START the session. Students can then time in.',cls:'ms'},
     DISMISS:{txt:'🚪 Allow students to TIME OUT and leave the lab. New time-ins are still allowed.',cls:'mo'},
     END:{txt:'⏹ End the session completely. Remaining students will be auto timed-out.',cls:'mw'},
@@ -1037,22 +1135,37 @@ function resolveMsg(d,isErr){
   };
   return map[d.action]||{txt:d.action,cls:'mi'};
 }
+
 function label(a){
   return{IN:'✅ Time IN',OUT:'✅ Time OUT',START:'▶ Start Session',
          DISMISS:'🚪 Allow Time Out',END:'⏹ End Session'}[a]||'✅ Confirm';
 }
-async function doConfirm(){
+
+async function doConfirm(isAuto = false){
   if(!payload)return;
-  const d=payload;dismiss();
+  const d=payload;
+  
+  if(!isAuto) dismiss(); // Manual clicks hide the modal immediately
+  
   const ep=d.role==='professor'?'/confirm_session':'/confirm_attendance';
   try{
     const r=await fetch(ep,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(d)});
     const json=await r.json();
     const bar=document.getElementById('bar');
     bar.textContent='● '+(json.message||'Done');
-    setTimeout(()=>{bar.textContent='● Scanning...';},3000);
+    
+    if(isAuto) {
+        // Show success directly on the big popup for 1.5 seconds, then clear screen for next student
+        document.getElementById('cardMsg').textContent = json.message || 'Saved!';
+        document.getElementById('cardMsg').className = 'ms';
+        document.getElementById('countdown').textContent = 'Saved successfully ✅';
+        setTimeout(() => dismiss(), 1500); 
+    } else {
+        setTimeout(()=>{bar.textContent='● Scanning...';},3000);
+    }
   }catch(e){console.error(e);}
 }
+
 function dismiss(){
   clearInterval(cd);clearTimeout(timer);
   document.getElementById('overlay').classList.remove('on');
