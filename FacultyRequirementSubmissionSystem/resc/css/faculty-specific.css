@@ -1,4 +1,5 @@
 :root {
+    font-size: 112.5%;
     --green-dark:    #0d3b1e;
     --green-mid:     #145a2e;
     --green-sidebar: #0f4423;
@@ -17,7 +18,9 @@
     --radius:        0.85rem;
 }
 
-*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+html {
+    font-size: 112.5%;
+}
 
 body {
     font-family: 'Source Sans 3', sans-serif;
@@ -477,6 +480,13 @@ body {
     gap: 1rem;
 }
 
+.filter-row .search-box {
+    position: relative;
+    width: 100%;
+    flex: unset;
+    margin-bottom: .3rem;
+}
+
 .search-box {
     position: relative;
     width: 100%;
@@ -491,6 +501,7 @@ body {
     color: var(--text-main);
     background: #f7faf8;
     width: 100%;
+    box-sizing: border-box;
     font-family: 'Source Sans 3', sans-serif;
     transition: all .2s;
 }
@@ -1051,13 +1062,13 @@ body {
 }
 
 /* My Files Specific Styles */
-.file-card {
+.file-card-my-files {
     display: flex;
     flex-direction: column;
     position: relative;
 }
 
-.file-icon {
+.file-card-my-files .file-icon {
     font-size: 3rem;
     text-align: center;
     padding: 1.5rem 1rem 1rem;
@@ -1065,14 +1076,14 @@ body {
     border-bottom: 1.5px solid var(--border);
 }
 
-.file-icon.pdf { background: linear-gradient(135deg, #fee2e2 0%, #fecaca 100%); }
-.file-icon.doc, .file-icon.docx { background: linear-gradient(135deg, #dbeafe 0%, #bfdbfe 100%); }
-.file-icon.xls, .file-icon.xlsx { background: linear-gradient(135deg, #d1fae5 0%, #a7f3d0 100%); }
-.file-icon.ppt, .file-icon.pptx { background: linear-gradient(135deg, #fed7aa 0%, #fdba74 100%); }
-.file-icon.zip, .file-icon.rar { background: linear-gradient(135deg, #e0e7ff 0%, #c7d2fe 100%); }
-.file-icon.jpg, .file-icon.jpeg, .file-icon.png, .file-icon.gif { background: linear-gradient(135deg, #fce7f3 0%, #fbcfe8 100%); }
+.file-card-my-files .file-icon.pdf { background: linear-gradient(135deg, #fee2e2 0%, #fecaca 100%); }
+.file-card-my-files .file-icon.doc, .file-card-my-files .file-icon.docx { background: linear-gradient(135deg, #dbeafe 0%, #bfdbfe 100%); }
+.file-card-my-files .file-icon.xls, .file-card-my-files .file-icon.xlsx { background: linear-gradient(135deg, #d1fae5 0%, #a7f3d0 100%); }
+.file-card-my-files .file-icon.ppt, .file-card-my-files .file-icon.pptx { background: linear-gradient(135deg, #fed7aa 0%, #fdba74 100%); }
+.file-card-my-files .file-icon.zip, .file-card-my-files .file-icon.rar { background: linear-gradient(135deg, #e0e7ff 0%, #c7d2fe 100%); }
+.file-card-my-files .file-icon.jpg, .file-card-my-files .file-icon.jpeg, .file-card-my-files .file-icon.png, .file-card-my-files .file-icon.gif { background: linear-gradient(135deg, #fce7f3 0%, #fbcfe8 100%); }
 
-.file-info {
+.file-card-my-files .file-info {
     flex: 1;
     display: flex;
     flex-direction: column;

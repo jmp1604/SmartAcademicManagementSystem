@@ -5,6 +5,19 @@
     margin-bottom: 1.8rem;
 }
 
+@media (max-width: 1400px) {
+    .stat-cards {
+        grid-template-columns: repeat(2, 1fr);
+    }
+}
+
+@media (max-width: 768px) {
+    .stat-cards {
+        grid-template-columns: 1fr;
+        gap: 1rem;
+    }
+}
+
 .stat-card {
     background: var(--card-bg);
     border-radius: var(--radius);
@@ -36,9 +49,24 @@
 
 .categories-grid {
     display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
-    gap: 1.25rem;
+    grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+    gap: 1.5rem;
     margin-top: 1.5rem;
+    padding: 0.5rem 0 1rem 0;
+    overflow: visible;
+}
+
+@media (max-width: 768px) {
+    .categories-grid {
+        grid-template-columns: 1fr;
+        gap: 1rem;
+    }
+}
+
+@media (max-width: 1024px) {
+    .categories-grid {
+        grid-template-columns: repeat(2, 1fr);
+    }
 }
 
 .category-card {
@@ -48,6 +76,9 @@
     padding: 1.5rem;
     transition: all .2s;
     position: relative;
+    display: flex;
+    flex-direction: column;
+    overflow: visible;
 }
 
 .category-card:hover {
@@ -143,6 +174,7 @@
 .category-actions {
     display: flex;
     gap: .5rem;
+    margin-top: auto;
 }
 
 .btn-edit, .btn-deactivate, .btn-delete {
@@ -577,31 +609,107 @@ textarea.form-control {
     .stat-cards {
         grid-template-columns: repeat(2, 1fr);
     }
+    
+    .icon-picker-grid {
+        grid-template-columns: repeat(6, 1fr);
+    }
 }
 
 @media (max-width: 768px) {
     .stat-cards {
         grid-template-columns: 1fr;
+        gap: 1rem;
     }
 
     .categories-grid {
         grid-template-columns: 1fr;
+        gap: 1rem;
     }
+    
+    .modal-dialog {
+        width: 95%;
+        max-width: none;
+    }
+    
+    .modal-body {
+        padding: 1.25rem;
+    }
+    
+    .category-meta {
+        grid-template-columns: repeat(2, 1fr);
+    }
+    
+    .icon-picker-grid {
+        grid-template-columns: repeat(5, 1fr);
+    }
+}
 
-    .toolbar {
+@media (max-width: 480px) {
+    .stat-cards {
+        gap: 0.75rem;
+    }
+    
+    .categories-grid {
+        gap: 0.75rem;
+    }
+    
+    .category-card {
+        padding: 1rem;
+    }
+    
+    .category-meta {
+        grid-template-columns: 1fr;
+        gap: 0.5rem;
+    }
+    
+    .category-actions {
         flex-direction: column;
-        align-items: stretch !important;
+        gap: 0.5rem;
     }
-
-    .toolbar-right {
-        flex-direction: column;
-    }
-
-    .search-box input {
+    
+    .btn-edit, .btn-deactivate, .btn-delete {
         width: 100%;
+        padding: 0.6rem 0.5rem;
+        font-size: 0.75rem;
     }
+    
+    .icon-picker-grid {
+        grid-template-columns: repeat(4, 1fr);
+    }
+    
+    .modal-header h3 {
+        font-size: 1.1rem;
+    }
+    
+    .form-group label {
+        font-size: 0.8rem;
+    }
+}
 
-    .filter-select {
-        width: 100%;
+/* Table action buttons styling */
+.btn-action-group {
+    display: flex;
+    gap: 0.5rem;
+    white-space: nowrap;
+}
+
+.btn-table-action {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.3rem;
+    padding: 0.4rem 0.8rem;
+    font-size: 0.75rem;
+    border: 1px solid var(--border);
+    border-radius: 0.4rem;
+    cursor: pointer;
+    transition: all 0.2s;
+    background: transparent;
+    white-space: nowrap;
+}
+
+@media (max-width: 768px) {
+    .btn-table-action {
+        padding: 0.35rem 0.6rem;
+        font-size: 0.65rem;
     }
 }

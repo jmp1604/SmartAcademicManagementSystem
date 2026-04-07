@@ -1,9 +1,14 @@
 :root {
+    font-size: 125%;
     --green-dark:  #0d3b1e;
     --green-mid:   #145a2e;
     --green-btn:   #1a6b36;
     --green-hover: #12522a;
     --card-shadow: 0 20px 60px rgba(0,0,0,0.35);
+}
+
+html {
+    font-size: 125%;
 }
 
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
@@ -28,7 +33,7 @@ body {
     border-radius: 1.25rem;
     padding: 2.75rem 2.5rem 2.5rem;
     width: 100%;
-    max-width: 580px;
+    max-width: 640px;
     box-shadow: var(--card-shadow);
     animation: fadeUp .55s cubic-bezier(.22,.68,0,1.2) both;
 }

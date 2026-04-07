@@ -4,6 +4,7 @@
    ------------------------------------------- */
 
 :root {
+    font-size: 125%;
     --green-dark:    #0d3b1e;
     --green-mid:     #145a2e;
     --green-sidebar: #0f4423;
@@ -20,6 +21,10 @@
     --shadow-sm:     0 2px 8px rgba(0,0,0,0.07);
     --shadow-md:     0 4px 20px rgba(0,0,0,0.10);
     --radius:        0.85rem;
+}
+
+html {
+    font-size: 125%;
 }
 
 /* Override global defaults for admin pages */
