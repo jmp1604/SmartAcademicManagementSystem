@@ -432,7 +432,6 @@ async function autoSaveReport(exportType) {
     }
 }
 
-// ── Print ─────────────────────────────────────────────────────
 async function printReport() {
     if (!checkDuplicateWarning('Print')) return;
 
@@ -460,29 +459,51 @@ async function printReport() {
         *{margin:0;padding:0;box-sizing:border-box}
         body{font-family:Arial,sans-serif;padding:20px;font-size:11px;color:#111}
         
-        /* ── GREEN BANNER HEADER STYLE ── */
+        /* ── INK-SAVER WHITE BANNER HEADER ── */
         .header-container { 
-            background-color: #166534; /* Solid Green Background */
-            color: white;
+            background-color: #ffffff; /* Pure White */
+            color: #000000;            /* Black Text */
             text-align: center; 
             margin-bottom: 20px; 
             padding: 20px 15px; 
+            border: 2px solid #000000; /* Black Border to define the area */
             border-radius: 8px;
-            /* CRITICAL: Forces browsers to print the background color */
-            -webkit-print-color-adjust: exact; 
-            print-color-adjust: exact; 
         }
         .logos-text-wrapper { display: flex; justify-content: center; align-items: center; gap: 25px; margin-bottom: 10px; }
         .logo-img { height: 50px; width: auto; object-fit: contain; }
-        .univ-title { font-size: 18px; font-weight: bold; color: white; line-height: 1.2; letter-spacing: 0.5px;}
-        .college-title { font-size: 11px; color: #bbf7d0; letter-spacing: 1px; text-transform: uppercase;}
-        .report-title { font-size: 16px; font-weight: bold; color: white; margin-top: 12px; text-transform: uppercase; letter-spacing: 1px;}
-        .report-meta { font-size: 11px; color: #bbf7d0; margin-top: 5px; }
+        .univ-title { font-size: 18px; font-weight: bold; color: #000000; line-height: 1.2; letter-spacing: 0.5px;}
+        .college-title { font-size: 11px; color: #444444; letter-spacing: 1px; text-transform: uppercase;}
+        .report-title { font-size: 16px; font-weight: bold; color: #000000; margin-top: 12px; text-transform: uppercase; letter-spacing: 1px;}
+        .report-meta { font-size: 11px; color: #555555; margin-top: 5px; }
         
-        table{width:100%;border-collapse:collapse; margin-top: 10px;}
-        th{background:#166534;color:#fff;padding:8px 10px;text-align:left;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.5px; -webkit-print-color-adjust: exact; print-color-adjust: exact;}
-        td{padding:8px 10px;border-bottom:1px solid #e5e7eb;font-size:11px}
-        tr:nth-child(even){background:#f9fafb; -webkit-print-color-adjust: exact; print-color-adjust: exact;}
+       /* ── Updated CSS for Solid Black Table Lines ── */
+table {
+    width: 100%;
+    border-collapse: collapse; 
+    margin-top: 10px;
+    /* Main table border */
+    border: 1px solid #000000 !important; 
+}
+
+th {
+    background: #ffffff; 
+    color: #000000; 
+    padding: 8px 10px; 
+    text-align: left; 
+    font-size: 10px; 
+    font-weight: 700; 
+    text-transform: uppercase; 
+    /* Solid black border for headers */
+    border: 1px solid #000000 !important; 
+}
+
+td {
+    padding: 8px 10px; 
+    /* Solid black border for all cells */
+    border: 1px solid #000000 !important; 
+    font-size: 11px;
+}
+        tr:nth-child(even){background:#f9fafb;}
         .footer{margin-top:20px;text-align:center;font-size:10px;color:#9ca3af;border-top:1px solid #e5e7eb;padding-top:10px}
         @media print{body{padding:0px}}
     </style></head><body>
@@ -511,9 +532,7 @@ async function printReport() {
 
     await autoSaveReport('Print');
 }
-
-// ── PDF ───────────────────────────────────────────────────────
-function downloadPDF() {
+async function downloadPDF() {
     if (!checkDuplicateWarning('PDF')) return;
 
     const { jsPDF } = window.jspdf;
@@ -536,135 +555,75 @@ function downloadPDF() {
         });
     }
 
-    Promise.all([
+    const [plpData, ccsData] = await Promise.all([
         loadImage('../../auth/assets/plplogo.png'),
         loadImage('../../auth/assets/ccslogo.png')
-    ]).then(async ([plpData, ccsData]) => {
+    ]);
         
-        const centerX = pageW / 2;
-        const headerHeight = 45; // Height of the green banner
-        
-        // ── DRAW SOLID GREEN BANNER ──
-        doc.setFillColor(22, 101, 52); // Tailwind green-800 (#166534)
-        doc.rect(0, 0, pageW, headerHeight, 'F');
-        
-        // ── LOGOS (Drawn over the green banner) ──
-        const logoSize = 18;
-        if (plpData) doc.addImage(plpData, 'PNG', centerX - 85, 8, logoSize, logoSize);
-        if (ccsData) doc.addImage(ccsData, 'PNG', centerX + 67, 8, logoSize, logoSize);
+    const centerX = pageW / 2;
+    const headerHeight = 45; 
+    
+    // ── DRAW HEADER BORDER (THIN BLACK) ──
+    doc.setDrawColor(0, 0, 0); 
+    doc.setLineWidth(0.1); // Extremely thin like the print version
+    doc.rect(10, 5, pageW - 20, headerHeight, 'S'); 
+    
+    // ── LOGOS ──
+    if (plpData) doc.addImage(plpData, 'PNG', centerX - 85, 10, 18, 18);
+    if (ccsData) doc.addImage(ccsData, 'PNG', centerX + 67, 10, 18, 18);
 
-        // ── CENTERED HEADER TEXT (White and Light Green) ──
-        doc.setFontSize(16); 
-        doc.setTextColor(255, 255, 255); // White
-        doc.setFont('helvetica', 'bold');
-        doc.text('PAMANTASAN NG LUNGSOD NG PASIG', centerX, 15, { align: 'center' });
-        
-        doc.setFontSize(9); 
-        doc.setTextColor(187, 247, 208); // Light Green (#bbf7d0)
-        doc.setFont('helvetica', 'normal');
-        doc.text('COLLEGE OF COMPUTER STUDIES', centerX, 20, { align: 'center' });
-        
-        doc.setFontSize(14); 
-        doc.setTextColor(255, 255, 255); // White
-        doc.setFont('helvetica', 'bold');
-        doc.text('LABORATORY ROOMS REPORT', centerX, 30, { align: 'center' });
-        
-        doc.setFontSize(8); 
-        doc.setTextColor(187, 247, 208); // Light Green (#bbf7d0)
-        doc.setFont('helvetica', 'normal');
-        doc.text(`Generated: ${nowStr}  ·  Total Labs: ${META.total}  ·  Available: ${META.available}  ·  Maintenance: ${META.maintenance}`, centerX, 36, { align: 'center' });
+    // ── TEXT (BLACK) ──
+    doc.setTextColor(0, 0, 0);
+    doc.setFontSize(16); doc.setFont('helvetica', 'bold');
+    doc.text('PAMANTASAN NG LUNGSOD NG PASIG', centerX, 18, { align: 'center' });
+    doc.setFontSize(9); doc.setFont('helvetica', 'normal');
+    doc.text('COLLEGE OF COMPUTER STUDIES', centerX, 23, { align: 'center' });
+    doc.setFontSize(14); doc.setFont('helvetica', 'bold');
+    doc.text('LABORATORY ROOMS REPORT', centerX, 33, { align: 'center' });
+    doc.setFontSize(8); doc.setFont('helvetica', 'normal');
+    doc.text(`Generated: ${nowStr}  ·  Total Labs: ${META.total}  ·  Available: ${META.available}  ·  Maintenance: ${META.maintenance}`, centerX, 39, { align: 'center' });
 
-        // ── AUTO-EXPANDING CLEAN TABLE ──
-        doc.autoTable({
-            // Added \n to long headers to save width and keep them looking clean
-            head: [['#','Lab Code','Lab Name','Building','Floor','Capacity','Status','Active\nSchedules','Sessions\nDone','Equipment','Date Added']],
-            body: REPORT.map((r, i) => [
-                i + 1, r.lab_code, r.lab_name, r.building, r.floor,
-                r.capacity + ' seats', r.status.toUpperCase(),
-                r.active_schedules, r.sessions_done,
-                r.equipment.substring(0, 45), r.date_added
-            ]),
-            startY: headerHeight + 8, // Start table slightly below the green banner
-            margin: { left: 14, right: 14 }, // Force the table to stretch to the page margins
-            theme: 'striped',
-            headStyles: { 
-                fillColor: [22, 101, 52], 
-                fontSize: 7.5, 
-                fontStyle: 'bold', 
-                textColor: 255,
-                halign: 'center', // Center align headers
-                valign: 'middle'
-            },
-            styles: { 
-                fontSize: 7.5, 
-                cellPadding: 3,
-                valign: 'middle'
-            },
-            columnStyles: {
-                0: { cellWidth: 10, halign: 'center' }, // #
-                1: { halign: 'center', fontStyle: 'bold' }, // Lab Code
-                2: { halign: 'left' }, // Lab Name
-                3: { halign: 'left' }, // Building
-                4: { halign: 'center' }, // Floor
-                5: { halign: 'center' }, // Capacity
-                6: { halign: 'center' }, // Status
-                7: { halign: 'center' }, // Schedules
-                8: { halign: 'center' }, // Sessions
-                9: { halign: 'left' },   // Equipment
-                10: { halign: 'center' } // Date Added
-            },
-            didParseCell(d) {
-                if (d.column.index === 6 && d.section === 'body') {
-                    const v = (d.cell.text[0] || '').toLowerCase();
-                    if (v === 'available')   { d.cell.styles.textColor = [22,101,52]; d.cell.styles.fontStyle = 'bold'; }
-                    if (v === 'maintenance') { d.cell.styles.textColor = [220,38,38]; d.cell.styles.fontStyle = 'bold'; }
-                    if (v === 'inactive')    { d.cell.styles.textColor = [100,116,139]; d.cell.styles.fontStyle = 'bold'; }
-                }
+    // ── TABLE (CLEAN GRID) ──
+    doc.autoTable({
+        head: [['#','Lab Code','Lab Name','Building','Floor','Capacity','Status','Active\nSchedules','Sessions\nDone','Equipment','Date Added']],
+        body: REPORT.map((r, i) => [
+            i + 1, r.lab_code, r.lab_name, r.building, r.floor,
+            r.capacity + ' seats', r.status.toUpperCase(),
+            r.active_schedules, r.sessions_done,
+            r.equipment.substring(0, 45), r.date_added
+        ]),
+        startY: headerHeight + 10,
+        margin: { left: 14, right: 14 },
+        theme: 'grid', 
+        headStyles: { 
+            fillColor: [255, 255, 255], 
+            textColor: [0, 0, 0],
+            lineColor: [0, 0, 0],
+            lineWidth: 0.1, // This creates the thin "Print" style lines
+            fontStyle: 'bold',
+            halign: 'center'
+        },
+        styles: { 
+            lineColor: [0, 0, 0],
+            lineWidth: 0.1, // Consistent thin lines
+            fontSize: 7.5,
+            textColor: [0, 0, 0]
+        },
+        columnStyles: {
+            0: { halign: 'center' }, 1: { halign: 'center' }, 4: { halign: 'center' },
+            5: { halign: 'center' }, 6: { halign: 'center' }, 7: { halign: 'center' },
+            8: { halign: 'center' }, 10: { halign: 'center' }
+        },
+        didParseCell(d) {
+            if (d.column.index === 6 && d.section === 'body') {
+                const v = (d.cell.text[0] || '').toLowerCase();
+                if (v === 'available')   { d.cell.styles.textColor = [22,101,52]; }
+                if (v === 'maintenance') { d.cell.styles.textColor = [220,38,38]; }
             }
-        });
-
-        const pages = doc.internal.getNumberOfPages();
-        for (let i = 1; i <= pages; i++) {
-            doc.setPage(i); doc.setFontSize(7); doc.setTextColor(156, 163, 175);
-            doc.text(`Laboratory Attendance System  ·  Page ${i} of ${pages}  ·  ${nowStr}`,
-                pageW / 2, doc.internal.pageSize.height - 8, { align: 'center' });
         }
-
-        doc.save(`Laboratory_Report_${new Date().toISOString().split('T')[0]}.pdf`);
-
-        await autoSaveReport('PDF');
     });
-}
 
-// ── CSV ───────────────────────────────────────────────────────
-async function exportCSV() {
-    if (!checkDuplicateWarning('CSV')) return;
-
-    const cols = ['#','Lab Code','Lab Name','Building','Floor','Capacity','Status',
-                  'Active Schedules','Sessions Done','Equipment','Date Added'];
-    const lines = [
-        cols.join(','),
-        ...REPORT.map((r, i) => [
-            i + 1,
-            `"${r.lab_code}"`,
-            `"${r.lab_name}"`,
-            `"${r.building}"`,
-            `"${r.floor}"`,
-            r.capacity,
-            r.status,
-            r.active_schedules,
-            r.sessions_done,
-            `"${r.equipment.replace(/"/g, '""')}"`,
-            `"${r.date_added}"`
-        ].join(','))
-    ];
-    const a = document.createElement('a');
-    a.href = URL.createObjectURL(new Blob([lines.join('\n')], { type: 'text/csv' }));
-    a.download = `Laboratory_Report_${new Date().toISOString().split('T')[0]}.csv`;
-    a.click();
-    URL.revokeObjectURL(a.href);
-
-    await autoSaveReport('CSV');
+    doc.save(`Laboratory_Report_${new Date().toISOString().split('T')[0]}.pdf`);
 }
 
 // ── Excel ─────────────────────────────────────────────────────

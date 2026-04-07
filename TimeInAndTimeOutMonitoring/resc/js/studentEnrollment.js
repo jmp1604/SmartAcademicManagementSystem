@@ -477,30 +477,29 @@ window.printReport = async function() {
         *{margin:0;padding:0;box-sizing:border-box}
         body{font-family:Arial,sans-serif;padding:20px;font-size:11px;color:#111}
         
-        /* ── GREEN BANNER HEADER STYLE ── */
+        /* ── INK-SAVER WHITE BANNER HEADER ── */
         .header-container { 
-            background-color: #166534; 
-            color: white;
+            background-color: #ffffff; 
+            color: #000000;
             text-align: center; 
             margin-bottom: 20px; 
             padding: 20px 15px; 
+            border: 2px solid #000000; 
             border-radius: 8px;
-            -webkit-print-color-adjust: exact; 
-            print-color-adjust: exact; 
         }
         .logos-text-wrapper { display: flex; justify-content: center; align-items: center; gap: 25px; margin-bottom: 10px; }
         .logo-img { height: 50px; width: auto; object-fit: contain; }
-        .univ-title { font-size: 18px; font-weight: bold; color: white; line-height: 1.2; letter-spacing: 0.5px;}
-        .college-title { font-size: 11px; color: #bbf7d0; letter-spacing: 1px; text-transform: uppercase;}
-        .report-title { font-size: 16px; font-weight: bold; color: white; margin-top: 12px; text-transform: uppercase; letter-spacing: 1px;}
-        .report-meta { font-size: 11px; color: #bbf7d0; margin-top: 5px; }
+        .univ-title { font-size: 18px; font-weight: bold; color: #000000; line-height: 1.2; letter-spacing: 0.5px;}
+        .college-title { font-size: 11px; color: #444444; letter-spacing: 1px; text-transform: uppercase;}
+        .report-title { font-size: 16px; font-weight: bold; color: #000000; margin-top: 12px; text-transform: uppercase; letter-spacing: 1px;}
+        .report-meta { font-size: 11px; color: #555555; margin-top: 5px; }
         
-        table{width:100%;border-collapse:collapse; margin-top: 10px;}
-        th{background:#166534;color:#fff;padding:8px 10px;text-align:center;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.5px; -webkit-print-color-adjust: exact; print-color-adjust: exact;}
-        td{padding:8px 10px;border-bottom:1px solid #e5e7eb;font-size:11px; text-align:center;}
-        td:nth-child(2), td:nth-child(3), td:nth-child(4), td:nth-child(5), td:nth-child(6) {text-align:left;} /* Left align text */
+        table{width:100%;border-collapse:collapse; margin-top: 10px; border: 1px solid #000000 !important;}
+        th{background:#ffffff; color:#000000; padding:8px 10px; text-align:center; font-size:10px; font-weight:700; text-transform:uppercase; letter-spacing:.5px; border: 1px solid #000000 !important;}
+        td{padding:8px 10px; border: 1px solid #000000 !important; font-size:11px; text-align:center;}
+        td:nth-child(2), td:nth-child(3), td:nth-child(4), td:nth-child(5), td:nth-child(6) {text-align:left;}
         td:last-child {text-align:left;}
-        tr:nth-child(even){background:#f9fafb; -webkit-print-color-adjust: exact; print-color-adjust: exact;}
+        tr:nth-child(even){background:#f9fafb;}
         .footer{margin-top:20px;text-align:center;font-size:10px;color:#9ca3af;border-top:1px solid #e5e7eb;padding-top:10px}
         @media print{body{padding:0px}}
     </style></head><body>
@@ -549,7 +548,6 @@ window.downloadPDF = async function() {
         const nowStr  = `${dateStr} at ${timeStr}`;
         const pageW   = doc.internal.pageSize.width;
 
-        // Helper to safely load the logos
         function loadImage(src) {
             return new Promise((resolve) => {
                 const img = new Image();
@@ -575,32 +573,28 @@ window.downloadPDF = async function() {
         const centerX = pageW / 2;
         const headerHeight = 45; 
         
-        doc.setFillColor(22, 101, 52); 
-        doc.rect(0, 0, pageW, headerHeight, 'F');
+        // ── DRAW THIN HEADER BORDER (WHITE BG) ──
+        doc.setDrawColor(0, 0, 0); 
+        doc.setLineWidth(0.1);
+        doc.rect(10, 5, pageW - 20, headerHeight, 'S'); 
         
         const logoSize = 18;
-        if (plpData) doc.addImage(plpData, 'PNG', centerX - 85, 8, logoSize, logoSize);
-        if (ccsData) doc.addImage(ccsData, 'PNG', centerX + 67, 8, logoSize, logoSize);
+        if (plpData) doc.addImage(plpData, 'PNG', centerX - 85, 10, logoSize, logoSize);
+        if (ccsData) doc.addImage(ccsData, 'PNG', centerX + 67, 10, logoSize, logoSize);
 
-        doc.setFontSize(16); 
-        doc.setTextColor(255, 255, 255); 
-        doc.setFont('helvetica', 'bold');
-        doc.text('PAMANTASAN NG LUNGSOD NG PASIG', centerX, 15, { align: 'center' });
+        // ── CENTERED HEADER TEXT (BLACK) ──
+        doc.setTextColor(0, 0, 0);
+        doc.setFontSize(16); doc.setFont('helvetica', 'bold');
+        doc.text('PAMANTASAN NG LUNGSOD NG PASIG', centerX, 18, { align: 'center' });
         
-        doc.setFontSize(9); 
-        doc.setTextColor(187, 247, 208); 
-        doc.setFont('helvetica', 'normal');
-        doc.text('COLLEGE OF COMPUTER STUDIES', centerX, 20, { align: 'center' });
+        doc.setFontSize(9); doc.setTextColor(60, 60, 60); doc.setFont('helvetica', 'normal');
+        doc.text('COLLEGE OF COMPUTER STUDIES', centerX, 23, { align: 'center' });
         
-        doc.setFontSize(14); 
-        doc.setTextColor(255, 255, 255); 
-        doc.setFont('helvetica', 'bold');
-        doc.text('STUDENT ENROLLMENT REPORT', centerX, 30, { align: 'center' });
+        doc.setFontSize(14); doc.setTextColor(0, 0, 0); doc.setFont('helvetica', 'bold');
+        doc.text('STUDENT ENROLLMENT REPORT', centerX, 33, { align: 'center' });
         
-        doc.setFontSize(8); 
-        doc.setTextColor(187, 247, 208); 
-        doc.setFont('helvetica', 'normal');
-        doc.text(`Generated: ${nowStr}  ·  Total Students: ${reportRows.length}`, centerX, 36, { align: 'center' });
+        doc.setFontSize(8); doc.setTextColor(80, 80, 80); doc.setFont('helvetica', 'normal');
+        doc.text(`Generated: ${nowStr}  ·  Total Students: ${reportRows.length}`, centerX, 39, { align: 'center' });
 
         const head = [['#','Student ID','Last Name','First Name','M.I.','Course','Yr','Section','Email','Face Status','Enrolled\nSubjects','Subject Codes']];
         const body = reportRows.map((r, i) => {
@@ -615,13 +609,27 @@ window.downloadPDF = async function() {
 
         doc.autoTable({
             head, body,
-            startY: headerHeight + 8,
+            startY: headerHeight + 10,
             margin: { left: 10, right: 10 },
-            theme: 'striped',
+            theme: 'grid',
             headStyles: { 
-                fillColor: [22, 101, 52], fontSize: 6.5, fontStyle: 'bold', textColor: 255, halign: 'center', valign: 'middle'
+                fillColor: [255, 255, 255], 
+                fontSize: 6.5, 
+                fontStyle: 'bold', 
+                textColor: [0, 0, 0], 
+                lineColor: [0, 0, 0], 
+                lineWidth: 0.1,
+                halign: 'center', 
+                valign: 'middle' 
             },
-            styles: { fontSize: 6.5, cellPadding: 2, valign: 'middle' },
+            styles: { 
+                fontSize: 6.5, 
+                cellPadding: 2, 
+                valign: 'middle',
+                lineColor: [0, 0, 0], 
+                lineWidth: 0.1,
+                textColor: [0, 0, 0]
+            },
             columnStyles: {
                 0: { cellWidth: 7, halign: 'center' },
                 1: { cellWidth: 16, halign: 'center', fontStyle: 'bold' },
@@ -634,7 +642,7 @@ window.downloadPDF = async function() {
                 8: { cellWidth: 35 },
                 9: { cellWidth: 18, halign: 'center', fontStyle: 'bold' },
                 10: { cellWidth: 14, halign: 'center' },
-                11: { cellWidth: 'auto', halign: 'left' } // Subject codes take remaining space
+                11: { cellWidth: 'auto', halign: 'left' }
             },
             didParseCell(d) {
                 if (d.column.index === 9 && d.section === 'body') {
@@ -658,8 +666,7 @@ window.downloadPDF = async function() {
 
     } catch (err) {
         console.error('PDF generation error:', err);
-        if (typeof showToast === 'function') showToast('There was an error generating the PDF. Check the console.', true);
-        else alert('There was an error generating the PDF. Check the console.');
+        if (typeof showToast === 'function') showToast('There was an error generating the PDF.', true);
     }
 };
 

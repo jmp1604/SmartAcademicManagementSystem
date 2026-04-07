@@ -26,7 +26,6 @@ document.addEventListener('DOMContentLoaded', async () => {
     }
     await loadReportsData();
     await loadDropdownDataForGenerator();
-   
 });
 
 // ────────────────────────────────────────────
@@ -54,19 +53,16 @@ async function loadReportsData() {
 }
 
 async function loadDropdownDataForGenerator() {
-    // Load Professors
     const { data: profs } = await supabaseClient.from('professors').select('professor_id, first_name, last_name').eq('status', 'active').order('last_name');
     const profOpts = '<option value="">All</option>' + (profs||[]).map(p => `<option value="${p.professor_id}" data-name="${p.first_name} ${p.last_name}">${p.last_name}, ${p.first_name}</option>`).join('');
     document.getElementById('gf-prof').innerHTML = profOpts;
     document.getElementById('gf-p-prof').innerHTML = profOpts;
 
-    // Load Subjects
     const { data: subjs } = await supabaseClient.from('subjects').select('subject_id, subject_code, subject_name').order('subject_code');
     const subjOpts = '<option value="">All</option>' + (subjs||[]).map(s => `<option value="${s.subject_id}" data-code="${s.subject_code}">${s.subject_code} — ${s.subject_name}</option>`).join('');
     document.getElementById('gf-subj').innerHTML = subjOpts;
     document.getElementById('gf-st-subj').innerHTML = subjOpts;
 
-    // Load Labs
     const { data: labs } = await supabaseClient.from('laboratory_rooms').select('lab_id, lab_code').order('lab_code');
     document.getElementById('gf-lab').innerHTML = '<option value="">All</option>' + (labs||[]).map(l => `<option value="${l.lab_id}" data-code="${l.lab_code}">${l.lab_code}</option>`).join('');
 }
@@ -92,16 +88,13 @@ function executeClientFilter() {
 
     filteredReports = allReports.filter(r => {
         if (type && r.report_type !== type) return false;
-        
         const rDate = r.created_at.split('T')[0];
         if (from && rDate < from) return false;
         if (to && rDate > to) return false;
-
         if (q) {
             const searchStr = `${r.report_name} ${r.report_id}`.toLowerCase();
             if (!searchStr.includes(q)) return false;
         }
-
         return true;
     });
 
@@ -111,20 +104,17 @@ function executeClientFilter() {
 
 function updateStats() {
     let s_sess = 0, s_att = 0, s_prof = 0, s_stu = 0;
-    
     allReports.forEach(r => {
         if (r.report_type === 'sessions') s_sess++;
         else if (r.report_type === 'attendance') s_att++;
         else if (r.report_type === 'professor' || r.report_type === 'professors') s_prof++;
         else if (r.report_type === 'student' || r.report_type === 'students' || r.report_type === 'enrollment') s_stu++;
     });
-
     document.getElementById('statTotalAll').textContent = allReports.length;
     document.getElementById('statSessions').textContent = s_sess;
     document.getElementById('statAttendance').textContent = s_att;
     document.getElementById('statProfessor').textContent = s_prof;
     document.getElementById('statStudent').textContent = s_stu;
-
     document.getElementById('recordCountDisplay').textContent = filteredReports.length;
     document.getElementById('btnDeleteAll').style.display = allReports.length > 0 ? 'inline-flex' : 'none';
 }
@@ -137,21 +127,15 @@ function renderTable() {
         return;
     }
 
-    tbody.innerHTML = filteredReports.map((r, i) => {
+    tbody.innerHTML = filteredReports.map((r) => {
         const tc = typeConfig[r.report_type] || { label: r.report_type, icon: 'fa-file', col: '#555', bg: '#f5f5f5', border: '#ddd' };
-        
         let filtersObj = {};
         try { filtersObj = JSON.parse(r.filters || '{}'); } catch(e){}
-        
         let chips = [];
         if (filtersObj.date_from || filtersObj.date_to) chips.push(`${filtersObj.date_from || '...'} → ${filtersObj.date_to || '...'}`);
-        if (filtersObj.date) chips.push(filtersObj.date);
         if (filtersObj.professor_name) chips.push(filtersObj.professor_name);
         if (filtersObj.subject_code) chips.push(filtersObj.subject_code);
         if (filtersObj.status) chips.push(filtersObj.status.charAt(0).toUpperCase() + filtersObj.status.slice(1));
-        if (filtersObj.section) chips.push(`Sec. ${filtersObj.section}`);
-        if (filtersObj.lab_code) chips.push(filtersObj.lab_code);
-
         const filterDisplay = chips.length > 0 ? chips.join(' &middot; ') : '<span style="color:var(--s300);font-style:italic">All Data</span>';
         const d = new Date(r.created_at);
 
@@ -177,16 +161,15 @@ function renderTable() {
                         <button class="act-btn act-print" onclick="triggerPrint('${r.report_id}')"><i class="fa-solid fa-print"></i> Print</button>
                         <button class="act-btn act-pdf" onclick="triggerPDF('${r.report_id}')"><i class="fa-solid fa-file-pdf"></i> PDF</button>
                         <button class="act-btn act-excel" onclick="triggerExcel('${r.report_id}')"><i class="fa-solid fa-file-excel"></i> Excel</button>
-                        <button class="act-btn act-del" onclick="deleteReport('${r.report_id}')" title="Delete"><i class="fa-solid fa-trash"></i></button>
+                        <button class="act-btn act-del" onclick="deleteReport('${r.report_id}')"><i class="fa-solid fa-trash"></i></button>
                     </div>
                 </td>
-            </tr>
-        `;
+            </tr>`;
     }).join('');
 }
 
 // ────────────────────────────────────────────
-// 3. GENERATION MODAL
+// 3. GENERATION MODAL & LOGIC
 // ────────────────────────────────────────────
 window.openGenModal = function() { document.getElementById('genModal').classList.add('on'); }
 window.closeGenModal = function() { document.getElementById('genModal').classList.remove('on'); window.selType = ''; }
@@ -196,45 +179,41 @@ window.selectType = function(type) {
     document.querySelectorAll('.rt-card').forEach(c => c.classList.remove('sel'));
     document.getElementById('rtc-' + type).classList.add('sel');
     document.getElementById('gfSection').style.display = 'block';
-    
     document.getElementById('gf-sa').style.display = ['sessions', 'attendance'].includes(type) ? 'grid' : 'none';
     document.getElementById('gf-p').style.display  = type === 'professor' ? 'grid' : 'none';
     document.getElementById('gf-st').style.display = type === 'student'   ? 'grid' : 'none';
     
     const nameEl = document.getElementById('genName');
-    if (!nameEl.value) {
-        const labels = { sessions:'Session Report', attendance:'Attendance Report', professor:'Professor Report', student:'Student Report' };
-        const mo = new Date().toLocaleDateString('en-US', { month:'long', year:'numeric' });
-        nameEl.value = `${labels[type] || 'System Report'} — ${mo}`;
-    }
+    const mo = new Date().toLocaleDateString('en-US', { month:'long', year:'numeric' });
+    const labels = { sessions:'Session Report', attendance:'Attendance Report', professor:'Professor Report', student:'Student Report' };
+    nameEl.value = `${labels[type] || 'System Report'} — ${mo}`;
 }
 
 function collectFilters() {
     const f = {};
     const setIf = (key, val) => { if (val) f[key] = val; };
-    
     if (['sessions', 'attendance'].includes(window.selType)) {
         const ps = document.getElementById('gf-prof');
         const ss = document.getElementById('gf-subj');
         const ls = document.getElementById('gf-lab');
         setIf('date_from', document.getElementById('gf-date-from').value);
         setIf('date_to',   document.getElementById('gf-date-to').value);
-        setIf('professor_id',   ps.value);
+        setIf('professor_id', ps.value);
         setIf('professor_name', ps.value ? ps.options[ps.selectedIndex].dataset.name : '');
-        setIf('subject_id',   ss.value);
+        setIf('subject_id', ss.value);
         setIf('subject_code', ss.value ? ss.options[ss.selectedIndex].dataset.code : '');
         setIf('status', document.getElementById('gf-status').value);
-        setIf('lab_id',   ls.value);
+        setIf('lab_id', ls.value);
         setIf('lab_code', ls.value ? ls.options[ls.selectedIndex].dataset.code : '');
     } else if (window.selType === 'professor') {
         const ps = document.getElementById('gf-p-prof');
-        setIf('professor_id',   ps.value);
+        setIf('professor_id', ps.value);
         setIf('professor_name', ps.value ? ps.options[ps.selectedIndex].dataset.name : '');
         setIf('date_from', document.getElementById('gf-p-from').value);
         setIf('date_to',   document.getElementById('gf-p-to').value);
     } else if (window.selType === 'student') {
         const ss = document.getElementById('gf-st-subj');
-        setIf('subject_id',   ss.value);
+        setIf('subject_id', ss.value);
         setIf('subject_code', ss.value ? ss.options[ss.selectedIndex].dataset.code : '');
         setIf('date_from', document.getElementById('gf-st-from').value);
         setIf('date_to',   document.getElementById('gf-st-to').value);
@@ -247,25 +226,98 @@ window.generateReport = async function() {
     const name = document.getElementById('genName').value.trim();
     if (!name) { showToast('Please enter a report name.', 'error'); return; }
     
-    // In a full Supabase implementation, the actual aggregation logic for 'sessions', 'student' etc 
-    // happens here. For brevity, we simulate the save.
-    
-    const payload = {
-        report_type: window.selType,
-        report_name: name,
-        filters: JSON.stringify(collectFilters()),
-        report_data: JSON.stringify([]) // You would fetch and populate this based on the selected type
-    };
+    const btn = document.querySelector('.btn-generate');
+    const originalText = btn.innerHTML;
+    btn.disabled = true;
+    btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Fetching Data...';
+
+    const filters = collectFilters();
+    let reportData = [];
 
     try {
-        const { error } = await supabaseClient.from('las_reports').insert([payload]);
-        if (error) throw error;
+        if (window.selType === 'sessions') {
+            let query = supabaseClient.from('lab_sessions').select(`
+                session_date, status, actual_start_time, actual_end_time,
+                lab_schedules ( section, subjects(subject_code), professors(last_name), laboratory_rooms(lab_code) )
+            `);
+            if (filters.date_from) query = query.gte('session_date', filters.date_from);
+            if (filters.date_to) query = query.lte('session_date', filters.date_to);
+            if (filters.status) query = query.eq('status', filters.status);
+            
+            const { data } = await query;
+            reportData = (data || []).map(r => ({
+                Date: r.session_date,
+                Subject: r.lab_schedules?.subjects?.subject_code,
+                Professor: r.lab_schedules?.professors?.last_name,
+                Lab: r.lab_schedules?.laboratory_rooms?.lab_code,
+                Status: r.status.toUpperCase(),
+                Started: r.actual_start_time || '—',
+                Ended: r.actual_end_time || '—'
+            }));
+
+        } else if (window.selType === 'attendance') {
+            let query = supabaseClient.from('lab_attendance').select(`
+                time_in, time_out, duration_minutes, time_in_status, late_minutes,
+                students ( id_number, last_name, first_name ),
+                lab_sessions ( session_date, lab_schedules ( subjects(subject_code) ) )
+            `);
+            if (filters.date_from) query = query.gte('lab_sessions.session_date', filters.date_from);
+            if (filters.date_to) query = query.lte('lab_sessions.session_date', filters.date_to);
+            
+            const { data } = await query;
+            reportData = (data || []).map(r => ({
+                StudentID: r.students?.id_number,
+                Name: `${r.students?.last_name}, ${r.students?.first_name}`,
+                Date: r.lab_sessions?.session_date,
+                Subject: r.lab_sessions?.lab_schedules?.subjects?.subject_code,
+                In: r.time_in ? new Date(r.time_in).toLocaleTimeString() : '—',
+                Out: r.time_out ? new Date(r.time_out).toLocaleTimeString() : 'In Lab',
+                Status: r.time_in_status,
+                LateMins: r.late_minutes
+            }));
+
+        } else if (window.selType === 'professor') {
+            let query = supabaseClient.from('lab_sessions').select(`
+                session_date, status,
+                lab_schedules!inner ( professor_id, subjects(subject_code) )
+            `).eq('lab_schedules.professor_id', filters.professor_id);
+            if (filters.date_from) query = query.gte('session_date', filters.date_from);
+            if (filters.date_to) query = query.lte('session_date', filters.date_to);
+            
+            const { data } = await query;
+            reportData = (data || []).map(r => ({
+                Date: r.session_date,
+                Subject: r.lab_schedules?.subjects?.subject_code,
+                Status: r.status
+            }));
+        }
+
+        if (reportData.length === 0) {
+            showToast('No data found for the selected filters.', 'error');
+            return;
+        }
+
+        const payload = {
+            report_type: window.selType,
+            report_name: name,
+            filters: JSON.stringify(filters),
+            report_data: JSON.stringify(reportData),
+            created_at: new Date().toISOString()
+        };
+
+        const { error: saveError } = await supabaseClient.from('las_reports').insert([payload]);
+        if (saveError) throw saveError;
         
         closeGenModal(); 
-        showToast('Report generated successfully!'); 
+        showToast('Report generated and saved!'); 
         await loadReportsData();
+
     } catch(err) {
-        showToast('Failed to save report: ' + err.message, 'error');
+        console.error('Report Generation Error:', err);
+        showToast('Failed to generate report: ' + err.message, 'error');
+    } finally {
+        btn.disabled = false;
+        btn.innerHTML = originalText;
     }
 }
 
@@ -279,62 +331,42 @@ window.deleteReport = async function(id) {
         if (error) throw error;
         showToast('Report deleted.');
         await loadReportsData();
-    } catch (err) {
-        showToast('Error deleting report.', 'error');
-    }
+    } catch (err) { showToast('Error deleting report.', 'error'); }
 }
-
-window.openDelAllModal = function() { document.getElementById('delAllModal').classList.add('on'); }
-window.closeDelAllModal = function() { document.getElementById('delAllModal').classList.remove('on'); }
 
 window.executeDeleteAll = async function() {
     try {
-        // Supabase requires a filter to delete. 'neq' to 0 deletes all valid IDs.
         const { error } = await supabaseClient.from('las_reports').delete().neq('report_id', 0);
         if (error) throw error;
-        closeDelAllModal();
+        document.getElementById('delAllModal').classList.remove('on');
         showToast('All reports deleted.');
         await loadReportsData();
-    } catch (err) {
-        showToast('Error deleting reports.', 'error');
-    }
+    } catch (err) { showToast('Error deleting reports.', 'error'); }
 }
 
 // ────────────────────────────────────────────
-// 5. EXPORTS (Print / PDF / Excel)
+// 5. EXPORTS & UTILS
 // ────────────────────────────────────────────
 function getReportData(id) {
     const report = allReports.find(r => r.report_id == id);
     if (!report) return null;
-    let data = [];
-    try { data = JSON.parse(report.report_data || '[]'); } catch(e){}
-    let filters = {};
-    try { filters = JSON.parse(report.filters || '{}'); } catch(e){}
+    let data = [], filters = {};
+    try { data = JSON.parse(report.report_data || '[]'); filters = JSON.parse(report.filters || '{}'); } catch(e){}
     return { ...report, parsedData: data, parsedFilters: filters };
 }
 
 window.triggerExcel = function(id) {
     const r = getReportData(id);
     if (!r || !r.parsedData.length) { showToast('No data to export.', 'error'); return; }
-    
     const headers = Object.keys(r.parsedData[0]);
-    const csv = [
-        headers.join(','),
-        ...r.parsedData.map(row => headers.map(h => `"${(row[h] ?? '').toString().replace(/"/g, '""')}"`).join(','))
-    ].join('\n');
-    
+    const csv = [headers.join(','), ...r.parsedData.map(row => headers.map(h => `"${(row[h] ?? '').toString().replace(/"/g, '""')}"`).join(','))].join('\n');
     const a = document.createElement('a');
     a.href = URL.createObjectURL(new Blob([csv], { type: 'text/csv' }));
     a.download = `Report_${id}_${new Date().toISOString().split('T')[0]}.csv`;
     a.click();
-    URL.revokeObjectURL(a.href);
     showToast('CSV exported!');
 }
 
-window.triggerPrint = function(id) { alert("Print functionality triggered (Requires HTML window write logic as seen in previous modules)"); }
-window.triggerPDF = function(id) { alert("PDF functionality triggered (Requires jsPDF logic as seen in previous modules)"); }
-
-// Utils
 function escapeHtml(str) {
     if (!str) return '';
     return String(str).replace(/[&<>"']/g, m => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[m]));

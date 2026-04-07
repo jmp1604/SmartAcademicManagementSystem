@@ -1,23 +1,13 @@
 <?php
-header('Access-Control-Allow-Origin: *');
-header('Access-Control-Allow-Methods: POST, OPTIONS');
-header('Access-Control-Allow-Headers: Content-Type');
 header('Content-Type: application/json');
+header('Access-Control-Allow-Origin: *');
 
-if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS') {
-    http_response_code(200);
-    exit;
-}
+// Point directly to your new BAT file
+$bat_file = 'C:\xampp\htdocs\INTEG SYSTEM\SmartAcademicManagementSystem\TimeInAndTimeOutMonitoring\students\START_ATTENDANCE.bat';
 
-// CONFIGURATION - Updated to flask_attendance.py
-$pythonExe  = "C:\\Users\\PLPASIG\\pythonnn\\python.exe";
-$scriptPath = "C:\\xampp\\htdocs\\INTEG SYSTEM\\SmartAcademicManagementSystem\\TimeInAndTimeOutMonitoring\\students\\flask_attendance.py";
-$logFile    = "C:\\xampp\\htdocs\\attendance_engine_error.log";
+// Execute the BAT file in the background
+// In trigger_attendance.php
+pclose(popen('start /B "" "' . $bat_file . '"', "r"));
 
-// Windows command to start the engine in the background
-$cmd = 'start /B "" "' . $pythonExe . '" "' . $scriptPath . '" > "' . $logFile . '" 2>&1';
-
-pclose(popen($cmd, "r"));
-
-echo json_encode(['success' => true, 'message' => 'Attendance engine ignition started']);
+echo json_encode(["status" => "success", "message" => "Triggered BAT file"]);
 ?>

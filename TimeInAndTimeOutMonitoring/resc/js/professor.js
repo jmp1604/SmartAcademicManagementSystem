@@ -385,8 +385,6 @@ async function autoSaveReport(exportType) {
         console.error('Auto-save error:', err);
     }
 }
-
-// ── Print ──────────────────────────────────────────────────
 async function printReport() {
     if (!checkDuplicateWarning('Print')) return;
 
@@ -423,29 +421,28 @@ async function printReport() {
         *{margin:0;padding:0;box-sizing:border-box}
         body{font-family:Arial,sans-serif;padding:20px;font-size:11px;color:#111}
         
-        /* ── GREEN BANNER HEADER STYLE ── */
+        /* ── INK-SAVER WHITE BANNER HEADER ── */
         .header-container { 
-            background-color: #166534; 
-            color: white;
+            background-color: #ffffff; 
+            color: #000000;
             text-align: center; 
             margin-bottom: 20px; 
             padding: 20px 15px; 
+            border: 2px solid #000000; 
             border-radius: 8px;
-            -webkit-print-color-adjust: exact; 
-            print-color-adjust: exact; 
         }
         .logos-text-wrapper { display: flex; justify-content: center; align-items: center; gap: 25px; margin-bottom: 10px; }
         .logo-img { height: 50px; width: auto; object-fit: contain; }
-        .univ-title { font-size: 18px; font-weight: bold; color: white; line-height: 1.2; letter-spacing: 0.5px;}
-        .college-title { font-size: 11px; color: #bbf7d0; letter-spacing: 1px; text-transform: uppercase;}
-        .report-title { font-size: 16px; font-weight: bold; color: white; margin-top: 12px; text-transform: uppercase; letter-spacing: 1px;}
-        .report-meta { font-size: 11px; color: #bbf7d0; margin-top: 5px; }
+        .univ-title { font-size: 18px; font-weight: bold; color: #000000; line-height: 1.2; letter-spacing: 0.5px;}
+        .college-title { font-size: 11px; color: #444444; letter-spacing: 1px; text-transform: uppercase;}
+        .report-title { font-size: 16px; font-weight: bold; color: #000000; margin-top: 12px; text-transform: uppercase; letter-spacing: 1px;}
+        .report-meta { font-size: 11px; color: #555555; margin-top: 5px; }
         
-        table{width:100%;border-collapse:collapse; margin-top: 10px;}
-        th{background:#166534;color:#fff;padding:8px 10px;text-align:center;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.5px; -webkit-print-color-adjust: exact; print-color-adjust: exact;}
-        td{padding:8px 10px;border-bottom:1px solid #e5e7eb;font-size:11px; text-align:center;}
+        table{width:100%;border-collapse:collapse; margin-top: 10px; border: 1px solid #000000 !important;}
+        th{background:#ffffff; color:#000000; padding:8px 10px; text-align:center; font-size:10px; font-weight:700; text-transform:uppercase; letter-spacing:.5px; border: 1px solid #000000 !important;}
+        td{padding:8px 10px; border: 1px solid #000000 !important; font-size:11px; text-align:center;}
         td:nth-child(2), td:nth-child(3), td:nth-child(4), td:nth-child(5), td:nth-child(6), td:nth-child(11) {text-align:left;}
-        tr:nth-child(even){background:#f9fafb; -webkit-print-color-adjust: exact; print-color-adjust: exact;}
+        tr:nth-child(even){background:#f9fafb;}
         .footer{margin-top:20px;text-align:center;font-size:10px;color:#9ca3af;border-top:1px solid #e5e7eb;padding-top:10px}
         @media print{body{padding:0px}}
     </style></head><body>
@@ -474,15 +471,9 @@ async function printReport() {
 
     await autoSaveReport('Print');
 }
-
-// ── PDF ────────────────────────────────────────────────────
 async function downloadPDF() {
     if (!checkDuplicateWarning('PDF')) return;
-
-    if (!window.jspdf) {
-        alert('PDF library not loaded yet. Please try again.');
-        return;
-    }
+    if (!window.jspdf) { alert('PDF library not loaded yet. Please try again.'); return; }
 
     try {
         const { jsPDF } = window.jspdf;
@@ -503,9 +494,7 @@ async function downloadPDF() {
                         canvas.width = img.width; canvas.height = img.height;
                         canvas.getContext('2d').drawImage(img, 0, 0);
                         resolve(canvas.toDataURL('image/png'));
-                    } catch(e) {
-                        resolve(null); 
-                    }
+                    } catch(e) { resolve(null); }
                 };
                 img.onerror = () => resolve(null);
                 img.src = src;
@@ -520,32 +509,28 @@ async function downloadPDF() {
         const centerX = pageW / 2;
         const headerHeight = 45;
         
-        doc.setFillColor(22, 101, 52); 
-        doc.rect(0, 0, pageW, headerHeight, 'F');
+        // ── DRAW THIN HEADER BORDER (WHITE BG) ──
+        doc.setDrawColor(0, 0, 0); 
+        doc.setLineWidth(0.1);
+        doc.rect(10, 5, pageW - 20, headerHeight, 'S');
         
         const logoSize = 18;
-        if (plpData) doc.addImage(plpData, 'PNG', centerX - 85, 8, logoSize, logoSize);
-        if (ccsData) doc.addImage(ccsData, 'PNG', centerX + 67, 8, logoSize, logoSize);
+        if (plpData) doc.addImage(plpData, 'PNG', centerX - 85, 10, logoSize, logoSize);
+        if (ccsData) doc.addImage(ccsData, 'PNG', centerX + 67, 10, logoSize, logoSize);
 
-        doc.setFontSize(16); 
-        doc.setTextColor(255, 255, 255); 
-        doc.setFont('helvetica', 'bold');
-        doc.text('PAMANTASAN NG LUNGSOD NG PASIG', centerX, 15, { align: 'center' });
+        // ── HEADER TEXT (BLACK) ──
+        doc.setTextColor(0, 0, 0);
+        doc.setFontSize(16); doc.setFont('helvetica', 'bold');
+        doc.text('PAMANTASAN NG LUNGSOD NG PASIG', centerX, 18, { align: 'center' });
         
-        doc.setFontSize(9); 
-        doc.setTextColor(187, 247, 208); 
-        doc.setFont('helvetica', 'normal');
-        doc.text('COLLEGE OF COMPUTER STUDIES', centerX, 20, { align: 'center' });
+        doc.setFontSize(9); doc.setTextColor(60, 60, 60); doc.setFont('helvetica', 'normal');
+        doc.text('COLLEGE OF COMPUTER STUDIES', centerX, 23, { align: 'center' });
         
-        doc.setFontSize(14); 
-        doc.setTextColor(255, 255, 255); 
-        doc.setFont('helvetica', 'bold');
-        doc.text('PROFESSORS REPORT', centerX, 30, { align: 'center' });
+        doc.setFontSize(14); doc.setTextColor(0, 0, 0); doc.setFont('helvetica', 'bold');
+        doc.text('PROFESSORS REPORT', centerX, 33, { align: 'center' });
         
-        doc.setFontSize(8); 
-        doc.setTextColor(187, 247, 208); 
-        doc.setFont('helvetica', 'normal');
-        doc.text(`Generated: ${nowStr}  ·  Total Professors: ${META.total}  ·  Face Registered: ${META.facial}  ·  Active Schedules: ${META.schedules}`, centerX, 36, { align: 'center' });
+        doc.setFontSize(8); doc.setTextColor(80, 80, 80); doc.setFont('helvetica', 'normal');
+        doc.text(`Generated: ${nowStr}  ·  Total Professors: ${META.total}  ·  Face Registered: ${META.facial}  ·  Active Schedules: ${META.schedules}`, centerX, 39, { align: 'center' });
 
         const head = [['#','Emp ID','Last Name','First Name','M.I.','Department','Face Status','Status','Schedules','Sessions Done','Subjects']];
         const body = reportRows.map((r, i) => {
@@ -560,25 +545,23 @@ async function downloadPDF() {
 
         doc.autoTable({
             head, body,
-            startY: headerHeight + 8,
+            startY: headerHeight + 10,
             margin: { left: 14, right: 14 },
-            theme: 'striped',
+            theme: 'grid',
             headStyles: { 
-                fillColor: [22, 101, 52], fontSize: 7.5, fontStyle: 'bold', textColor: 255, halign: 'center', valign: 'middle'
+                fillColor: [255, 255, 255], fontSize: 7.5, fontStyle: 'bold', textColor: [0,0,0], 
+                lineColor: [0,0,0], lineWidth: 0.1, halign: 'center', valign: 'middle'
             },
-            styles: { fontSize: 7.5, cellPadding: 3, valign: 'middle' },
+            styles: { fontSize: 7.5, cellPadding: 3, valign: 'middle', lineColor: [0,0,0], lineWidth: 0.1, textColor: [0,0,0] },
             columnStyles: {
                 0: { cellWidth: 10, halign: 'center' },
                 1: { cellWidth: 20, halign: 'center', fontStyle: 'bold' },
                 2: { cellWidth: 30, fontStyle: 'bold' },
                 3: { cellWidth: 30 },
-                4: { cellWidth: 12 },
-                5: { cellWidth: 35 },
                 6: { cellWidth: 20, halign: 'center', fontStyle: 'bold' },
                 7: { cellWidth: 15, halign: 'center', fontStyle: 'bold' },
                 8: { cellWidth: 20, halign: 'center' },
-                9: { cellWidth: 20, halign: 'center' },
-                10: { cellWidth: 'auto' }
+                9: { cellWidth: 20, halign: 'center' }
             },
             didParseCell(d) {
                 if (d.column.index === 6 && d.section === 'body') {
@@ -602,13 +585,11 @@ async function downloadPDF() {
         }
 
         doc.save(`Professors_Report_${now.toISOString().split('T')[0]}.pdf`);
-
         await autoSaveReport('PDF');
 
     } catch (err) {
         console.error('PDF generation error:', err);
-        if (typeof showToast === 'function') showToast('There was an error generating the PDF. Check the console.', true);
-        else alert('There was an error generating the PDF. Check the console.');
+        showToast('There was an error generating the PDF.', true);
     }
 }
 
