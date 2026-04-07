@@ -393,7 +393,6 @@ function loadImage(src) {
     });
 }
 
-// ── Print ─────────────────────────────────────────────────────
 async function printReport() {
     if (!checkDuplicateWarning('Print')) return;
 
@@ -405,10 +404,10 @@ async function printReport() {
         
         let statusColor = '#64748b'; 
         const s = r.status.toLowerCase();
-        if (s === 'completed')                    statusColor = '#166534'; 
-        if (s === 'cancelled')                    statusColor = '#dc2626'; 
+        if (s === 'completed')                      statusColor = '#166534'; 
+        if (s === 'cancelled')                      statusColor = '#dc2626'; 
         if (s === 'ongoing' || s === 'dismissing') statusColor = '#d97706'; 
-        if (s === 'scheduled')                    statusColor = '#2563eb'; 
+        if (s === 'scheduled')                      statusColor = '#2563eb'; 
         
         return `<tr>
             <td>${i + 1}</td>
@@ -431,28 +430,28 @@ async function printReport() {
         *{margin:0;padding:0;box-sizing:border-box}
         body{font-family:Arial,sans-serif;padding:20px;font-size:11px;color:#111}
         
+        /* ── INK-SAVER WHITE BANNER ── */
         .header-container { 
-            background-color: #166534; 
-            color: white;
+            background-color: #ffffff; 
+            color: #000000;
             text-align: center; 
             margin-bottom: 20px; 
             padding: 20px 15px; 
+            border: 2px solid #000000;
             border-radius: 8px;
-            -webkit-print-color-adjust: exact; 
-            print-color-adjust: exact; 
         }
         .logos-text-wrapper { display: flex; justify-content: center; align-items: center; gap: 25px; margin-bottom: 10px; }
         .logo-img { height: 50px; width: auto; object-fit: contain; }
-        .univ-title { font-size: 18px; font-weight: bold; color: white; line-height: 1.2; letter-spacing: 0.5px;}
-        .college-title { font-size: 11px; color: #bbf7d0; letter-spacing: 1px; text-transform: uppercase;}
-        .report-title { font-size: 16px; font-weight: bold; color: white; margin-top: 12px; text-transform: uppercase; letter-spacing: 1px;}
-        .report-meta { font-size: 11px; color: #bbf7d0; margin-top: 5px; }
+        .univ-title { font-size: 18px; font-weight: bold; color: #000000; line-height: 1.2; letter-spacing: 0.5px;}
+        .college-title { font-size: 11px; color: #444444; letter-spacing: 1px; text-transform: uppercase;}
+        .report-title { font-size: 16px; font-weight: bold; color: #000000; margin-top: 12px; text-transform: uppercase; letter-spacing: 1px;}
+        .report-meta { font-size: 11px; color: #555555; margin-top: 5px; }
         
-        table{width:100%;border-collapse:collapse; margin-top: 10px;}
-        th{background:#166534;color:#fff;padding:8px 10px;text-align:center;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.5px; -webkit-print-color-adjust: exact; print-color-adjust: exact;}
-        td{padding:8px 10px;border-bottom:1px solid #e5e7eb;font-size:11px; text-align:center;}
+        table{width:100%;border-collapse:collapse; margin-top: 10px; border: 1px solid #000000 !important;}
+        th{background:#ffffff; color:#000000; padding:8px 10px; border: 1px solid #000000 !important; text-align:center; font-size:10px; font-weight:700; text-transform:uppercase; letter-spacing:.5px;}
+        td{padding:8px 10px; border: 1px solid #000000 !important; font-size:11px; text-align:center;}
         td:nth-child(4), td:nth-child(5) {text-align:left;}
-        tr:nth-child(even){background:#f9fafb; -webkit-print-color-adjust: exact; print-color-adjust: exact;}
+        tr:nth-child(even){background:#f9fafb;}
         .footer{margin-top:20px;text-align:center;font-size:10px;color:#9ca3af;border-top:1px solid #e5e7eb;padding-top:10px}
         @media print{body{padding:0px}}
     </style></head><body>
@@ -482,129 +481,86 @@ async function printReport() {
     await autoSaveReport('Print');
 }
 
-// ── PDF ───────────────────────────────────────────────────────
 async function downloadPDF() {
     if (!checkDuplicateWarning('PDF')) return;
 
-    if (!window.jspdf) {
-        alert("PDF Library not loaded yet. Please try again.");
-        return;
-    }
-    
-    try {
-        const { jsPDF } = window.jspdf;
-        const nowStr = new Date().toLocaleString();
+    const { jsPDF } = window.jspdf;
+    const nowStr = new Date().toLocaleString();
 
-        // Load logos first, then build the PDF (mirrors laboratories.js)
-        const [plpData, ccsData] = await Promise.all([
-            loadImage('../resc/assets/plp_logo.png'),
-            loadImage('../resc/assets/ccs_logo.png')
-        ]);
-
-        const doc      = new jsPDF('landscape');
-        const pageW    = doc.internal.pageSize.width;
-        const centerX  = pageW / 2;
-        const headerHeight = 45; 
-        
-        // ── DRAW SOLID GREEN BANNER ──
-        doc.setFillColor(22, 101, 52); 
-        doc.rect(0, 0, pageW, headerHeight, 'F');
-        
-        // ── LOGOS ──
-        const logoSize = 18;
-        if (plpData) doc.addImage(plpData, 'PNG', centerX - 85, 8, logoSize, logoSize);
-        if (ccsData) doc.addImage(ccsData, 'PNG', centerX + 67, 8, logoSize, logoSize);
-
-        // ── CENTERED HEADER TEXT ──
-        doc.setFontSize(16); 
-        doc.setTextColor(255, 255, 255); 
-        doc.setFont('helvetica', 'bold');
-        doc.text('PAMANTASAN NG LUNGSOD NG PASIG', centerX, 15, { align: 'center' });
-        
-        doc.setFontSize(9); 
-        doc.setTextColor(187, 247, 208); 
-        doc.setFont('helvetica', 'normal');
-        doc.text('COLLEGE OF COMPUTER STUDIES', centerX, 20, { align: 'center' });
-        
-        doc.setFontSize(14); 
-        doc.setTextColor(255, 255, 255); 
-        doc.setFont('helvetica', 'bold');
-        doc.text('SESSION HISTORY REPORT', centerX, 30, { align: 'center' });
-        
-        doc.setFontSize(8); 
-        doc.setTextColor(187, 247, 208); 
-        doc.setFont('helvetica', 'normal');
-        doc.text(`Generated: ${nowStr}  ·  Completed Records: ${META.completed}  ·  Filters: ${META.filters}`, centerX, 36, { align: 'center' });
-
-        // ── AUTO-EXPANDING CLEAN TABLE ──
-        doc.autoTable({
-            head: [['#','Date','Day','Subject','Professor','Section','Lab','Sched\nTime','Actual\nStart','Actual\nEnd','Status']],
-            body: window.REPORT_DATA.map((r, i) => {
-                const sch = r.lab_schedules;
-                return [
-                    i + 1, r.session_date, sch.day_of_week, sch.subjects.subject_code,
-                    sch.professors.last_name, sch.section, sch.laboratory_rooms.lab_code,
-                    sch.start_time.substring(0,5), 
-                    r.actual_start_time ? r.actual_start_time.substring(0,5) : '—',
-                    r.actual_end_time ? r.actual_end_time.substring(0,5) : '—',
-                    r.status.toUpperCase()
-                ];
-            }),
-            startY: headerHeight + 8, 
-            margin: { left: 14, right: 14 }, 
-            theme: 'striped',
-            headStyles: { 
-                fillColor: [22, 101, 52], 
-                fontSize: 7.5, 
-                fontStyle: 'bold', 
-                textColor: 255,
-                halign: 'center',
-                valign: 'middle'
-            },
-            styles: { 
-                fontSize: 7.5, 
-                cellPadding: 3,
-                valign: 'middle'
-            },
-            columnStyles: {
-                0:  { cellWidth: 10, halign: 'center' }, 
-                1:  { halign: 'center', fontStyle: 'bold' }, 
-                2:  { halign: 'center' }, 
-                3:  { halign: 'left', fontStyle: 'bold' }, 
-                4:  { halign: 'left' }, 
-                5:  { halign: 'center' }, 
-                6:  { halign: 'center', fontStyle: 'bold' }, 
-                7:  { halign: 'center' }, 
-                8:  { halign: 'center' }, 
-                9:  { halign: 'center' }, 
-                10: { halign: 'center' } 
-            },
-            didParseCell(d) {
-                if (d.column.index === 10 && d.section === 'body') {
-                    const s = (d.cell.text[0] || '').toLowerCase();
-                    if (s === 'completed')                        { d.cell.styles.textColor = [22,101,52];  d.cell.styles.fontStyle = 'bold'; }
-                    else if (s === 'cancelled')                   { d.cell.styles.textColor = [220,38,38];  d.cell.styles.fontStyle = 'bold'; }
-                    else if (s === 'ongoing' || s === 'dismissing') { d.cell.styles.textColor = [217,119,6]; d.cell.styles.fontStyle = 'bold'; }
-                    else if (s === 'scheduled')                   { d.cell.styles.textColor = [37,99,235];  d.cell.styles.fontStyle = 'bold'; }
-                }
-            }
+    function loadImage(src) {
+        return new Promise((resolve) => {
+            const img = new Image();
+            img.crossOrigin = 'anonymous';
+            img.onload = () => {
+                const canvas = document.createElement('canvas');
+                canvas.width = img.width; canvas.height = img.height;
+                canvas.getContext('2d').drawImage(img, 0, 0);
+                resolve(canvas.toDataURL('image/png'));
+            };
+            img.onerror = () => resolve(null);
+            img.src = src;
         });
-
-        const pages = doc.internal.getNumberOfPages();
-        for (let i = 1; i <= pages; i++) {
-            doc.setPage(i); doc.setFontSize(7); doc.setTextColor(156, 163, 175);
-            doc.text(`Laboratory Attendance System  ·  Page ${i} of ${pages}  ·  ${nowStr}`,
-                pageW / 2, doc.internal.pageSize.height - 8, { align: 'center' });
-        }
-
-        doc.save(`Session_History_Report_${new Date().toISOString().split('T')[0]}.pdf`);
-        
-        await autoSaveReport('PDF');
-        
-    } catch(err) {
-        console.error("PDF Generation Error: ", err);
-        showToast('There was an error generating the PDF. Check the console.', true);
     }
+
+    const [plpData, ccsData] = await Promise.all([
+        loadImage('../resc/assets/plp_logo.png'),
+        loadImage('../resc/assets/ccs_logo.png')
+    ]);
+
+    const doc = new jsPDF('landscape');
+    const pageW = doc.internal.pageSize.width;
+    const centerX = pageW / 2;
+    const headerHeight = 45; 
+
+    // ── HEADER BORDER ──
+    doc.setDrawColor(0, 0, 0);
+    doc.setLineWidth(0.1);
+    doc.rect(10, 5, pageW - 20, headerHeight, 'S');
+
+    // ── HEADER TEXT ──
+    doc.setTextColor(0, 0, 0);
+    doc.setFontSize(16); doc.setFont('helvetica', 'bold');
+    doc.text('PAMANTASAN NG LUNGSOD NG PASIG', centerX, 18, { align: 'center' });
+    doc.setFontSize(14); doc.text('SESSION HISTORY REPORT', centerX, 33, { align: 'center' });
+    doc.setFontSize(8); doc.setFont('helvetica', 'normal');
+    doc.text(`Generated: ${nowStr}  ·  Completed Records: ${META.completed}`, centerX, 39, { align: 'center' });
+
+    if (plpData) doc.addImage(plpData, 'PNG', centerX - 85, 10, 18, 18);
+    if (ccsData) doc.addImage(ccsData, 'PNG', centerX + 67, 10, 18, 18);
+
+    doc.autoTable({
+        head: [['#','Date','Day','Subject','Professor','Section','Lab','Sched\nTime','Actual\nStart','Actual\nEnd','Status']],
+        body: window.REPORT_DATA.map((r, i) => {
+            const sch = r.lab_schedules;
+            return [
+                i + 1, r.session_date, sch.day_of_week, sch.subjects.subject_code,
+                sch.professors.last_name, sch.section, sch.laboratory_rooms.lab_code,
+                sch.start_time.substring(0,5), 
+                r.actual_start_time ? r.actual_start_time.substring(0,5) : '—',
+                r.actual_end_time ? r.actual_end_time.substring(0,5) : '—',
+                r.status.toUpperCase()
+            ];
+        }),
+        startY: headerHeight + 10,
+        theme: 'grid',
+        headStyles: { 
+            fillColor: [255, 255, 255], textColor: [0, 0, 0], 
+            lineColor: [0, 0, 0], lineWidth: 0.1, halign: 'center' 
+        },
+        styles: { 
+            lineColor: [0, 0, 0], lineWidth: 0.1, 
+            fontSize: 7.5, textColor: [0, 0, 0] 
+        },
+        didParseCell(d) {
+            if (d.column.index === 10 && d.section === 'body') {
+                const s = (d.cell.text[0] || '').toLowerCase();
+                if (s === 'completed') { d.cell.styles.textColor = [22,101,52]; }
+                else if (s === 'cancelled') { d.cell.styles.textColor = [220,38,38]; }
+            }
+        }
+    });
+
+    doc.save(`Session_History_Report_${new Date().toISOString().split('T')[0]}.pdf`);
 }
 
 // ── CSV ───────────────────────────────────────────────────────

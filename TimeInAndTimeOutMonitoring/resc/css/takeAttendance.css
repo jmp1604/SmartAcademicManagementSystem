@@ -36,51 +36,115 @@ body {
     font-size: 15px;
     line-height: 1.6;
 }
-
-/* ── Top Bar ─────────────────────────────────── */
-.topbar {
-    display: flex;
-    align-items: center;
-    gap: 12px;
-    padding: 14px 32px;
-    background: var(--white);
-    border-bottom: 1.5px solid var(--border);
-    box-shadow: var(--shadow-sm);
+/* ══════════════════════════════════════════════════════════
+   UNIFIED HEADER
+══════════════════════════════════════════════════════════ */
+header {
+    background: var(--green-dark);
     position: sticky;
     top: 0;
-    z-index: 50;
-}
-
-.back-btn {
-    display: inline-flex;
+    z-index: 200;
+    padding: 0 40px;
+    height: 68px;
+    display: flex;
     align-items: center;
-    gap: 7px;
-    padding: 7px 14px;
-    background: var(--surface);
-    color: var(--green-dark);
-    border: 1.5px solid var(--border);
-    border-radius: 99px;
-    font-size: 13.5px;
-    font-weight: 600;
+    justify-content: space-between;
+    box-shadow: 0 2px 20px rgba(0,0,0,0.20);
+}
+
+.brand {
+    display: flex;
+    align-items: center;
+    gap: 14px;
     text-decoration: none;
-    transition: all .2s;
+    flex: 1; /* Helps balance the centered clock */
 }
 
-.back-btn:hover {
-    background: var(--green-dark);
+.brand-logos {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    flex-shrink: 0;
+}
+
+.brand-logos img { 
+    width: 42px; 
+    height: 42px; 
+    object-fit: contain; 
+    flex-shrink: 0; 
+}
+
+.logo-divider {
+    width: 1px; height: 28px;
+    background: rgba(255,255,255,0.18);
+    flex-shrink: 0;
+}
+
+.brand-text { display: flex; flex-direction: column; line-height: 1.2; }
+
+.brand-text .sys-label {
+    font-family: 'Syne', sans-serif;
+    font-size: 10px; font-weight: 600;
+    letter-spacing: 2.2px; text-transform: uppercase;
+    color: var(--yellow);
+}
+
+.brand-text h1 {
+    font-family: 'Syne', sans-serif;
+    font-size: 15px; font-weight: 700;
+    color: var(--white); letter-spacing: 0.2px;
+    margin: 0;
+}
+
+/* Centered Clock Styling */
+.header-clock {
+    display: flex;
+    align-items: center;
+    gap: 6px;
     color: var(--white);
-    border-color: var(--green-dark);
+    font-family: 'DM Sans', sans-serif;
+    font-size: 14.5px;
+    font-weight: 600;
+    letter-spacing: 0.5px;
+    white-space: nowrap;
 }
 
-.date-chip {
-    margin-left: auto;
+.header-clock i {
+    color: var(--yellow);
     font-size: 13px;
-    color: var(--text-muted);
-    font-weight: 500;
-    background: var(--surface);
-    padding: 6px 14px;
-    border-radius: 99px;
-    border: 1px solid var(--border);
+}
+
+nav { 
+    display: flex; 
+    align-items: center; 
+    gap: 6px; 
+    flex: 1; 
+    justify-content: flex-end; /* Balances the centered clock */
+}
+
+nav a {
+    font-family: 'DM Sans', sans-serif;
+    font-size: 13.5px; font-weight: 500;
+    color: rgba(255,255,255,0.72);
+    text-decoration: none;
+    padding: 7px 14px; border-radius: 7px;
+    transition: color 0.2s, background 0.2s;
+    display: flex; align-items: center; gap: 6px;
+}
+
+nav a:hover { color: var(--white); background: rgba(255,255,255,0.10); }
+
+nav a.active {
+    color: var(--green-dark);
+    background: var(--yellow);
+    font-weight: 700;
+}
+
+@media (max-width: 900px) {
+    header { padding: 0 20px; flex-wrap: wrap; height: auto; padding: 12px 20px; gap: 10px;}
+    .brand { flex: 100%; justify-content: center; }
+    .header-clock { flex: 100%; justify-content: center; padding-bottom: 8px; border-bottom: 1px solid rgba(255,255,255,0.1); }
+    nav { flex: 100%; justify-content: center; padding-top: 8px;}
 }
 
 /* ── Page Header ─────────────────────────────── */
@@ -285,6 +349,17 @@ body {
     background: var(--green-mid);
     transform: translateY(-2px);
     box-shadow: 0 6px 18px rgba(26, 71, 49, .3);
+}
+
+.btn-boot {
+    background: var(--blue);
+    color: var(--white);
+    box-shadow: 0 3px 12px rgba(37, 99, 235, .22);
+}
+.btn-boot:hover:not(:disabled) {
+    background: #1d4ed8;
+    transform: translateY(-2px);
+    box-shadow: 0 6px 18px rgba(37, 99, 235, .3);
 }
 
 .btn-stop {
