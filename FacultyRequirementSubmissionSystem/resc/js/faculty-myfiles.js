@@ -39,7 +39,7 @@ document.addEventListener('DOMContentLoaded', async function () {
         const status  = (statusFilter?.value || '').toLowerCase();
         const sem     = (semesterFilter?.value || '').toLowerCase();
 
-        document.querySelectorAll('.file-card[data-cat]').forEach(function (card) {
+        document.querySelectorAll('.file-card-my-files[data-cat]').forEach(function (card) {
             const matchQ       = !q       || card.dataset.name?.toLowerCase().includes(q);
             const matchCat     = !cat     || cat === 'all categories' || card.dataset.cat?.toLowerCase() === cat;
             const matchStatus  = !status  || status === 'all status'  || card.dataset.status?.toLowerCase() === status;
@@ -333,7 +333,7 @@ function renderFiles(submissions) {
         const semesterName = submission.semester_name || `Semester ${submission.semester_id}`;
 
         return `
-            <div class="file-card" data-name="${escapeHtml(fileName)}" data-cat="${escapeHtml(categoryName.toLowerCase())}" data-status="${status}" data-semester="${escapeHtml(semesterName.toLowerCase())}">
+            <div class="file-card-my-files" data-name="${escapeHtml(fileName)}" data-cat="${escapeHtml(categoryName.toLowerCase())}" data-status="${status}" data-semester="${escapeHtml(semesterName.toLowerCase())}">
                 <div class="file-icon ${fileExt}">${fileIcon}</div>
                 <div class="file-info">
                     <div class="file-name" title="${escapeHtml(fileName)}">${escapeHtml(fileName)}</div>

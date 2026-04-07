@@ -62,7 +62,6 @@ document.addEventListener('DOMContentLoaded', async function () {
     await loadActiveSemester();
     loadSubmissions();
     setupEventListeners();
-    populateDeptFilter();
     populateCatFilter();
 });
 
@@ -97,9 +96,6 @@ function setupEventListeners() {
     const searchInput = document.querySelector('.search-input');
     if (searchInput) searchInput.addEventListener('input', applyFileFilters);
 
-    const deptFilter = document.querySelector('.dept-filter');
-    if (deptFilter) deptFilter.addEventListener('change', applyFileFilters);
-
     const catFilter = document.querySelector('.cat-filter');
     if (catFilter) catFilter.addEventListener('change', applyFileFilters);
 
@@ -126,31 +122,6 @@ function setupEventListeners() {
     }
 }
 
-
-async function populateDeptFilter() {
-    try {
-        const { data: depts } = await supabaseClient
-            .from('departments')
-            .select('id, department_name, department_code')
-            .eq('is_active', true)
-            .order('department_name');
-
-        if (!depts || depts.length === 0) return;
-
-        const select = document.querySelector('.dept-filter');
-        if (!select) return;
-
-        select.innerHTML = '<option value="">All Depts</option>';
-        depts.forEach(d => {
-            const opt = document.createElement('option');
-            opt.value = d.department_code?.toLowerCase() || d.id;
-            opt.textContent = d.department_code || d.department_name;
-            select.appendChild(opt);
-        });
-    } catch (e) {
-        console.warn('Could not load departments for filter:', e);
-    }
-}
 
 async function populateCatFilter() {
     try {
@@ -441,7 +412,6 @@ function renderSubmissions() {
 
 
 function applyFileFilters() {
-    const dept   = (document.querySelector('.dept-filter')?.value   || '').trim().toLowerCase();
     const cat    = (document.querySelector('.cat-filter')?.value    || '').trim().toLowerCase();
     const status = (document.querySelector('.status-filter')?.value || '').trim().toLowerCase();
     const q      = (document.querySelector('.search-input')?.value  || '').trim().toLowerCase();
@@ -449,17 +419,15 @@ function applyFileFilters() {
     let visibleCount = 0;
 
     document.querySelectorAll('.searchable-row').forEach(row => {
-        const rowDept   = (row.dataset.dept   || '').toLowerCase();
         const rowCat    = (row.dataset.cat    || '').toLowerCase();
         const rowStatus = (row.dataset.status || '').toLowerCase();
         const rowText   = row.textContent.toLowerCase();
 
-        const matchDept   = !dept   || dept === 'all depts'      || rowDept === dept;
         const matchCat    = !cat    || cat === 'all categories'  || rowCat === cat;
         const matchStatus = !status || status === 'all status'   || rowStatus === status;
         const matchQ      = !q      || rowText.includes(q);
 
-        const isVisible = matchDept && matchCat && matchStatus && matchQ;
+        const isVisible = matchCat && matchStatus && matchQ;
         row.style.display = isVisible ? '' : 'none';
         
         if (isVisible) visibleCount++;
