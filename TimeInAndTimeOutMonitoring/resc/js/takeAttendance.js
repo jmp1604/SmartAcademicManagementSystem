@@ -306,36 +306,79 @@ function handleStudentEvent(d) {
             });
             confirmStudent(d); 
             break;
+        case 'COMPLETED':
+            showNotif({ 
+                icon: '✅', title: 'Attendance Complete', 
+                msg: `${name}\nYou have already timed in and timed out for this session.`, 
+                buttons: [{ label: 'Dismiss', color: 'gray' }], autoDismiss: 4 
+            });
+            break;
         case 'NOT_ENROLLED':
-            showNotif({ icon: '📋', title: 'Not Enrolled', msg: d.error, buttons: [{ label: 'OK', color: 'gray' }] });
+            showNotif({ icon: '📋', title: 'Not Enrolled', msg: d.error, buttons: [{ label: 'Dismiss', color: 'gray' }], autoDismiss: 4 });
             break;
         case 'SESSION_NOT_STARTED':
-            showNotif({ icon: '⏳', title: 'Session Not Started', msg: d.error, buttons: [{ label: 'OK', color: 'orange' }] });
-            break;
+            showNotif({ icon: '⏳', title: 'Session Not Started Yet', 
+                msg: d.error || 'Your professor has not started the session yet. Please wait.',
+                buttons: [{ label: 'OK', color: 'orange' }], autoDismiss: 8 });
+        break;
+
+        case 'ALL_DONE':
+             showNotif({ icon: '✅', title: 'All Classes Done', 
+              msg: d.error || 'You have no more classes for today. Great job!',
+               buttons: [{ label: 'OK', color: 'gray' }], autoDismiss: 5 });
+             break;
         case 'CANNOT_TIME_OUT':
-            showNotif({ icon: '🔐', title: 'Cannot Time Out', msg: name, cannotTimeOutTxt: d.error, buttons: [{ label: 'OK', color: 'gray' }], autoDismiss: 8 });
+            showNotif({ icon: '🔐', title: 'Cannot Time Out', msg: name, cannotTimeOutTxt: d.error, buttons: [{ label: 'Dismiss', color: 'gray' }], autoDismiss: 6 });
+            break;
+        case 'SESSION_CANCELLED':
+            showNotif({ icon: '🚫', title: 'Session Voided', msg: d.error, buttons: [{ label: 'Dismiss', color: 'red' }], autoDismiss: 4 });
+            break;
+        case 'SESSION_ENDED':
+            showNotif({ icon: '⏹', title: 'Session Ended', msg: d.error, buttons: [{ label: 'Dismiss', color: 'gray' }], autoDismiss: 4 });
             break;
     }
 }
-
 function handleProfessorEvent(d) {
     const name = d.name || 'Professor';
     const time = new Date().toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: true });
     
     switch (d.action) {
         case 'START':
-            showNotif({ icon: '🟣', title: 'Start Session', msg: `${name}\nTime: ${time}`, 
-                buttons: [{ label: '▶ Start Session', color: 'purple', action: () => confirmProfessor(d) }, { label: 'Cancel', color: 'gray' }] 
-            });
+            // ... (keep existing)
             break;
         case 'DISMISS':
-            showNotif({ icon: '🚪', title: 'Allow Dismissal', msg: `${name}\nTime: ${time}`, 
-                buttons: [{ label: '🚪 Allow Time Out', color: 'orange', action: () => confirmProfessor(d) }, { label: 'Cancel', color: 'gray' }] 
-            });
+            // ... (keep existing)
             break;
         case 'END':
-            showNotif({ icon: '🔴', title: 'End Session', msg: `${name}\nTime: ${time}`, 
-                buttons: [{ label: '⏹ End Session', color: 'red', action: () => confirmProfessor(d) }, { label: 'Cancel', color: 'gray' }] 
+            // ... (keep existing)
+            break;
+            
+        // ── ERROR HANDLERS ──
+        case 'NO_SCHEDULE':
+        case 'NO_VALID_SCHEDULE':
+            // ... (keep existing)
+            break;
+        case 'TOO_EARLY':
+            // ... (keep existing)
+            break;
+            
+        // ── NEW: SMART JUMP HANDLERS FOR PROFESSOR ──
+        case 'ALL_DONE':
+            showNotif({ 
+                icon: '🎉', title: 'All Done!', msg: d.error, 
+                buttons: [{ label: 'Dismiss', color: 'gray' }], autoDismiss: 4 
+            });
+            break;
+        case 'SESSION_ENDED':
+            showNotif({ 
+                icon: '✅', title: 'Session Completed', msg: d.error, 
+                buttons: [{ label: 'Dismiss', color: 'gray' }], autoDismiss: 4 
+            });
+            break;
+        case 'SESSION_CANCELLED':
+            showNotif({ 
+                icon: '🚫', title: 'Session Voided', msg: d.error, 
+                buttons: [{ label: 'Dismiss', color: 'red' }], autoDismiss: 5 
             });
             break;
     }

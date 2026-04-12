@@ -63,81 +63,135 @@ function formatDateTime(dtStr) {
 //   lab_attendance.time_out       → timestamptz             (store as ISO string)
 //   lab_attendance.time_in        → timestamptz
 // ══════════════════════════════════════════════════════════
+// ══════════════════════════════════════════════════════════
+// AUTO-END & AUTO-VOID
+// ══════════════════════════════════════════════════════════
+// ══════════════════════════════════════════════════════════
+// AUTO-END & AUTO-VOID
+// ══════════════════════════════════════════════════════════
 async function autoEndSessions() {
     const currentTime = getCurrentTime();
+    const now = new Date();
+    let count = 0;
 
+    // 1. Handle existing sessions (ongoing, dismissing, scheduled)
     const { data: sessions, error } = await supabaseClient
         .from('lab_sessions')
         .select(`
             session_id,
             status,
-            lab_schedules ( end_time )
+            schedule_id,
+            lab_schedules ( start_time, end_time )
         `)
-        .in('status', ['ongoing', 'dismissing'])
+        .in('status', ['ongoing', 'dismissing', 'scheduled'])
         .eq('session_date', today);
 
-    if (error) { console.error('autoEndSessions fetch:', error); return 0; }
-    if (!sessions?.length) return 0;
+    if (!error && sessions?.length) {
+        for (const session of sessions) {
+            const startTime = session.lab_schedules?.start_time;
+            const endTime = session.lab_schedules?.end_time;
+            
+            let isExpired = false;
+            let isVoidedBy45MinRule = false;
 
-    let count = 0;
+            // Check the 2 rules
+            if (endTime && currentTime > endTime) {
+                isExpired = true;
+            } else if (session.status === 'scheduled' && startTime) {
+                const deadline = new Date(timeToDate(startTime).getTime() + PROFESSOR_START_WINDOW * 60000);
+                if (now > deadline) {
+                    isExpired = true;
+                    isVoidedBy45MinRule = true;
+                }
+            }
 
-    for (const session of sessions) {
-        const endTime = session.lab_schedules?.end_time; // "HH:MM:SS"
-        if (!endTime || currentTime <= endTime) continue;
+            if (!isExpired) continue;
 
-        // 1. Mark session as completed
-        //    actual_end_time is "time without time zone" → store as "HH:MM:SS"
-        const { error: sessionErr } = await supabaseClient
-            .from('lab_sessions')
-            .update({
-                status:          'completed',
-                actual_end_time: endTime,
-                notes:           'Prof forgot to end the session, auto time out',
-                updated_at:      new Date().toISOString()
-            })
-            .eq('session_id', session.session_id)
-            .in('status', ['ongoing', 'dismissing']);
+            if (session.status === 'scheduled') {
+                const reason = isVoidedBy45MinRule ? 'System Auto-Void: 45-minute grace period elapsed' : 'System Auto-Void: Class ended without professor starting it';
+                await supabaseClient.from('lab_sessions').update({
+                    status:     'cancelled',
+                    notes:      reason,
+                    updated_at: new Date().toISOString()
+                }).eq('session_id', session.session_id);
+                count++;
+            } else {
+                const { error: sessionErr } = await supabaseClient.from('lab_sessions').update({
+                    status:          'completed',
+                    actual_end_time: endTime,
+                    notes:           'System Auto-End: Schedule time elapsed',
+                    updated_at:      new Date().toISOString()
+                }).eq('session_id', session.session_id).in('status', ['ongoing', 'dismissing']);
 
-        if (sessionErr) { console.error('autoEnd update session:', sessionErr); continue; }
+                if (sessionErr) continue;
 
-        // 2. Fetch students still inside (time_in NOT NULL, time_out IS NULL)
-        const { data: stillInside, error: attErr } = await supabaseClient
-            .from('lab_attendance')
-            .select('attendance_id, time_in')
-            .eq('session_id', session.session_id)
-            .not('time_in', 'is', null)
-            .is('time_out', null);
+                const { data: stillInside } = await supabaseClient.from('lab_attendance')
+                    .select('attendance_id, time_in')
+                    .eq('session_id', session.session_id)
+                    .not('time_in', 'is', null)
+                    .is('time_out', null);
 
-        if (attErr) { console.error('autoEnd fetch attendance:', attErr); continue; }
-
-        if (stillInside?.length) {
-            // Build time_out as a proper local Date → ISO for timestamptz storage
-            const timeOutDate = timeToDate(endTime);
-
-            for (const att of stillInside) {
-                const timeInDate   = new Date(att.time_in); // timestamptz → Date
-                const durationMins = Math.max(
-                    0,
-                    Math.floor((timeOutDate - timeInDate) / 60_000)
-                );
-
-                await supabaseClient
-                    .from('lab_attendance')
-                    .update({
-                        time_out:         timeOutDate.toISOString(), // timestamptz
-                        duration_minutes: durationMins,
-                        updated_at:       new Date().toISOString()
-                    })
-                    .eq('attendance_id', att.attendance_id);
+                if (stillInside?.length) {
+                    const timeOutDate = timeToDate(endTime);
+                    for (const att of stillInside) {
+                        const timeInDate   = new Date(att.time_in);
+                        const durationMins = Math.max(0, Math.floor((timeOutDate - timeInDate) / 60_000));
+                        await supabaseClient.from('lab_attendance').update({
+                            time_out:         timeOutDate.toISOString(),
+                            duration_minutes: durationMins,
+                            updated_at:       new Date().toISOString()
+                        }).eq('attendance_id', att.attendance_id);
+                    }
+                }
+                count++;
             }
         }
-
-        count++;
     }
 
+    // 2. Handle phantom classes (Professor never scanned, so no session was ever created)
+    const { data: schedules } = await supabaseClient
+        .from('lab_schedules')
+        .select(`schedule_id, start_time, end_time`)
+        .eq('day_of_week', currentDay)
+        .eq('status', 'active');
+
+    if (schedules) {
+        for (const sch of schedules) {
+            let isExpired = false;
+            
+            if (sch.end_time && currentTime > sch.end_time) {
+                isExpired = true;
+            } else if (sch.start_time) {
+                const deadline = new Date(timeToDate(sch.start_time).getTime() + PROFESSOR_START_WINDOW * 60000);
+                if (now > deadline) {
+                    isExpired = true;
+                }
+            }
+
+            if (isExpired) {
+                const { data: existingSess } = await supabaseClient
+                    .from('lab_sessions')
+                    .select('session_id')
+                    .eq('schedule_id', sch.schedule_id)
+                    .eq('session_date', today)
+                    .maybeSingle();
+
+                if (!existingSess) {
+                    await supabaseClient.from('lab_sessions').insert({
+                        schedule_id:  sch.schedule_id,
+                        session_date: today,
+                        status:       'cancelled',
+                        notes:        'System Auto-Void: 45-minute grace period elapsed',
+                        created_at:   new Date().toISOString(),
+                        updated_at:   new Date().toISOString()
+                    });
+                    count++;
+                }
+            }
+        }
+    }
     return count;
 }
-
 // ══════════════════════════════════════════════════════════
 // AUTO-TRANSITION: dismissing → ongoing ("STAY IN")
 // When every student who timed in has timed out, revert to ongoing.
@@ -532,7 +586,6 @@ function renderCompletedCard(s) {
         </div>
     `;
 }
-
 // ══════════════════════════════════════════════════════════
 // RENDER: Cancelled / voided session card
 // ══════════════════════════════════════════════════════════
@@ -541,15 +594,17 @@ function renderCancelledCard(s) {
     const subj        = sch?.subjects;
     const prof        = sch?.professors;
     const lab         = sch?.laboratory_rooms;
-    const isAutoVoid  = (s.notes || '').includes('Auto-voided');
-    const isAutoEnd   = (s.notes || '').includes('auto time out')
-                     || (s.notes || '').includes('Auto-ended:');
-    const cancelledAt = formatDateTime(s.updated_at); // updated_at is timestamptz ✓
+    
+    // Make it case-insensitive to catch 'Auto-Void', 'auto-void', etc.
+    const notesLower  = (s.notes || '').toLowerCase(); 
+    const isAutoVoid  = notesLower.includes('auto-void');
+    const isAutoEnd   = notesLower.includes('auto time out') || notesLower.includes('auto-end');
+    const cancelledAt = formatDateTime(s.updated_at); 
 
     let noticeContent;
     if (isAutoVoid) {
         noticeContent = `<strong>Auto-voided at ${cancelledAt}</strong><br>
-            Professor did not start within the ${PROFESSOR_START_WINDOW}-minute window.`;
+            Professor did not start the session and the scheduled time has elapsed.`;
     } else if (isAutoEnd) {
         noticeContent = `<strong>Auto-ended at ${cancelledAt}</strong><br>
             Professor forgot to end the session. All students were auto timed-out.`;
