@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Reports | Laboratory Attendance System</title>
+    <title>Report Logs | Laboratory Attendance System</title>
 
     <link href="https://fonts.googleapis.com/css2?family=Nunito:wght@300;400;600;700;800&family=Nunito+Sans:wght@300;400;500;600;700&display=swap" rel="stylesheet">
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;700&display=swap" rel="stylesheet">
@@ -14,10 +14,6 @@
     <link rel="stylesheet" href="../resc/css/header.css">
     <link rel="stylesheet" href="../resc/css/nav.css">
     <link rel="stylesheet" href="../resc/css/reports.css">
-
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.5.31/jspdf.plugin.autotable.min.js"></script>
 </head>
 <body>
 
@@ -29,35 +25,32 @@
 
             <div class="page-header">
                 <div class="header-titles">
-                    <h1><i class="fa-solid fa-file-lines"></i> Reports</h1>
-                    <p>All generated reports — sessions, attendance, professors, students, schedules, enrollment, labs, subjects.</p>
+                    <h1><i class="fa-solid fa-clock-rotate-left"></i> Export Logs</h1>
+                    <p>Audit history of all generated reports and data exports across the system.</p>
                 </div>
-                <button class="btn-report" onclick="openGenModal()">
-                    <i class="fa-solid fa-file-circle-plus"></i> Generate New Report
-                </button>
             </div>
             <hr>
             
             <div class="stats-row">
                 <div class="stat-card">
                     <div class="stat-icon blue"><i class="fa-solid fa-file-lines"></i></div>
-                    <div><div class="stat-val" id="statTotalAll">0</div><div class="stat-lbl">Total Reports</div></div>
+                    <div><div class="stat-val" id="statTotalAll">0</div><div class="stat-lbl">Total Exports</div></div>
                 </div>
                 <div class="stat-card">
                     <div class="stat-icon green"><i class="fa-solid fa-desktop"></i></div>
-                    <div><div class="stat-val" id="statSessions">0</div><div class="stat-lbl">Session Reports</div></div>
+                    <div><div class="stat-val" id="statSessions">0</div><div class="stat-lbl">Session Logs</div></div>
                 </div>
                 <div class="stat-card">
                     <div class="stat-icon dark"><i class="fa-solid fa-clipboard-user"></i></div>
-                    <div><div class="stat-val" id="statAttendance">0</div><div class="stat-lbl">Attendance Reports</div></div>
+                    <div><div class="stat-val" id="statAttendance">0</div><div class="stat-lbl">Attendance Logs</div></div>
                 </div>
                 <div class="stat-card">
                     <div class="stat-icon amber"><i class="fa-solid fa-chalkboard-teacher"></i></div>
-                    <div><div class="stat-val" id="statProfessor">0</div><div class="stat-lbl">Professor Reports</div></div>
+                    <div><div class="stat-val" id="statProfessor">0</div><div class="stat-lbl">Professor Logs</div></div>
                 </div>
                 <div class="stat-card">
                     <div class="stat-icon purple"><i class="fa-solid fa-user-graduate"></i></div>
-                    <div><div class="stat-val" id="statStudent">0</div><div class="stat-lbl">Student Reports</div></div>
+                    <div><div class="stat-val" id="statStudent">0</div><div class="stat-lbl">Student Logs</div></div>
                 </div>
             </div>
 
@@ -75,6 +68,10 @@
                             <option value="attendance">Attendance Report</option>
                             <option value="professor">Professor Report</option>
                             <option value="student">Student Report</option>
+                            <option value="schedules">Schedules Report</option>
+                            <option value="enrollment">Enrollment Report</option>
+                            <option value="laboratories">Laboratories Report</option>
+                            <option value="subjects">Subjects Report</option>
                         </select>
                     </div>
                     <div class="fg">
@@ -102,119 +99,39 @@
                             <th style="width:60px">#</th>
                             <th>Report Name</th>
                             <th>Type</th>
-                            <th>Filters</th>
-                            <th>Generated</th>
+                            <th>Filters Applied</th>
+                            <th>Generated On</th>
                             <th style="width:100px; text-align:center;">Action</th>
                         </tr>
                     </thead>
                     <tbody id="reportsBody">
-                        <tr><td colspan="6" class="empty-state"><i class="fa-solid fa-spinner fa-spin"></i><p>Loading reports...</p></td></tr>
+                        <tr><td colspan="6" class="empty-state"><i class="fa-solid fa-spinner fa-spin"></i><p>Loading logs...</p></td></tr>
                     </tbody>
                 </table>
             </div>
 
             <div class="bottom-bar">
-                <div class="rb-count"><strong id="recordCountDisplay">0</strong> report(s) found</div>
+                <div class="rb-count"><strong id="recordCountDisplay">0</strong> log(s) found</div>
                 <button onclick="openDelAllModal()" class="btn-danger-outline" id="btnDeleteAll" style="display:none;">
-                    <i class="fa-solid fa-trash-can"></i> Delete All Reports
+                    <i class="fa-solid fa-trash-can"></i> Clear All Logs
                 </button>
             </div>
 
         </div>
     </main>
 
-    <div class="modal-overlay" id="genModal" onclick="if(event.target===this)closeGenModal()">
-        <div class="modal lg">
-            <button class="modal-close" onclick="closeGenModal()"><i class="fa-solid fa-xmark"></i></button>
-            <h3 style="margin-bottom: 5px;"><i class="fa-solid fa-file-circle-plus" style="color:var(--green-bright)"></i> Generate & Export Report</h3>
-            <div class="modal-sub">Select a report type, apply filters, and choose your export format.</div>
-
-            <div class="rt-grid">
-                <label class="rt-card" id="rtc-sessions" onclick="selectType('sessions')">
-                    <input type="radio" name="rtype" value="sessions">
-                    <div class="rt-ico green"><i class="fa-solid fa-desktop"></i></div>
-                    <div><div class="rt-name">Session Report</div><div class="rt-desc">All sessions — completed, voided, ongoing</div></div>
-                </label>
-                <label class="rt-card" id="rtc-attendance" onclick="selectType('attendance')">
-                    <input type="radio" name="rtype" value="attendance">
-                    <div class="rt-ico blue"><i class="fa-solid fa-clipboard-user"></i></div>
-                    <div><div class="rt-name">Attendance Report</div><div class="rt-desc">Student time-in/out per session</div></div>
-                </label>
-                <label class="rt-card" id="rtc-professor" onclick="selectType('professor')">
-                    <input type="radio" name="rtype" value="professor">
-                    <div class="rt-ico amber"><i class="fa-solid fa-chalkboard-teacher"></i></div>
-                    <div><div class="rt-name">Professor Report</div><div class="rt-desc">Sessions per professor, activity</div></div>
-                </label>
-                <label class="rt-card" id="rtc-student" onclick="selectType('student')">
-                    <input type="radio" name="rtype" value="student">
-                    <div class="rt-ico purple"><i class="fa-solid fa-user-graduate"></i></div>
-                    <div><div class="rt-name">Student Report</div><div class="rt-desc">Individual student attendance summary</div></div>
-                </label>
-            </div>
-
-            <div class="pm-group">
-                <label>Report Name</label>
-                <input type="text" id="genName" placeholder="e.g. March 2026 Attendance Report">
-            </div>
-
-            <div class="pm-section" id="gfSection" style="display:none;">
-                <div class="pm-section-title"><i class="fa-solid fa-sliders"></i> Optional Filters</div>
-                <div class="pm-fields">
-                    <div class="pm-grid-2" id="gf-sa" style="display:none;">
-                        <div class="pm-group"><label>Date From</label><input type="date" id="gf-date-from"></div>
-                        <div class="pm-group"><label>Date To</label><input type="date" id="gf-date-to"></div>
-                        <div class="pm-group"><label>Professor</label><select id="gf-prof"><option value="">All</option></select></div>
-                        <div class="pm-group"><label>Subject</label><select id="gf-subj"><option value="">All</option></select></div>
-                        <div class="pm-group"><label>Lab Room</label><select id="gf-lab"><option value="">All</option></select></div>
-                        <div class="pm-group">
-                            <label>Status</label>
-                            <select id="gf-status">
-                                <option value="">All Statuses</option>
-                                <option value="completed">Completed</option>
-                                <option value="cancelled">Voided / Cancelled</option>
-                                <option value="ongoing">Ongoing</option>
-                                <option value="scheduled">Scheduled</option>
-                            </select>
-                        </div>
-                    </div>
-                    <div class="pm-grid-2" id="gf-p" style="display:none;">
-                        <div class="pm-group"><label>Professor</label><select id="gf-p-prof"><option value="">All</option></select></div>
-                        <div></div>
-                        <div class="pm-group"><label>Date From</label><input type="date" id="gf-p-from"></div>
-                        <div class="pm-group"><label>Date To</label><input type="date" id="gf-p-to"></div>
-                    </div>
-                    <div class="pm-grid-2" id="gf-st" style="display:none;">
-                        <div class="pm-group"><label>Subject</label><select id="gf-st-subj"><option value="">All</option></select></div>
-                        <div></div>
-                        <div class="pm-group"><label>Date From</label><input type="date" id="gf-st-from"></div>
-                        <div class="pm-group"><label>Date To</label><input type="date" id="gf-st-to"></div>
-                    </div>
-                </div>
-            </div>
-
-            <div class="modal-footer" style="display: flex; justify-content: space-between; align-items: center; width: 100%; border-top: 1px solid var(--border); padding-top: 20px; margin-top: 10px;">
-                <button class="pm-btn-cancel" onclick="closeGenModal()">Cancel</button>
-                <div style="display: flex; gap: 10px;" id="exportBtnGroup">
-                    <button class="pm-btn-submit" style="background:#0f766e; border:none; padding:10px 18px;" onclick="generateReport('Print')"><i class="fa-solid fa-print"></i> Print</button>
-                    <button class="pm-btn-submit" style="background:#dc2626; border:none; padding:10px 18px;" onclick="generateReport('PDF')"><i class="fa-solid fa-file-pdf"></i> PDF</button>
-                    <button class="pm-btn-submit" style="background:#16a34a; border:none; padding:10px 18px;" onclick="generateReport('Excel')"><i class="fa-solid fa-file-excel"></i> Excel</button>
-                </div>
-            </div>
-        </div>
-    </div>
-
     <div class="modal-overlay" id="delAllModal" onclick="if(event.target===this)closeDelAllModal()">
         <div class="modal sm">
             <button class="modal-close" onclick="closeDelAllModal()"><i class="fa-solid fa-xmark"></i></button>
-            <h3><i class="fa-solid fa-trash-can" style="color:var(--red)"></i> Delete All Reports?</h3>
+            <h3><i class="fa-solid fa-trash-can" style="color:var(--red)"></i> Clear All Logs?</h3>
             <div class="conflict-warning" style="background:var(--red-bg); border-color:#fca5a5; color:#991b1b">
                 <h4 style="color:#991b1b; font-family:'Nunito Sans', sans-serif;"><i class="fa-solid fa-triangle-exclamation"></i> Warning: This cannot be undone.</h4>
-                <p style="font-size: 13px;">All saved reports will be deleted. Your raw session and attendance data will <strong>not</strong> be affected.</p>
+                <p style="font-size: 13px;">The audit history of all exports will be wiped. Your raw system data will <strong>not</strong> be affected.</p>
             </div>
             <div class="modal-footer">
                 <button type="button" class="pm-btn-cancel" onclick="closeDelAllModal()">Cancel</button>
                 <button type="button" class="btn-danger" style="padding:10px 24px; border-radius:8px; border:none; cursor:pointer; font-weight:700; font-family:'Nunito Sans', sans-serif;" onclick="executeDeleteAll()">
-                    <i class="fa-solid fa-trash-can"></i> Yes, Delete All
+                    <i class="fa-solid fa-trash-can"></i> Yes, Clear Logs
                 </button>
             </div>
         </div>
