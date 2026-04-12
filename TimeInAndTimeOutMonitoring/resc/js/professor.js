@@ -24,7 +24,7 @@ document.addEventListener('DOMContentLoaded', async () => {
 });
 
 // ────────────────────────────────────────────
-// LOAD ALL PROFESSORS DATA (Replaces PHP Queries)
+// LOAD ALL PROFESSORS DATA
 // ────────────────────────────────────────────
 async function loadProfessorsData() {
     try {
@@ -40,11 +40,12 @@ async function loadProfessorsData() {
             .eq('status', 'active');
         META.schedules = totalSchedules || 0;
 
-        // 2. Fetch Professors, their active schedules, and subjects
+        // 2. Fetch Professors, joined with Departments and Schedules
         const { data: professors, error } = await supabaseClient
             .from('professors')
             .select(`
                 *,
+                departments ( department_name ),
                 lab_schedules (
                     schedule_id, section, day_of_week, start_time, end_time, status,
                     subjects ( subject_code, subject_name ),
@@ -81,7 +82,6 @@ async function loadProfessorsData() {
             let inSessionObj = null;
             for (let s of activeSchedules) {
                 if (s.day_of_week === currentDay && nowTimeStr >= s.start_time && nowTimeStr <= s.end_time) {
-                    // Check if there's a scheduled/ongoing session today
                     const todaySession = s.lab_sessions.find(ls => ls.session_date === todayStr && ['scheduled', 'ongoing'].includes(ls.status));
                     if (todaySession) {
                         inSessionObj = { code: s.subjects?.subject_code, section: s.section };
@@ -91,9 +91,13 @@ async function loadProfessorsData() {
                 }
             }
 
+            // Extract the actual department name from the joined table
+            const deptName = prof.departments ? prof.departments.department_name : '—';
+
             const enrichedProf = {
                 ...prof,
                 fullName: `${prof.first_name} ${prof.middle_name || ''} ${prof.last_name}`.replace(/\s+/g, ' ').trim(),
+                departmentName: deptName, // Use the extracted name here
                 scheduleCount: activeSchedules.length,
                 subjectsTaught: subjectsTaught,
                 inSessionObj: inSessionObj,
@@ -109,12 +113,12 @@ async function loadProfessorsData() {
                 last_name: prof.last_name,
                 first_name: prof.first_name,
                 middle_name: prof.middle_name || '—',
-                department: prof.department || '—',
+                department: deptName, // Use the extracted name here
                 email: prof.email,
                 face_status: prof.facial_dataset_path ? 'Registered' : 'Not Registered',
                 status: prof.status,
                 active_schedules: activeSchedules.length,
-                sessions_done: 0, // Simplified for brevity; would require another subquery to count completed sessions
+                sessions_done: 0,
                 subjects: Array.from(new Set(activeSchedules.map(s => s.subjects?.subject_code))).join(', ')
             });
         });
@@ -149,7 +153,7 @@ function renderTable(data) {
                 <strong>${escapeHtml(prof.fullName)}</strong>
                 ${prof.middle_name ? `<br><small style="color:#6c757d">${escapeHtml(prof.middle_name)}</small>` : ''}
             </td>
-            <td>${escapeHtml(prof.department || '-')}</td>
+            <td>${escapeHtml(prof.departmentName)}</td>
             <td>${escapeHtml(prof.email)}</td>
             <td>
                 ${prof.subjectsTaught ? `<span class="subjects-taught">${escapeHtml(prof.subjectsTaught)}</span>` : `<span style="color:#999;font-style:italic">No schedules</span>`}
@@ -202,10 +206,10 @@ function initFilters() {
         renderTable(allProfessors);
     });
 }
+
 // ────────────────────────────────────────────
 // MODALS & UTILS
 // ────────────────────────────────────────────
-
 function openModal(id) {
     const m = document.getElementById(id);
     if (!m) return;
@@ -220,8 +224,6 @@ function closeModal(id) {
     
     setTimeout(() => {
         m.style.display = 'none';
-        
-        // Reset the form when the modal closes
         if (id === 'faceRegModal') {
             document.getElementById('profIdSearch').value = '';
             document.getElementById('profStudentInfo').innerHTML = '';
@@ -236,14 +238,11 @@ function closeModal(id) {
 function openFaceRegModal(employeeId) {
     openModal('faceRegModal');
     document.getElementById('profIdSearch').value = employeeId;
-    searchProfessor(); // Auto-search if opened from table icon
+    searchProfessor(); 
 }
 
-// Close modal if user clicks on the dark background overlay
 window.addEventListener('click', e => {
-    if (e.target.classList.contains('prof-modal')) {
-        closeModal(e.target.id);
-    }
+    if (e.target.classList.contains('prof-modal')) closeModal(e.target.id);
 });
 
 function showToast(msg) {
@@ -259,10 +258,9 @@ function escapeHtml(str) {
 }
 
 // ────────────────────────────────────────────
-// REPORT MODAL LOGIC (With Duplicate Prevention & Green Banner)
+// REPORT MODAL LOGIC (With Duplicate Prevention & White Banner)
 // ────────────────────────────────────────────
-
-let existingReportsToday = []; // Tracks reports to prevent exact duplicates
+let existingReportsToday = []; 
 
 async function openReportModal() {
     document.getElementById('rmTotalChip').textContent = META.total;
@@ -293,7 +291,6 @@ async function openReportModal() {
     
     document.getElementById('rmOverlay').classList.add('on');
 
-    // ── PRE-FETCH TODAY'S REPORTS TO PREVENT EXACT DUPLICATES ──
     const dateStr = new Date().toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' });
     try {
         const { data } = await supabaseClient
@@ -319,15 +316,12 @@ function closeReportModal() {
     document.getElementById('rmOverlay').classList.remove('on');
 }
 
-// ── Smart Duplicate Check Helper ──
 function checkDuplicateWarning(exportType) {
     const dateStr = new Date().toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' });
     const reportName = `Professors Report — ${dateStr} (${exportType})`;
     const currentDataString = JSON.stringify(reportRows);
     
-    const isExactDuplicate = existingReportsToday.some(r => 
-        r.name === reportName && r.dataString === currentDataString
-    );
+    const isExactDuplicate = existingReportsToday.some(r => r.name === reportName && r.dataString === currentDataString);
     
     if (isExactDuplicate) {
         return confirm(`A ${exportType} report with this EXACT data has already been saved today.\n\nAre you sure you want to generate a duplicate?`);
@@ -335,35 +329,18 @@ function checkDuplicateWarning(exportType) {
     return true; 
 }
 
-// ── Save to Reports (Manual Button) ───────────────────────────
 async function saveReport() {
     if (!checkDuplicateWarning('Manual Save')) return;
-
     const btn = document.querySelector('.rm-btn[onclick="saveReport()"]');
-    if (btn) {
-        btn.disabled = true;
-        btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Saving...';
-    }
-
+    if (btn) { btn.disabled = true; btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Saving...'; }
     await autoSaveReport('Manual Save');
-
-    if (btn) {
-        btn.disabled = false;
-        btn.innerHTML = '<i class="fa-solid fa-floppy-disk"></i> Save to Reports';
-    }
+    if (btn) { btn.disabled = false; btn.innerHTML = '<i class="fa-solid fa-floppy-disk"></i> Save to Reports'; }
 }
 
-// ── Auto-save helper ──────────────────────────────────────────
 async function autoSaveReport(exportType) {
     const dateStr    = new Date().toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' });
     const reportName = `Professors Report — ${dateStr} (${exportType})`;
-
-    const payload = {
-        report_type: 'professors',
-        report_name: reportName,
-        filters:     JSON.stringify({}),
-        report_data: JSON.stringify(reportRows)
-    };
+    const payload = { report_type: 'professors', report_name: reportName, filters: JSON.stringify({}), report_data: JSON.stringify(reportRows) };
 
     try {
         const { error } = await supabaseClient.from('las_reports').insert([payload]);
@@ -372,19 +349,14 @@ async function autoSaveReport(exportType) {
         if (exportType === 'Manual Save') {
             if (typeof showToast === 'function') showToast('Report saved successfully!', true);
             else alert('Report saved successfully!');
-        } else {
-            console.log(`[Auto-Save] ${exportType} report securely archived.`);
         }
         
-        existingReportsToday.push({
-            name: payload.report_name,
-            dataString: payload.report_data
-        }); 
-        
+        existingReportsToday.push({ name: payload.report_name, dataString: payload.report_data }); 
     } catch (err) {
         console.error('Auto-save error:', err);
     }
 }
+
 async function printReport() {
     if (!checkDuplicateWarning('Print')) return;
 
@@ -420,24 +392,13 @@ async function printReport() {
     <style>
         *{margin:0;padding:0;box-sizing:border-box}
         body{font-family:Arial,sans-serif;padding:20px;font-size:11px;color:#111}
-        
-        /* ── INK-SAVER WHITE BANNER HEADER ── */
-        .header-container { 
-            background-color: #ffffff; 
-            color: #000000;
-            text-align: center; 
-            margin-bottom: 20px; 
-            padding: 20px 15px; 
-            border: 2px solid #000000; 
-            border-radius: 8px;
-        }
+        .header-container { background-color: #ffffff; color: #000000; text-align: center; margin-bottom: 20px; padding: 20px 15px; border: 2px solid #000000; border-radius: 8px; }
         .logos-text-wrapper { display: flex; justify-content: center; align-items: center; gap: 25px; margin-bottom: 10px; }
         .logo-img { height: 50px; width: auto; object-fit: contain; }
         .univ-title { font-size: 18px; font-weight: bold; color: #000000; line-height: 1.2; letter-spacing: 0.5px;}
         .college-title { font-size: 11px; color: #444444; letter-spacing: 1px; text-transform: uppercase;}
         .report-title { font-size: 16px; font-weight: bold; color: #000000; margin-top: 12px; text-transform: uppercase; letter-spacing: 1px;}
         .report-meta { font-size: 11px; color: #555555; margin-top: 5px; }
-        
         table{width:100%;border-collapse:collapse; margin-top: 10px; border: 1px solid #000000 !important;}
         th{background:#ffffff; color:#000000; padding:8px 10px; text-align:center; font-size:10px; font-weight:700; text-transform:uppercase; letter-spacing:.5px; border: 1px solid #000000 !important;}
         td{padding:8px 10px; border: 1px solid #000000 !important; font-size:11px; text-align:center;}
@@ -446,31 +407,23 @@ async function printReport() {
         .footer{margin-top:20px;text-align:center;font-size:10px;color:#9ca3af;border-top:1px solid #e5e7eb;padding-top:10px}
         @media print{body{padding:0px}}
     </style></head><body>
-    
     <div class="header-container">
         <div class="logos-text-wrapper">
             <img src="../resc/assets/plp_logo.png" class="logo-img" alt="PLP Logo">
-            <div>
-                <div class="univ-title">PAMANTASAN NG LUNGSOD NG PASIG</div>
-                <div class="college-title">College of Computer Studies</div>
-            </div>
+            <div><div class="univ-title">PAMANTASAN NG LUNGSOD NG PASIG</div><div class="college-title">College of Computer Studies</div></div>
             <img src="../resc/assets/ccs_logo.png" class="logo-img" alt="CCS Logo">
         </div>
         <div class="report-title">Professors Report</div>
         <div class="report-meta">Generated: ${nowStr} &nbsp;&middot;&nbsp; Total Professors: ${META.total} &nbsp;&middot;&nbsp; Face Registered: ${META.facial} &nbsp;&middot;&nbsp; Active Schedules: ${META.schedules}</div>
     </div>
-
-    <table>
-        <thead><tr>${cols.map(c => `<th>${c}</th>`).join('')}</tr></thead>
-        <tbody>${rows}</tbody>
-    </table>
+    <table><thead><tr>${cols.map(c => `<th>${c}</th>`).join('')}</tr></thead><tbody>${rows}</tbody></table>
     <div class="footer">Laboratory Attendance System &nbsp;&middot;&nbsp; ${nowStr}</div>
     <script>window.onload=()=>setTimeout(()=>window.print(),500)<\/script>
     </body></html>`);
     w.document.close();
-
     await autoSaveReport('Print');
 }
+
 async function downloadPDF() {
     if (!checkDuplicateWarning('PDF')) return;
     if (!window.jspdf) { alert('PDF library not loaded yet. Please try again.'); return; }
@@ -486,133 +439,57 @@ async function downloadPDF() {
 
         function loadImage(src) {
             return new Promise((resolve) => {
-                const img = new Image();
-                img.crossOrigin = 'anonymous';
-                img.onload = () => {
-                    try {
-                        const canvas = document.createElement('canvas');
-                        canvas.width = img.width; canvas.height = img.height;
-                        canvas.getContext('2d').drawImage(img, 0, 0);
-                        resolve(canvas.toDataURL('image/png'));
-                    } catch(e) { resolve(null); }
-                };
-                img.onerror = () => resolve(null);
-                img.src = src;
+                const img = new Image(); img.crossOrigin = 'anonymous';
+                img.onload = () => { try { const canvas = document.createElement('canvas'); canvas.width = img.width; canvas.height = img.height; canvas.getContext('2d').drawImage(img, 0, 0); resolve(canvas.toDataURL('image/png')); } catch(e) { resolve(null); } };
+                img.onerror = () => resolve(null); img.src = src;
             });
         }
 
-        const [plpData, ccsData] = await Promise.all([
-            loadImage('../resc/assets/plp_logo.png'),
-            loadImage('../resc/assets/ccs_logo.png')
-        ]);
-
-        const centerX = pageW / 2;
-        const headerHeight = 45;
+        const [plpData, ccsData] = await Promise.all([loadImage('../resc/assets/plp_logo.png'), loadImage('../resc/assets/ccs_logo.png')]);
+        const centerX = pageW / 2, headerHeight = 45;
         
-        // ── DRAW THIN HEADER BORDER (WHITE BG) ──
-        doc.setDrawColor(0, 0, 0); 
-        doc.setLineWidth(0.1);
+        doc.setDrawColor(0, 0, 0); doc.setLineWidth(0.1);
         doc.rect(10, 5, pageW - 20, headerHeight, 'S');
         
-        const logoSize = 18;
-        if (plpData) doc.addImage(plpData, 'PNG', centerX - 85, 10, logoSize, logoSize);
-        if (ccsData) doc.addImage(ccsData, 'PNG', centerX + 67, 10, logoSize, logoSize);
+        if (plpData) doc.addImage(plpData, 'PNG', centerX - 85, 10, 18, 18);
+        if (ccsData) doc.addImage(ccsData, 'PNG', centerX + 67, 10, 18, 18);
 
-        // ── HEADER TEXT (BLACK) ──
         doc.setTextColor(0, 0, 0);
         doc.setFontSize(16); doc.setFont('helvetica', 'bold');
         doc.text('PAMANTASAN NG LUNGSOD NG PASIG', centerX, 18, { align: 'center' });
-        
         doc.setFontSize(9); doc.setTextColor(60, 60, 60); doc.setFont('helvetica', 'normal');
         doc.text('COLLEGE OF COMPUTER STUDIES', centerX, 23, { align: 'center' });
-        
         doc.setFontSize(14); doc.setTextColor(0, 0, 0); doc.setFont('helvetica', 'bold');
         doc.text('PROFESSORS REPORT', centerX, 33, { align: 'center' });
-        
         doc.setFontSize(8); doc.setTextColor(80, 80, 80); doc.setFont('helvetica', 'normal');
         doc.text(`Generated: ${nowStr}  ·  Total Professors: ${META.total}  ·  Face Registered: ${META.facial}  ·  Active Schedules: ${META.schedules}`, centerX, 39, { align: 'center' });
 
         const head = [['#','Emp ID','Last Name','First Name','M.I.','Department','Face Status','Status','Schedules','Sessions Done','Subjects']];
-        const body = reportRows.map((r, i) => {
-            const mi = r.middle_name ? r.middle_name.substring(0,2) + '.' : '—';
-            const subs = r.subjects ? r.subjects.substring(0, 45) + (r.subjects.length > 45 ? '...' : '') : '—';
-            return [
-                i + 1, r.employee_id, r.last_name, r.first_name, mi,
-                r.department, r.face_status.toUpperCase(), r.status.toUpperCase(),
-                r.active_schedules, r.sessions_done, subs
-            ];
-        });
+        const body = reportRows.map((r, i) => [
+            i + 1, r.employee_id, r.last_name, r.first_name, r.middle_name ? r.middle_name.substring(0,2) + '.' : '—',
+            r.department, r.face_status.toUpperCase(), r.status.toUpperCase(),
+            r.active_schedules, r.sessions_done, r.subjects ? r.subjects.substring(0, 45) + (r.subjects.length > 45 ? '...' : '') : '—'
+        ]);
 
         doc.autoTable({
-            head, body,
-            startY: headerHeight + 10,
-            margin: { left: 14, right: 14 },
-            theme: 'grid',
-            headStyles: { 
-                fillColor: [255, 255, 255], fontSize: 7.5, fontStyle: 'bold', textColor: [0,0,0], 
-                lineColor: [0,0,0], lineWidth: 0.1, halign: 'center', valign: 'middle'
-            },
+            head, body, startY: headerHeight + 10, margin: { left: 14, right: 14 }, theme: 'grid',
+            headStyles: { fillColor: [255, 255, 255], fontSize: 7.5, fontStyle: 'bold', textColor: [0,0,0], lineColor: [0,0,0], lineWidth: 0.1, halign: 'center', valign: 'middle' },
             styles: { fontSize: 7.5, cellPadding: 3, valign: 'middle', lineColor: [0,0,0], lineWidth: 0.1, textColor: [0,0,0] },
-            columnStyles: {
-                0: { cellWidth: 10, halign: 'center' },
-                1: { cellWidth: 20, halign: 'center', fontStyle: 'bold' },
-                2: { cellWidth: 30, fontStyle: 'bold' },
-                3: { cellWidth: 30 },
-                6: { cellWidth: 20, halign: 'center', fontStyle: 'bold' },
-                7: { cellWidth: 15, halign: 'center', fontStyle: 'bold' },
-                8: { cellWidth: 20, halign: 'center' },
-                9: { cellWidth: 20, halign: 'center' }
-            },
+            columnStyles: { 0:{cellWidth:10,halign:'center'}, 1:{cellWidth:20,halign:'center',fontStyle:'bold'}, 2:{cellWidth:30,fontStyle:'bold'}, 3:{cellWidth:30}, 6:{cellWidth:20,halign:'center',fontStyle:'bold'}, 7:{cellWidth:15,halign:'center',fontStyle:'bold'}, 8:{cellWidth:20,halign:'center'}, 9:{cellWidth:20,halign:'center'} },
             didParseCell(d) {
-                if (d.column.index === 6 && d.section === 'body') {
-                    const s = (d.cell.text[0] || '').toLowerCase();
-                    if (s === 'registered') { d.cell.styles.textColor = [22, 101, 52]; }
-                    if (s === 'not registered') { d.cell.styles.textColor = [217, 119, 6]; }
-                }
-                if (d.column.index === 7 && d.section === 'body') {
-                    const s = (d.cell.text[0] || '').toLowerCase();
-                    if (s === 'active') { d.cell.styles.textColor = [22, 101, 52]; }
-                    if (s === 'inactive') { d.cell.styles.textColor = [220, 38, 38]; }
-                }
+                if (d.column.index === 6 && d.section === 'body') { const s = (d.cell.text[0] || '').toLowerCase(); if (s === 'registered') { d.cell.styles.textColor = [22, 101, 52]; } if (s === 'not registered') { d.cell.styles.textColor = [217, 119, 6]; } }
+                if (d.column.index === 7 && d.section === 'body') { const s = (d.cell.text[0] || '').toLowerCase(); if (s === 'active') { d.cell.styles.textColor = [22, 101, 52]; } if (s === 'inactive') { d.cell.styles.textColor = [220, 38, 38]; } }
             }
         });
 
         const pages = doc.internal.getNumberOfPages();
-        for (let i = 1; i <= pages; i++) {
-            doc.setPage(i); doc.setFontSize(7); doc.setTextColor(156, 163, 175);
-            doc.text(`Laboratory Attendance System  ·  Page ${i} of ${pages}  ·  ${nowStr}`,
-                pageW / 2, doc.internal.pageSize.height - 8, { align: 'center' });
-        }
-
+        for (let i = 1; i <= pages; i++) { doc.setPage(i); doc.setFontSize(7); doc.setTextColor(156, 163, 175); doc.text(`Laboratory Attendance System  ·  Page ${i} of ${pages}  ·  ${nowStr}`, pageW / 2, doc.internal.pageSize.height - 8, { align: 'center' }); }
         doc.save(`Professors_Report_${now.toISOString().split('T')[0]}.pdf`);
         await autoSaveReport('PDF');
-
     } catch (err) {
         console.error('PDF generation error:', err);
-        showToast('There was an error generating the PDF.', true);
+        if (typeof showToast === 'function') showToast('There was an error generating the PDF.', true);
     }
-}
-
-// ── CSV ────────────────────────────────────────────────────
-async function exportCSV() {
-    if (!checkDuplicateWarning('CSV')) return;
-
-    const cols = ['#','Employee ID','Last Name','First Name','Middle Name','Department','Email','Face Status','Status','Active Schedules','Sessions Done','Subjects'];
-    const lines = [
-        cols.join(','),
-        ...reportRows.map((r, i) => [
-            i + 1, `"${r.employee_id}"`, `"${r.last_name}"`, `"${r.first_name}"`, `"${r.middle_name}"`,
-            `"${r.department}"`, `"${r.email}"`, `"${r.face_status}"`, r.status,
-            r.active_schedules, r.sessions_done, `"${(r.subjects || '').replace(/"/g, '""')}"`
-        ].join(','))
-    ];
-    const a = document.createElement('a');
-    a.href = URL.createObjectURL(new Blob([lines.join('\n')], { type: 'text/csv' }));
-    a.download = `Professors_Report_${new Date().toISOString().split('T')[0]}.csv`;
-    a.click();
-    URL.revokeObjectURL(a.href);
-    
-    await autoSaveReport('CSV');
 }
 
 // ── Excel ──────────────────────────────────────────────────
@@ -620,10 +497,12 @@ async function exportExcel() {
     if (!checkDuplicateWarning('Excel')) return;
 
     if (!window.XLSX) {
-        return exportCSV(); // Fallback if library fails
+        if (typeof showToast === 'function') showToast('Excel library not loaded. Please refresh the page.', true);
+        else alert('Excel library not loaded.');
+        return; 
     }
+    
     const wb = XLSX.utils.book_new();
-
     const headers = ['#','Employee ID','Last Name','First Name','Middle Name','Department','Email','Face Status','Status','Active Schedules','Sessions Done','Subjects'];
                   
     const rows = reportRows.map((r, i) => [
@@ -634,16 +513,13 @@ async function exportExcel() {
 
     const dataSheet = XLSX.utils.aoa_to_sheet([headers, ...rows]);
     XLSX.utils.book_append_sheet(wb, dataSheet, 'Professors');
-
     XLSX.writeFile(wb, `Professors_Report_${new Date().toISOString().split('T')[0]}.xlsx`);
 
     await autoSaveReport('Excel');
 }
 
-// Stubs for real-time validation visual feedback
-function initRealTimeValidation() {
-    // Wired up via supabaseClient.from().select() calls as needed.
-}
+function initRealTimeValidation() {}
+
 // ── FACE REGISTRATION SEARCH & REDIRECT ──
 async function searchProfessor() {
     const empId = document.getElementById('profIdSearch').value.trim();
@@ -652,11 +528,9 @@ async function searchProfessor() {
     
     if (!empId) { showToast('Please enter an Employee ID.'); return; }
 
-    // Disable button and show spinner
     searchBtn.disabled = true;
     searchBtn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Searching...';
     
-    // Hide previous results while searching
     resultDiv.style.display = 'none'; 
     resultDiv.classList.remove('active');
 
@@ -688,14 +562,12 @@ async function searchProfessor() {
             <div class="info-item"><label>Full Name</label><div class="value">${escapeHtml(p.first_name)} ${escapeHtml(p.last_name)}</div></div>
         `;
         
-        // ✅ THE FIX: Explicitly reveal the result box with animation
         resultDiv.style.display = 'block';
         setTimeout(() => resultDiv.classList.add('active'), 10);
         
     } catch (err) {
         showToast('Error: ' + err.message);
     } finally {
-        // Reset the button back to normal
         searchBtn.disabled = false;
         searchBtn.innerHTML = '<i class="fa-solid fa-search"></i> Search Professor';
     }
@@ -703,18 +575,5 @@ async function searchProfessor() {
 
 function redirectToProfFaceReg() {
     const empId = document.getElementById('profIdSearch').value.trim();
-    
-    // Safely redirect to the registration portal
-    window.top.location.href = 
-        '/INTEG SYSTEM/SmartAcademicManagementSystem/TimeInAndTimeOutMonitoring/students/accountRegistration.html'
-        + '?role=professor&employee_id=' + encodeURIComponent(empId);
-}
-
-function redirectToProfFaceReg() {
-    const empId = document.getElementById('profIdSearch').value.trim();
-    
-    // Uses a relative path to jump from /admin/ back to /students/
-    window.top.location.href = 
-        '../students/accountRegistration.html'
-        + '?role=professor&employee_id=' + encodeURIComponent(empId);
+    window.top.location.href = '../students/accountRegistration.html?role=professor&employee_id=' + encodeURIComponent(empId);
 }
