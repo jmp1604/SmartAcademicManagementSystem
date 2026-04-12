@@ -73,12 +73,8 @@
                             <option value="">All Types</option>
                             <option value="sessions">Session Report</option>
                             <option value="attendance">Attendance Report</option>
-                            <option value="professors">Professor Report</option>
-                            <option value="students">Student Report</option>
-                            <option value="schedules">Schedules Report</option>
-                            <option value="enrollment">Enrollment Report</option>
-                            <option value="laboratories">Laboratories Report</option>
-                            <option value="subjects">Subjects Report</option>
+                            <option value="professor">Professor Report</option>
+                            <option value="student">Student Report</option>
                         </select>
                     </div>
                     <div class="fg">
@@ -108,7 +104,7 @@
                             <th>Type</th>
                             <th>Filters</th>
                             <th>Generated</th>
-                            <th>Actions</th>
+                            <th style="width:100px; text-align:center;">Action</th>
                         </tr>
                     </thead>
                     <tbody id="reportsBody">
@@ -130,8 +126,8 @@
     <div class="modal-overlay" id="genModal" onclick="if(event.target===this)closeGenModal()">
         <div class="modal lg">
             <button class="modal-close" onclick="closeGenModal()"><i class="fa-solid fa-xmark"></i></button>
-            <h3 style="margin-bottom: 5px;"><i class="fa-solid fa-file-circle-plus" style="color:var(--green-bright)"></i> Generate New Report</h3>
-            <div class="modal-sub">Select a report type and optionally set filters, then click Generate.</div>
+            <h3 style="margin-bottom: 5px;"><i class="fa-solid fa-file-circle-plus" style="color:var(--green-bright)"></i> Generate & Export Report</h3>
+            <div class="modal-sub">Select a report type, apply filters, and choose your export format.</div>
 
             <div class="rt-grid">
                 <label class="rt-card" id="rtc-sessions" onclick="selectType('sessions')">
@@ -196,9 +192,13 @@
                 </div>
             </div>
 
-            <div class="modal-footer">
+            <div class="modal-footer" style="display: flex; justify-content: space-between; align-items: center; width: 100%; border-top: 1px solid var(--border); padding-top: 20px; margin-top: 10px;">
                 <button class="pm-btn-cancel" onclick="closeGenModal()">Cancel</button>
-                <button class="pm-btn-submit" onclick="generateReport()"><i class="fa-solid fa-file-circle-plus"></i> Generate</button>
+                <div style="display: flex; gap: 10px;" id="exportBtnGroup">
+                    <button class="pm-btn-submit" style="background:#0f766e; border:none; padding:10px 18px;" onclick="generateReport('Print')"><i class="fa-solid fa-print"></i> Print</button>
+                    <button class="pm-btn-submit" style="background:#dc2626; border:none; padding:10px 18px;" onclick="generateReport('PDF')"><i class="fa-solid fa-file-pdf"></i> PDF</button>
+                    <button class="pm-btn-submit" style="background:#16a34a; border:none; padding:10px 18px;" onclick="generateReport('Excel')"><i class="fa-solid fa-file-excel"></i> Excel</button>
+                </div>
             </div>
         </div>
     </div>

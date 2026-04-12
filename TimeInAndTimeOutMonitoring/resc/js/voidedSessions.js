@@ -561,6 +561,7 @@ async function downloadPDF() {
     });
 
     doc.save(`Session_History_Report_${new Date().toISOString().split('T')[0]}.pdf`);
+     await autoSaveReport('PDF');
 }
 
 // ── CSV ───────────────────────────────────────────────────────
@@ -595,6 +596,7 @@ async function exportCSV() {
     URL.revokeObjectURL(a.href);
     
     await autoSaveReport('CSV');
+    
 }
 
 // ── Excel ─────────────────────────────────────────────────────

@@ -423,8 +423,8 @@ const isStayIn     = s.status === 'ongoing' && !!s.actual_dismiss_time;
             </div>` : ''}
 
             <div class="attendance-stat"><strong>${s.students_present}/${s.total_enrolled}</strong> present (${pct}%)</div>
-            <button class="btn" onclick="location.href='attendeesList.html?session_id=${s.session_id}'">
-                <i class="fa-solid fa-eye"></i> View Attendees
+            <button class="btn" onclick="location.href='students.html?session_id=${s.session_id}'">
+                <i class="fa-solid fa-eye"></i> View Students
             </button>
         </div>
     `;
