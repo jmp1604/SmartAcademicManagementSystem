@@ -69,8 +69,27 @@
                                 <input type="text" id="searchInput" placeholder="Search by name, ID, or email" />
                             </div>
                         </div>
+                        
                         <div class="control-group">
-                            <label for="statusFilter"><i class="fa-solid fa-filter"></i> Filter by Status</label>
+                            <label for="deptFilter"><i class="fa-solid fa-building"></i> Department</label>
+                            <div class="filter-container">
+                                <select id="deptFilter">
+                                    <option value="">All Departments</option>
+                                </select>
+                            </div>
+                        </div>
+
+                        <div class="control-group">
+                            <label for="subjectFilter"><i class="fa-solid fa-book"></i> Subject</label>
+                            <div class="filter-container">
+                                <select id="subjectFilter">
+                                    <option value="">All Subjects</option>
+                                </select>
+                            </div>
+                        </div>
+
+                        <div class="control-group">
+                            <label for="statusFilter"><i class="fa-solid fa-filter"></i> Status</label>
                             <div class="filter-container">
                                 <select id="statusFilter">
                                     <option value="">All Status</option>
@@ -80,7 +99,7 @@
                             </div>
                         </div>
                         <div class="control-group">
-                            <label for="sessionFilter"><i class="fa-solid fa-filter"></i> Session Status</label>
+                            <label for="sessionFilter"><i class="fa-solid fa-filter"></i> Session</label>
                             <div class="filter-container">
                                 <select id="sessionFilter">
                                     <option value="">All</option>
@@ -90,11 +109,11 @@
                             </div>
                         </div>
                         <div class="control-group">
-                            <label for="faceFilter"><i class="fa-solid fa-filter"></i> Face Registration</label>
+                            <label for="faceFilter"><i class="fa-solid fa-filter"></i> Face</label>
                             <div class="filter-container">
                                 <select id="faceFilter">
                                     <option value="">All</option>
-                                    <option value="registered">Face Registered</option>
+                                    <option value="registered">Registered</option>
                                     <option value="not-registered">Not Registered</option>
                                 </select>
                             </div>

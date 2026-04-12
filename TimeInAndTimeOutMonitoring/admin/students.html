@@ -62,11 +62,26 @@
                 <div class="controls-header">
                     <h2><i class="fa-solid fa-sliders-h"></i> Filters &amp; Search</h2>
                 </div>
-                <div class="table-controls">
+              <div class="table-controls">
                     <div class="control-group">
                         <label for="searchInput"><i class="fa-solid fa-magnifying-glass"></i> Search by ID or Name</label>
                         <input type="text" id="searchInput" placeholder="Search by ID or Name" />
                     </div>
+
+                    <div class="control-group">
+                        <label for="courseFilter"><i class="fa-solid fa-graduation-cap"></i> Filter by Program</label>
+                        <select id="courseFilter">
+                            <option value="">All Programs</option>
+                        </select>
+                    </div>
+
+                    <div class="control-group">
+                        <label for="yearSectionFilter"><i class="fa-solid fa-chalkboard-user"></i> Filter by Yr &amp; Sec</label>
+                        <select id="yearSectionFilter">
+                            <option value="">All Yr &amp; Sec</option>
+                        </select>
+                    </div>
+
                     <div class="control-group">
                         <label for="statusFilter"><i class="fa-solid fa-filter"></i> Filter by Status</label>
                         <select id="statusFilter">

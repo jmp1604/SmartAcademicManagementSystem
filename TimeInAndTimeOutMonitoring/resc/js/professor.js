@@ -131,6 +131,9 @@ async function loadProfessorsData() {
         document.getElementById('statSchedules').textContent = META.schedules;
         document.getElementById('statFaceReg').textContent = META.facial;
 
+        // NEW: Populate dropdowns based on available data
+        populateDynamicFilters();
+
         renderTable(allProfessors);
 
     } catch (error) {
@@ -178,31 +181,72 @@ function renderTable(data) {
 // ────────────────────────────────────────────
 // FILTERS
 // ────────────────────────────────────────────
+function populateDynamicFilters() {
+    const deptFilter = document.getElementById('deptFilter');
+    const subjFilter = document.getElementById('subjectFilter');
+
+    if (!deptFilter || !subjFilter) return;
+
+    // Get unique departments, sort them, and ignore empties/placeholders
+    const depts = [...new Set(allProfessors.map(p => p.departmentName).filter(d => d && d !== '—'))].sort();
+
+    // Dig into the raw schedules to get a clean list of unique subject codes (e.g., "IT103")
+    const allSubjs = [];
+    allProfessors.forEach(p => {
+        if (p.lab_schedules) {
+            p.lab_schedules.forEach(s => {
+                if (s.status === 'active' && s.subjects?.subject_code) {
+                    allSubjs.push(s.subjects.subject_code);
+                }
+            });
+        }
+    });
+    const subjects = [...new Set(allSubjs)].sort();
+
+    deptFilter.innerHTML = '<option value="">All Departments</option>' + depts.map(d => `<option value="${escapeHtml(d)}">${escapeHtml(d)}</option>`).join('');
+    subjFilter.innerHTML = '<option value="">All Subjects</option>' + subjects.map(s => `<option value="${escapeHtml(s)}">${escapeHtml(s)}</option>`).join('');
+}
+
 function initFilters() {
-    const search = document.getElementById('searchInput');
-    const status = document.getElementById('statusFilter');
+    const search  = document.getElementById('searchInput');
+    const status  = document.getElementById('statusFilter');
     const session = document.getElementById('sessionFilter');
-    const face = document.getElementById('faceFilter');
+    const face    = document.getElementById('faceFilter');
+    const dept    = document.getElementById('deptFilter');
+    const subj    = document.getElementById('subjectFilter');
 
     function apply() {
-        const q = search.value.toLowerCase().trim();
-        const st = status.value, se = session.value, fc = face.value;
+        const q  = search.value.toLowerCase().trim();
+        const st = status.value;
+        const se = session.value;
+        const fc = face.value;
+        const dp = dept?.value;
+        const sb = subj?.value;
         
         const filtered = allProfessors.filter(p => {
-            const matchQ = !q || p.fullName.toLowerCase().includes(q) || p.employee_id.toLowerCase().includes(q) || p.email.toLowerCase().includes(q);
+            const matchQ  = !q || p.fullName.toLowerCase().includes(q) || p.employee_id.toLowerCase().includes(q) || p.email.toLowerCase().includes(q);
             const matchSt = !st || p.status === st;
             const matchSe = !se || p.sessionStatus === se;
             const matchFc = !fc || p.faceStatus === fc;
-            return matchQ && matchSt && matchSe && matchFc;
+            const matchDp = !dp || p.departmentName === dp;
+            
+            // Check if the selected subject string is inside the professor's "subjectsTaught" list
+            const matchSb = !sb || (p.subjectsTaught && p.subjectsTaught.includes(sb));
+
+            return matchQ && matchSt && matchSe && matchFc && matchDp && matchSb;
         });
         renderTable(filtered);
     }
 
     search.addEventListener('input', apply);
-    [status, session, face].forEach(el => el.addEventListener('change', apply));
+    [status, session, face, dept, subj].forEach(el => {
+        if(el) el.addEventListener('change', apply);
+    });
 
     document.getElementById('clearFilters').addEventListener('click', () => {
         search.value = ''; status.value = ''; session.value = ''; face.value = '';
+        if(dept) dept.value = '';
+        if(subj) subj.value = '';
         renderTable(allProfessors);
     });
 }
