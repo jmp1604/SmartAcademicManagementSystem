@@ -477,7 +477,6 @@ function clearAddStudentDups() {
         if (el) { el.classList.remove('show', 'ok'); el.innerHTML = ''; }
     });
 }
-
 // ══════════════════════════════════════════════════════════
 // 7. FACE REGISTRATION SEARCH
 // ══════════════════════════════════════════════════════════
@@ -492,13 +491,13 @@ async function searchStudent() {
     searchBtn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Searching...';
 
     try {
-        // ✅ FIX: Strip dash so both "23-00223" and "2300223" match the DB's raw digits
-        const rawId = rawStudentId(studentId);
+        // ✅ FIX: Format the ID to ENSURE it has the dash (e.g., 23-00223) to match Supabase
+        const searchId = formatStudentId(studentId);
 
         const { data: s, error } = await supabaseClient
             .from('students')
             .select('id_number, first_name, middle_name, last_name, course, year_level, section, email, facial_dataset_path')
-            .eq('id_number', rawId)
+            .eq('id_number', searchId)
             .single();
 
         if (error || !s) {
@@ -515,10 +514,10 @@ async function searchStudent() {
 
         const rb = document.getElementById('registerFaceBtn');
         rb.style.display = hasFace ? 'none' : 'block';
-        rb.dataset.studentId = rawId;
+        rb.dataset.studentId = searchId; // Store the dashed ID for the redirect
 
         document.getElementById('studentInfo').innerHTML = `
-            <div class="info-item"><label>Student ID</label><div class="value">${escHtml(formatStudentId(s.id_number))}</div></div>
+            <div class="info-item"><label>Student ID</label><div class="value">${escHtml(searchId)}</div></div>
             <div class="info-item"><label>Full Name</label><div class="value">${escHtml(s.first_name)} ${escHtml(s.middle_name || '')} ${escHtml(s.last_name)}</div></div>
             <div class="info-item"><label>Course</label><div class="value">${escHtml(s.course || '-')}</div></div>
             <div class="info-item"><label>Year &amp; Section</label><div class="value">${s.year_level || ''}${escHtml(s.section || '')}</div></div>
