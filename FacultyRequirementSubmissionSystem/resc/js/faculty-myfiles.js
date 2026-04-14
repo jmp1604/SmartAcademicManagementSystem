@@ -13,6 +13,7 @@ document.addEventListener('DOMContentLoaded', async function () {
         const viewBtn = e.target.closest('.view-btn');
         const downloadBtn = e.target.closest('.download-btn');
         const deleteBtn = e.target.closest('.delete-btn');
+        const editBtn = e.target.closest('.edit-btn');
         
         if (viewBtn) {
             console.log('View button clicked');
@@ -26,6 +27,10 @@ document.addEventListener('DOMContentLoaded', async function () {
             const fileUrl = downloadBtn.dataset.fileUrl;
             const fileName = downloadBtn.dataset.fileName;
             if (fileUrl && fileName) downloadFile(fileUrl, fileName);
+        } else if (editBtn) {
+            console.log('Edit button clicked');
+            const submissionId = editBtn.dataset.submissionId;
+            if (submissionId) editSubmission(submissionId);
         } else if (deleteBtn) {
             console.log('Delete button clicked');
             const submissionId = deleteBtn.dataset.submissionId;
@@ -39,12 +44,12 @@ document.addEventListener('DOMContentLoaded', async function () {
         const status  = (statusFilter?.value || '').toLowerCase();
         const sem     = (semesterFilter?.value || '').toLowerCase();
 
-        document.querySelectorAll('.file-card-my-files[data-cat]').forEach(function (card) {
-            const matchQ       = !q       || card.dataset.name?.toLowerCase().includes(q);
-            const matchCat     = !cat     || cat === 'all categories' || card.dataset.cat?.toLowerCase() === cat;
-            const matchStatus  = !status  || status === 'all status'  || card.dataset.status?.toLowerCase() === status;
-            const matchSem     = !sem     || sem === 'all semesters' || card.dataset.semester?.toLowerCase() === sem;
-            card.style.display = (matchQ && matchCat && matchStatus && matchSem) ? '' : 'none';
+        document.querySelectorAll('#files-grid tr[data-cat]').forEach(function (row) {
+            const matchQ       = !q       || row.dataset.name?.toLowerCase().includes(q);
+            const matchCat     = !cat     || cat === 'all categories' || row.dataset.cat?.toLowerCase() === cat;
+            const matchStatus  = !status  || status === 'all status'  || row.dataset.status?.toLowerCase() === status;
+            const matchSem     = !sem     || sem === 'all semesters' || row.dataset.semester?.toLowerCase() === sem;
+            row.style.display = (matchQ && matchCat && matchStatus && matchSem) ? '' : 'none';
         });
     }
     searchInput?.addEventListener('input',  applyFilters);
@@ -279,6 +284,7 @@ function populateSemesterFilter(submissions) {
 
 function renderFiles(submissions) {
     const filesGrid = document.getElementById('files-grid');
+    const emptyState = document.getElementById('emptyState');
     if (!filesGrid) {
         console.error('files-grid element not found');
         return;
@@ -286,107 +292,101 @@ function renderFiles(submissions) {
 
     console.log('Rendering files, count:', submissions.length);
     
+    if (submissions.length === 0) {
+        filesGrid.innerHTML = '';
+        if (emptyState) emptyState.style.display = 'block';
+        return;
+    }
+
+    if (emptyState) emptyState.style.display = 'none';
+    
     try {
+        const statusBadges = {
+            approved: '<span class="status-badge approved">Approved</span>',
+            pending: '<span class="status-badge pending">Pending</span>',
+            rejected: '<span class="status-badge rejected">Rejected</span>'
+        };
 
-    const statusColors = {
-        approved: '#10b981',
-        pending: '#f59e0b',
-        rejected: '#ef4444'
-    };
+        filesGrid.innerHTML = submissions.map(submission => {
+            console.log('Processing submission:', submission.id, 'Files:', submission.submission_files);
+            const file = submission.submission_files?.[0]; 
+            if (!file) {
+                console.warn('Submission without file:', submission);
+                return '';
+            }
 
-    const statusIcons = {
-        approved: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="20 6 9 17 4 12"/></svg>',
-        pending: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>',
-        rejected: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="15" y1="9" x2="9" y2="15"/><line x1="9" y1="9" x2="15" y2="15"/></svg>'
-    };
+            console.log('File found:', file.file_name);
+            console.log('File URL:', file.file_url);
 
-    filesGrid.innerHTML = submissions.map(submission => {
-        console.log('Processing submission:', submission.id, 'Files:', submission.submission_files);
-        const file = submission.submission_files?.[0]; 
-        if (!file) {
-            console.warn('Submission without file:', submission);
-            return '';
-        }
+            const requirementName = submission.requirements?.name || 'Unknown Requirement';
+            const categoryName = submission.requirements?.categories?.name || 'General';
+            const status = submission.status || 'pending';
+            const createdDate = new Date(submission.submitted_at).toLocaleDateString('en-US', {
+                year: 'numeric',
+                month: 'short',
+                day: 'numeric'
+            });
 
-        console.log('File found:', file.file_name);
-        console.log('File URL:', file.file_url);
+            const fileSize = formatBytes(file.file_size);
+            const fileName = file.file_name;
+            const semesterName = submission.semester_name || `Semester ${submission.semester_id}`;
+            const statusBadge = statusBadges[status] || '<span class="status-badge">Unknown</span>';
 
-        const requirementName = submission.requirements?.name || 'Unknown Requirement';
-        const categoryName = submission.requirements?.categories?.name || 'General';
-        let categoryIcon = submission.requirements?.categories?.icon || '📁';
-        if (categoryIcon.includes('fa-')) {
-            categoryIcon = `<i class="${categoryIcon}"></i>`;
-        }
-        const status = submission.status || 'pending';
-        const statusColor = statusColors[status] || '#6b7280';
-        const statusIcon = statusIcons[status] || '';
-        const createdDate = new Date(submission.submitted_at).toLocaleDateString('en-US', {
-            year: 'numeric',
-            month: 'short',
-            day: 'numeric'
-        });
-
-        const fileSize = formatBytes(file.file_size);
-        const fileName = file.file_name;
-        const fileExt = fileName.split('.').pop().toLowerCase();
-        const fileIcon = getFileIcon(fileExt);
-        const semesterName = submission.semester_name || `Semester ${submission.semester_id}`;
-
-        return `
-            <div class="file-card-my-files" data-name="${escapeHtml(fileName)}" data-cat="${escapeHtml(categoryName.toLowerCase())}" data-status="${status}" data-semester="${escapeHtml(semesterName.toLowerCase())}">
-                <div class="file-icon ${fileExt}">${fileIcon}</div>
-                <div class="file-info">
-                    <div class="file-name" title="${escapeHtml(fileName)}">${escapeHtml(fileName)}</div>
-                    <div class="file-meta">
-                        <span>${fileSize}</span>
-                        <span>•</span>
-                        <span>${createdDate}</span>
-                    </div>
-                    <div class="file-requirement">
-                        <span class="req-icon">${categoryIcon}</span>
-                        <span class="req-text">${escapeHtml(requirementName)}</span>
-                    </div>
-                    <div style="display: flex; gap: 0.5rem; margin-top: 0.5rem;">
-                        <div class="file-category-badge">${escapeHtml(categoryName)}</div>
-                        <div class="file-category-badge" style="background: rgba(59, 130, 246, 0.15); color: #1e40af;">${escapeHtml(semesterName)}</div>
-                    </div>
-                </div>
-                <div class="file-status" style="background:${statusColor};">
-                    ${statusIcon}
-                    <span>${capitalizeFirst(status)}</span>
-                </div>
-                <div class="file-actions">
-                    <button class="btn-action view-btn" data-file-url="${file.signed_url}" data-file-name="${escapeHtml(fileName)}" title="View file">
-                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                            <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/>
-                            <circle cx="12" cy="12" r="3"/>
-                        </svg>
-                    </button>
-                    <button class="btn-action download-btn" data-file-url="${file.signed_url}" data-file-name="${escapeHtml(fileName)}" title="Download file">
-                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                            <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
-                            <polyline points="7 10 12 15 17 10"/>
-                            <line x1="12" y1="15" x2="12" y2="3"/>
-                        </svg>
-                    </button>
-                    ${status === 'pending' ? `
-                    <button class="btn-action delete delete-btn" data-submission-id="${submission.id}" title="Delete submission">
-                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                            <polyline points="3 6 5 6 21 6"/>
-                            <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/>
-                        </svg>
-                    </button>
-                    ` : ''}
-                </div>
-            </div>
-        `;
-    }).filter(html => html).join('');
-    
-    console.log('Generated HTML length:', filesGrid.innerHTML.length);
-    
+            return `
+                <tr data-name="${escapeHtml(fileName)}" data-cat="${escapeHtml(categoryName.toLowerCase())}" data-status="${status}" data-semester="${escapeHtml(semesterName.toLowerCase())}">
+                    <td>${escapeHtml(fileName)}</td>
+                    <td>${escapeHtml(requirementName)}</td>
+                    <td>${escapeHtml(categoryName)}</td>
+                    <td>${escapeHtml(semesterName)}</td>
+                    <td>${createdDate}</td>
+                    <td>${fileSize}</td>
+                    <td>${statusBadge}</td>
+                    <td>
+                        <div class="action-buttons">
+                            <button class="btn-icon view-btn" data-file-url="${file.signed_url}" data-file-name="${escapeHtml(fileName)}" title="View">
+                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                    <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/>
+                                    <circle cx="12" cy="12" r="3"/>
+                                </svg>
+                            </button>
+                            <button class="btn-icon download-btn" data-file-url="${file.signed_url}" data-file-name="${escapeHtml(fileName)}" title="Download">
+                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                    <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
+                                    <polyline points="7 10 12 15 17 10"/>
+                                    <line x1="12" y1="15" x2="12" y2="3"/>
+                                </svg>
+                            </button>
+                            ${status === 'pending' ? `
+                            <button class="btn-icon btn-edit edit-btn" data-submission-id="${submission.id}" title="Edit Submission">
+                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                    <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/>
+                                    <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/>
+                                </svg>
+                            </button>
+                            <button class="btn-icon btn-danger delete-btn" data-submission-id="${submission.id}" title="Delete Submission">
+                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                    <polyline points="3 6 5 6 21 6"/>
+                                    <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/>
+                                </svg>
+                            </button>
+                            ` : `
+                            <button class="btn-icon btn-locked" title="Status: ${status}" disabled style="opacity: 0.4; cursor: not-allowed;">
+                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                    <rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/>
+                                </svg>
+                            </button>
+                            `}
+                        </div>
+                    </td>
+                </tr>
+            `;
+        }).filter(html => html).join('');
+        
+        console.log('Generated HTML length:', filesGrid.innerHTML.length);
+        
     } catch (err) {
         console.error('Error in renderFiles:', err);
-        filesGrid.innerHTML = `<div style="color:red;padding:2rem;">Error rendering files: ${err.message}</div>`;
+        filesGrid.innerHTML = `<tr><td colspan="8" style="text-align:center;color:red;padding:2rem;">Error rendering files: ${err.message}</td></tr>`;
     }
 }
 
@@ -439,21 +439,13 @@ function escapeHtml(text) {
 
 function showNoFilesMessage(message) {
     const filesGrid = document.getElementById('files-grid');
+    const emptyState = document.getElementById('emptyState');
     if (!filesGrid) return;
 
-    filesGrid.innerHTML = `
-        <div style="text-align:center; padding:4rem 2rem; grid-column:1/-1;">
-            <div style="width:80px;height:80px;border-radius:50%;background:#f3f4f6;display:flex;align-items:center;justify-content:center;margin:0 auto 1.5rem;">
-                <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="#9ca3af" stroke-width="2">
-                    <path d="M13 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V9z"/>
-                    <polyline points="13 2 13 9 20 9"/>
-                </svg>
-            </div>
-            <h3 style="font-family:'Merriweather',serif;color:#374151;margin-bottom:.5rem;font-size:1.2rem;">No Files Found</h3>
-            <p style="color:#6b7280;font-size:.95rem;margin-bottom:1.5rem;">${escapeHtml(message)}</p>
-            <a href="faculty-upload.html" style="display:inline-block;padding:.7rem 1.5rem;background:#1e40af;color:#fff;border-radius:.5rem;font-weight:600;text-decoration:none;">Upload File</a>
-        </div>
-    `;
+    filesGrid.innerHTML = '';
+    if (emptyState) {
+        emptyState.style.display = 'block';
+    }
 }
 
 function initializeModal() {
@@ -584,11 +576,32 @@ function downloadFile(fileUrl, fileName) {
 }
 
 async function deleteSubmission(submissionId) {
-    if (!confirm('Are you sure you want to delete this submission? This action cannot be undone.')) {
-        return;
-    }
-
     try {
+        // Find the submission to check its status
+        const { data: submission } = await supabaseClient
+            .from('submissions')
+            .select('status, requirements(name), submission_files(file_name)')
+            .eq('id', submissionId)
+            .single();
+
+        if (!submission) {
+            alert('Submission not found.');
+            return;
+        }
+
+        // Only allow deletion of pending or rejected submissions
+        if (submission.status !== 'pending' && submission.status !== 'rejected') {
+            alert(`Cannot delete ${submission.status} submissions. Only pending and rejected submissions can be deleted by you. Contact your administrator if you need to modify an approved submission.`);
+            return;
+        }
+
+        const requirementName = submission.requirements?.name || 'this submission';
+        const fileName = submission.submission_files?.[0]?.file_name || 'the file';
+        
+        if (!confirm(`Are you sure you want to delete "${fileName}"?\n\nThis action cannot be undone. You can resubmit the requirement later.`)) {
+            return;
+        }
+
         // Capture submission record before deletion for audit log
         const { data: submissionToDelete } = await supabaseClient
             .from('submissions')
@@ -604,15 +617,166 @@ async function deleteSubmission(submissionId) {
         if (error) throw error;
 
         // AUDIT: log submission deletion
-        const submissionName = `Submission ${submissionId}`;
+        const submissionName = `Submission for ${requirementName}`;
         await auditLog('DELETE_SUBMISSION', 'submissions', submissionId, submissionName, submissionToDelete || null, null);
 
         // Reload files
         await loadMyFiles();
         
-        alert('Submission deleted successfully.');
+        showNotification(`Submission deleted successfully. You can resubmit "${requirementName}" anytime.`);
     } catch (error) {
         console.error('Error deleting submission:', error);
-        alert('Failed to delete submission. Please try again.');
+        showNotification('Failed to delete submission. Please try again.', 'error');
+    }
+}
+
+async function editSubmission(submissionId) {
+    try {
+        const { data: submission } = await supabaseClient
+            .from('submissions')
+            .select(`
+                *,
+                submission_files(*),
+                requirements(
+                    name,
+                    categories(name)
+                )
+            `)
+            .eq('id', submissionId)
+            .single();
+
+        if (!submission) {
+            showNotification('Submission not found.', 'error');
+            return;
+        }
+
+        // Only allow editing of pending submissions
+        if (submission.status !== 'pending') {
+            showNotification(`Cannot edit ${submission.status} submissions. Only pending submissions can be edited.`, 'error');
+            return;
+        }
+
+        // Store current submission for update
+        window.currentEditingSubmissionId = submissionId;
+        window.currentEditingSubmission = submission;
+
+        // Open the edit modal (we'll need to add this to the HTML)
+        const modal = document.getElementById('edit-submission-modal');
+        if (!modal) {
+            // If modal doesn't exist, create a simple prompt for now
+            const description = submission.remarks || '';
+            const newDescription = prompt('Edit submission remarks/description:', description);
+            
+            if (newDescription !== null && newDescription !== description) {
+                // Update the submission remarks
+                const { error } = await supabaseClient
+                    .from('submissions')
+                    .update({ remarks: newDescription, updated_at: new Date().toISOString() })
+                    .eq('id', submissionId);
+
+                if (error) throw error;
+
+                // AUDIT: log submission update
+                await auditLog('UPDATE_SUBMISSION', 'submissions', submissionId, 
+                    submission.requirements?.name || 'Unknown', 
+                    submission,
+                    { remarks: newDescription, updated_at: new Date().toISOString() }
+                );
+
+                showNotification('Submission updated successfully. Pending admin review.');
+                await loadMyFiles();
+            }
+            return;
+        }
+
+        // Populate modal if it exists
+        populateEditSubmissionModal(submission);
+        modal.style.display = 'flex';
+
+    } catch (error) {
+        console.error('Error editing submission:', error);
+        showNotification('Failed to load submission for editing.', 'error');
+    }
+}
+
+function populateEditSubmissionModal(submission) {
+    // Update modal content with submission data
+    const modal = document.getElementById('edit-submission-modal');
+    if (!modal) return;
+
+    const file = submission.submission_files?.[0];
+    const requirementName = submission.requirements?.name || 'Unknown';
+    const categoryName = submission.requirements?.categories?.name || 'N/A';
+
+    document.getElementById('edit-modal-title').textContent = `Edit Submission - ${requirementName}`;
+    document.getElementById('edit-submission-requirement').textContent = requirementName;
+    document.getElementById('edit-submission-category').textContent = categoryName;
+    document.getElementById('edit-submission-status').textContent = `Pending Review`;
+    
+    if (file) {
+        document.getElementById('edit-submission-current-file').innerHTML = `
+            <div style="padding: 10px; background: #f5f5f5; border-radius: 4px; margin: 10px 0;">
+                <strong>Current File:</strong> ${escapeHtml(file.file_name)}
+                <br><small style="color: #666;">Size: ${formatBytes(file.file_size)} • Uploaded: ${new Date(file.uploaded_at).toLocaleDateString()}</small>
+            </div>
+        `;
+    }
+
+    document.getElementById('edit-submission-remarks').value = submission.remarks || '';
+}
+
+function closeEditSubmissionModal() {
+    const modal = document.getElementById('edit-submission-modal');
+    if (modal) modal.style.display = 'none';
+    window.currentEditingSubmissionId = null;
+    window.currentEditingSubmission = null;
+}
+
+async function submitEditedSubmission(e) {
+    e.preventDefault();
+    const submissionId = window.currentEditingSubmissionId;
+    if (!submissionId) {
+        showNotification('No submission selected for editing.', 'error');
+        return;
+    }
+
+    try {
+        const newRemarks = document.getElementById('edit-submission-remarks').value.trim();
+        const fileInput = document.getElementById('edit-submission-file-input');
+        
+        // Update submission remarks
+        const { error: updateError } = await supabaseClient
+            .from('submissions')
+            .update({ 
+                remarks: newRemarks, 
+                updated_at: new Date().toISOString() 
+            })
+            .eq('id', submissionId);
+
+        if (updateError) throw updateError;
+
+        // AUDIT: log submission update
+        const submission = window.currentEditingSubmission;
+        await auditLog('UPDATE_SUBMISSION', 'submissions', submissionId, 
+            submission.requirements?.name || 'Unknown', 
+            submission,
+            { remarks: newRemarks, updated_at: new Date().toISOString() }
+        );
+
+        showNotification('Submission updated successfully! Your changes are pending admin review.');
+        closeEditSubmissionModal();
+        await loadMyFiles();
+
+    } catch (error) {
+        console.error('Error updating submission:', error);
+        showNotification('Failed to update submission: ' + error.message, 'error');
+    }
+}
+
+function showNotification(message, type = 'success') {
+    if (type === 'error') {
+        alert('Error: ' + message);
+    } else {
+        alert(message);
     }
 }

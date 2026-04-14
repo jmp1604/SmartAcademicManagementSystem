@@ -230,6 +230,22 @@ async function loadDepartments() {
 
         requirements = data || [];
         console.log('Loaded requirements for department:', requirements.length);
+        
+        // Fetch semester name for display
+        if (activeSemesterId) {
+            const { data: semData } = await supabaseClient
+                .from('semesters')
+                .select('name')
+                .eq('id', activeSemesterId)
+                .single();
+            
+            if (semData) {
+                requirements.forEach(req => {
+                    req.semesterName = semData.name;
+                });
+            }
+        }
+        
         updateStats();
         renderRequirements(requirements);
 
@@ -273,6 +289,7 @@ function renderRequirements(requirementsToRender) {
 
     tbody.innerHTML = requirementsToRender.map(requirement => {
         const categoryName = requirement.categories?.name || 'N/A';
+        const semesterName = requirement.semesterName || activeSemesterName || 'N/A';
         const deadline = requirement.deadline 
             ? new Date(requirement.deadline).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
             : 'No deadline';
@@ -281,7 +298,6 @@ function renderRequirements(requirementsToRender) {
             day: 'numeric',
             year: 'numeric'
         });
-        const semester = requirement.semester || 'N/A';
         const isMandatory = requirement.is_mandatory 
             ? '<span class="badge badge-danger">Required</span>' 
             : '<span class="badge badge-gray">Optional</span>';
@@ -296,7 +312,7 @@ function renderRequirements(requirementsToRender) {
                     ${requirement.description ? `<br><small style="color:#888;">${escapeHtml(requirement.description.substring(0, 60))}${requirement.description.length > 60 ? '...' : ''}</small>` : ''}
                 </td>
                 <td>${escapeHtml(categoryName)}</td>
-                <td>${escapeHtml(semester)}</td>
+                <td>${escapeHtml(semesterName)}</td>
                 <td>${deadline}</td>
                 <td>${isMandatory}</td>
                 <td>${statusBadge}</td>
@@ -317,25 +333,21 @@ function renderRequirements(requirementsToRender) {
 }
 
 function initializeEventListeners() {
-    // Create button
     const btnCreate = document.getElementById('btnCreateRequirement');
     if (btnCreate) {
         btnCreate.addEventListener('click', openCreateModal);
     }
 
-    // Form submit
     const form = document.getElementById('requirementForm');
     if (form) {
         form.addEventListener('submit', handleSaveRequirement);
     }
 
-    // Search
     const searchInput = document.getElementById('searchRequirements');
     if (searchInput) {
         searchInput.addEventListener('input', handleSearch);
     }
 
-    // Filters
     const categoryFilter = document.getElementById('categoryFilter');
     if (categoryFilter) {
         categoryFilter.addEventListener('change', applyFilters);
@@ -346,7 +358,6 @@ function initializeEventListeners() {
         statusFilter.addEventListener('change', applyFilters);
     }
 
-    // Delete confirm
     const btnConfirmDelete = document.getElementById('btnConfirmDelete');
     if (btnConfirmDelete) {
         btnConfirmDelete.addEventListener('click', handleDeleteRequirement);
@@ -360,12 +371,10 @@ function openCreateModal() {
     document.getElementById('requirementId').value = '';
     document.querySelector('input[name="requirementStatus"][value="active"]').checked = true;
     
-    // Auto-select active semester
     if (activeSemesterId) {
         document.getElementById('requirementSemester').value = activeSemesterId;
     }
     
-    // Display user's department (read-only)
     document.getElementById('requirementDepartment').value = userDepartmentName;
     
     document.getElementById('requirementModal').style.display = 'flex';

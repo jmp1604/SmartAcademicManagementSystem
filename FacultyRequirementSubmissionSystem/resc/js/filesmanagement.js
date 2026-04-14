@@ -647,9 +647,47 @@ async function handleReviewSubmission(action) {
 
 
 async function deleteSubmission(submissionId) {
-    if (!confirm('Are you sure you want to delete this submission? This action cannot be undone.')) return;
-
     try {
+        // Fetch submission to check status and get details
+        const { data: submission } = await supabaseClient
+            .from('submissions')
+            .select('status, requirements(name), submission_files(file_name)')
+            .eq('id', submissionId)
+            .single();
+
+        if (!submission) {
+            alert('Submission not found.');
+            return;
+        }
+
+        const requirementName = submission.requirements?.name || 'Unknown Requirement';
+        const fileName = submission.submission_files?.[0]?.file_name || 'the file';
+        const status = submission.status || 'unknown';
+
+        // Admins can delete any submission, but provide warnings
+        let confirmMessage = `Delete submission: "${fileName}"\n`;
+        confirmMessage += `Requirement: ${requirementName}\n`;
+        confirmMessage += `Status: ${status.toUpperCase()}\n\n`;
+        
+        if (status === 'approved') {
+            confirmMessage += 'WARNING: This is an APPROVED submission. Deleting it may require re-verification by the professor.\n\n';
+        } else if (status === 'pending') {
+            confirmMessage += 'This submission is pending review.\n\n';
+        } else if (status === 'rejected') {
+            confirmMessage += 'This submission was previously rejected.\n\n';
+        }
+        
+        confirmMessage += 'This action cannot be undone. Continue?';
+
+        if (!confirm(confirmMessage)) return;
+
+        // Capture submission record before deletion for audit log
+        const { data: submissionToDelete } = await supabaseClient
+            .from('submissions')
+            .select('*')
+            .eq('id', submissionId)
+            .single();
+
         const { error } = await supabaseClient
             .from('submissions')
             .delete()
@@ -657,7 +695,13 @@ async function deleteSubmission(submissionId) {
 
         if (error) throw error;
 
-        alert('Submission deleted successfully.');
+        // AUDIT: log admin submission deletion
+        const adminUser = getCurrentUser();
+        const submissionName = `Submission for ${requirementName}`;
+        await auditLog('DELETE_SUBMISSION_ADMIN', 'submissions', submissionId, submissionName, submissionToDelete || null, null);
+
+        console.log('✓ Submission deleted by admin:', adminUser.firstName, adminUser.lastName);
+        alert(`Submission "${fileName}" deleted successfully.`);
         await loadSubmissions();
 
     } catch (err) {

@@ -67,8 +67,22 @@
             </div>
         </div>
 
-        <div id="categoriesGrid" class="categories-grid">
-            <!-- Categories will be loaded here dynamically -->
+        <div id="categoriesGrid">
+            <table class="data-table">
+                <thead>
+                    <tr>
+                        <th>Name</th>
+                        <th>Description</th>
+                        <th>Status</th>
+                        <th>Files</th>
+                        <th>Created</th>
+                        <th>Actions</th>
+                    </tr>
+                </thead>
+                <tbody id="categoryTableBody">
+                    <!-- Categories will be loaded here dynamically -->
+                </tbody>
+            </table>
         </div>
 
         <div id="emptyState" class="empty-state" style="display:none;">
