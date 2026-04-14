@@ -28,10 +28,6 @@ document.addEventListener('DOMContentLoaded', function() {
     });
 });
 
-/**
- * Inlined audit logger — writes directly to requirement_submission_audit_logs.
- * Eliminates the dependency on audit-logger.js being loaded from an external path.
- */
 async function writeLoginAudit(userObj, tableName) {
     console.log('[AuditLog] writeLoginAudit called | tableName:', tableName, '| id:', userObj.id);
 
@@ -40,12 +36,10 @@ async function writeLoginAudit(userObj, tableName) {
         return;
     }
 
-    // For admins, lastName contains the full admin_name; for others, concatenate firstName + lastName
     const userName = tableName === 'admins' 
         ? (userObj.lastName || '').trim()
         : `${userObj.firstName || ''} ${userObj.lastName || ''}`.trim();
 
-    // Use the appropriate ID field based on user type
     let entry = {
         action:        'LOGIN',
         target_table:  tableName,
@@ -56,7 +50,6 @@ async function writeLoginAudit(userObj, tableName) {
         department_id: userObj.departmentId || null,
     };
 
-    // Set the correct ID column based on user type
     if (tableName === 'admins') {
         entry.admin_id = userObj.id || null;
     } else if (tableName === 'professors') {
@@ -84,6 +77,32 @@ async function writeLoginAudit(userObj, tableName) {
     } catch (err) {
         console.error('[AuditLog] ✗ Unexpected error during insert:', err);
     }
+}
+
+async function ensureSupabaseAuthSession(email, password) {
+    const { error: signInError } = await supabaseClient.auth.signInWithPassword({ email, password });
+
+    if (!signInError) {
+        console.log('[Auth] ✓ Supabase Auth session established for:', email);
+        return true;
+    }
+
+    console.warn('[Auth] Sign-in failed, attempting sign-up:', signInError.message);
+    const { error: signUpError } = await supabaseClient.auth.signUp({ email, password });
+
+    if (signUpError) {
+        console.warn('[Auth] Sign-up also failed:', signUpError.message);
+        return false;
+    }
+
+    const { error: retryError } = await supabaseClient.auth.signInWithPassword({ email, password });
+    if (retryError) {
+        console.warn('[Auth] Sign-in after sign-up failed:', retryError.message);
+        return false;
+    }
+
+    console.log('[Auth] ✓ Supabase Auth session created and established for:', email);
+    return true;
 }
 
 async function loginUser(username, password) {
@@ -173,28 +192,10 @@ async function loginUser(username, password) {
         throw new Error('Your account is not active. Please contact the administrator.');
     }
 
-    // ── Supabase Auth session (admins only) ───────────────────────────────────
-    if (tableName === 'admins') {
-        const { error: authSignInError } = await supabaseClient.auth.signInWithPassword({
-            email:    userData.email,
-            password: password,
-        });
-
-        if (authSignInError) {
-            console.warn('[loginUser] Supabase Auth sign-in failed for admin, attempting sign-up:', authSignInError.message);
-            const { error: signUpError } = await supabaseClient.auth.signUp({
-                email:    userData.email,
-                password: password,
-            });
-            if (signUpError) {
-                console.warn('[loginUser] Supabase Auth sign-up also failed:', signUpError.message);
-            } else {
-                await supabaseClient.auth.signInWithPassword({ email: userData.email, password });
-            }
-        }
+    if (tableName === 'admins' || tableName === 'professors') {
+        await ensureSupabaseAuthSession(userData.email, password);
     }
 
-    // ── Fetch department info ─────────────────────────────────────────────────
     let departmentInfo = null;
     if (userData.department_id) {
         try {
@@ -209,7 +210,6 @@ async function loginUser(username, password) {
         }
     }
 
-    // ── Build user object & save to sessionStorage ────────────────────────────
     const userObj = {
         id:             userData.student_id || userData.professor_id || userData.admin_id,
         studentId:      userData.id_number    || null,

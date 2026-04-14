@@ -275,6 +275,7 @@
     justify-content: center;
     z-index: 10000;
     animation: fadeIn .25s ease;
+    pointer-events: auto;
 }
 
 @keyframes fadeIn {
@@ -286,11 +287,12 @@
     background: var(--card-bg);
     border-radius: var(--radius);
     width: 90%;
-    max-width: 520px;
+    max-width: 720px;
     box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
     animation: slideUp .3s ease;
     position: relative;
     z-index: 10001;
+    pointer-events: auto;
 }
 
 .modal-dialog.modal-small {
@@ -352,6 +354,8 @@
 
 .modal-body {
     padding: 1.75rem;
+    max-height: 70vh;
+    overflow-y: auto;
 }
 
 .modal-footer {
@@ -434,6 +438,19 @@ textarea.form-control {
 .radio-label input[type="radio"] {
     width: 18px;
     height: 18px;
+    cursor: pointer;
+    accent-color: var(--green-mid);
+}
+
+.radio-label input[type="checkbox"] {
+    width: 18px;
+    height: 18px;
+    cursor: pointer;
+    accent-color: var(--green-mid);
+}
+
+input[type="checkbox"],
+input[type="radio"] {
     cursor: pointer;
     accent-color: var(--green-mid);
 }
@@ -687,6 +704,57 @@ textarea.form-control {
 }
 
 /* Table action buttons styling */
+.action-buttons {
+    display: flex;
+    gap: 0.5rem;
+    align-items: center;
+    white-space: nowrap;
+}
+
+.btn-icon {
+    background: transparent;
+    border: none;
+    padding: 0.5rem;
+    cursor: pointer;
+    border-radius: 0.375rem;
+    transition: all 0.2s;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 36px;
+    height: 36px;
+}
+
+.btn-icon:hover {
+    background: #f0fdf4;
+}
+
+.btn-icon:active {
+    transform: scale(0.95);
+}
+
+.btn-icon svg {
+    width: 18px;
+    height: 18px;
+    stroke: var(--text-main);
+    fill: none;
+    stroke-width: 2;
+    stroke-linecap: round;
+    stroke-linejoin: round;
+}
+
+.btn-icon.btn-danger {
+    color: #dc2626;
+}
+
+.btn-icon.btn-danger:hover {
+    background: #fee2e2;
+}
+
+.btn-icon.btn-danger:hover svg {
+    stroke: #dc2626;
+}
+
 .btn-action-group {
     display: flex;
     gap: 0.5rem;

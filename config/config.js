@@ -10,7 +10,13 @@ if (!SUPABASE_CONFIG.projectUrl || !SUPABASE_CONFIG.anonKey) {
 
 let supabaseClient = null;
 if (typeof supabase !== 'undefined' && SUPABASE_CONFIG.projectUrl && SUPABASE_CONFIG.anonKey) {
-    supabaseClient = supabase.createClient(SUPABASE_CONFIG.projectUrl, SUPABASE_CONFIG.anonKey);
+    supabaseClient = supabase.createClient(SUPABASE_CONFIG.projectUrl, SUPABASE_CONFIG.anonKey, {
+        auth: {
+            persistSession: true,      
+            autoRefreshToken: true,  
+            detectSessionInUrl: false   
+        }
+    });
 }
 
 if (typeof module !== 'undefined' && module.exports) {

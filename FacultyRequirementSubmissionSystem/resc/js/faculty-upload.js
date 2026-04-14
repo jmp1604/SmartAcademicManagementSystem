@@ -37,6 +37,18 @@ document.addEventListener('DOMContentLoaded', async function () {
     initUploadForm();
 });
 
+document.addEventListener('visibilitychange', async function () {
+    if (!document.hidden) {
+        await loadActiveSemester();
+        await loadCategories();
+    }
+});
+
+window.addEventListener('focus', async function () {
+    await loadActiveSemester();
+    await loadCategories();
+});
+
 async function loadCategories() {
     try {
         if (!supabaseClient) { console.error('Supabase not initialised'); return; }
@@ -290,25 +302,8 @@ async function submitAll() {
     const requirement = await fetchRequirement(categoryId, sessionUser.departmentId);
     if (!requirement) return;
 
-    // Block re-uploads: one submission per requirement per semester per professor
-    const { data: existing, error: checkErr } = await supabaseClient
-        .from('submissions')
-        .select('id')
-        .eq('professor_id',   sessionUser.id)
-        .eq('requirement_id', requirement.id)
-        .eq('semester_id',    activeSemesterId)
-        .maybeSingle();
-
-    if (checkErr) {
-        console.error('Error checking existing submission:', checkErr);
-        alert('Could not verify submission status. Please try again.');
-        return;
-    }
-
-    if (existing) {
-        alert('You have already submitted a file for this requirement this semester.\n\nOnly one submission is allowed per requirement per semester.');
-        return;
-    }
+    // Multiple submissions allowed - admin will review and approve/reject each one
+    // Professors can freely submit as many times as needed per requirement
 
     /* lock UI */
     const submitBtn = document.getElementById('submit-btn');
@@ -362,6 +357,72 @@ async function submitAll() {
         renderQueue();
     }
 
+    // NOTIFICATION: Notify admin of new submission
+    if (successCount > 0 && submission?.id && sessionUser.departmentId) {
+        try {
+            console.log('Attempting to notify admin - Department ID:', sessionUser.departmentId);
+            
+            // Get the admin/department head for this department
+            const { data: adminData, error: adminErr } = await supabaseClient
+                .from('admins')
+                .select('admin_id')
+                .eq('department_id', sessionUser.departmentId)
+                .limit(1)
+                .single();
+
+            console.log('Admin query result - Error:', adminErr, 'Data:', adminData);
+            
+            if (adminErr) {
+                console.warn('Error querying admin for notification:', adminErr);
+                // Try to find ANY admin for this department (fallback)
+                const { data: fallbackAdmins, error: fallbackErr } = await supabaseClient
+                    .from('admins')
+                    .select('admin_id')
+                    .eq('department_id', sessionUser.departmentId)
+                    .limit(1);
+                
+                if (!fallbackErr && fallbackAdmins?.length > 0) {
+                    const adminId = fallbackAdmins[0].admin_id;
+                    console.log('Found admin via fallback query:', adminId);
+                    
+                    const notifResult = await notifyAdminNewSubmission(
+                        adminId,                                 // Admin's ID
+                        submission.id,                           // Submission ID
+                        requirement?.id,                         // Requirement ID
+                        sessionUser.departmentId,                // Department ID
+                        `${sessionUser.firstName || ''} ${sessionUser.lastName || ''}`.trim() // Professor name
+                    );
+                    if (notifResult.error) {
+                        console.warn('Could not create admin notification:', notifResult.error);
+                    } else {
+                        console.log('✓ Admin notified of new submission (via fallback)');
+                    }
+                }
+            } else if (adminData?.admin_id) {
+                console.log('Found admin:', adminData.admin_id);
+                
+                const notifResult = await notifyAdminNewSubmission(
+                    adminData.admin_id,                      // Admin's ID
+                    submission.id,                           // Submission ID
+                    requirement?.id,                         // Requirement ID
+                    sessionUser.departmentId,                // Department ID
+                    `${sessionUser.firstName || ''} ${sessionUser.lastName || ''}`.trim() // Professor name
+                );
+                if (notifResult.error) {
+                    console.warn('Could not create admin notification:', notifResult.error);
+                } else {
+                    console.log('✓ Admin notified of new submission');
+                }
+            } else {
+                console.warn('No admin found for department:', sessionUser.departmentId);
+            }
+        } catch (notifErr) {
+            console.error('Exception while notifying admin:', notifErr);
+        }
+    } else {
+        console.log('Skipping admin notification - successCount:', successCount, 'submissionId:', submission?.id, 'departmentId:', sessionUser.departmentId);
+    }
+
     submitBtn.disabled = false;
     if (addMore) addMore.disabled = false;
 
@@ -374,10 +435,12 @@ async function submitAll() {
     updateUploadStatistics();
 
     if (failCount === 0) {
+        // Stay on same requirement for easy re-submission
         setTimeout(() => {
             document.getElementById('upload-form').reset();
             resetQueue();
-            moveToStep(1);
+            document.getElementById('file-description').value = '';
+            // User can add more files or go back to categories
         }, 1800);
     }
 }

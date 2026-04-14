@@ -9,6 +9,7 @@
     <link href="https://fonts.googleapis.com/css2?family=Merriweather:wght@400;700&family=Source+Sans+3:wght@400;500;600&display=swap" rel="stylesheet"/>
     <link rel="stylesheet" href="../../shared/global.css"/>
     <link rel="stylesheet" href="../resc/css/faculty-specific.css"/>
+    <link rel="stylesheet" href="../resc/css/notification-bell.css"/>
 </head>
 <body>
 
@@ -140,6 +141,8 @@
 <script src="../../config/.env.js"></script>
 <script src="../../config/config.js"></script>
 <script src="../../shared/global.js"></script>
+<script src="../resc/js/notification-service.js"></script>
+<script src="../resc/js/notification-bell.js"></script>
 <script src="includes/sidebar.js"></script>
 <script src="../resc/js/faculty-specific.js"></script>
 <script src="../resc/js/audit-logger.js"></script>
@@ -147,6 +150,19 @@
 <script>
 loadHeader();
 loadSidebar('faculty-myfiles');
+
+// Initialize notification bell after header is rendered
+setTimeout(() => {
+    if (typeof NotificationBell !== 'undefined') {
+        const container = document.getElementById('notificationBellContainer');
+        if (container) {
+            window.notificationBellInstance = new NotificationBell({
+                containerId: 'notificationBellContainer',
+                maxNotifications: 10
+            });
+        }
+    }
+}, 100);
 </script>
 </body>
 </html>

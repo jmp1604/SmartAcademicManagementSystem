@@ -9,6 +9,7 @@
     <link href="https://fonts.googleapis.com/css2?family=Merriweather:wght@400;700&family=Source+Sans+3:wght@400;500;600&display=swap" rel="stylesheet"/>
     <link rel="stylesheet" href="../../shared/global.css"/>
     <link rel="stylesheet" href="../resc/css/faculty-specific.css"/>
+    <link rel="stylesheet" href="../resc/css/notification-bell.css"/>
 </head>
 <body>
 
@@ -20,7 +21,7 @@
     <div class="page-header anim anim-1">
         <div>
             <h1>Upload Files</h1>
-            <p>Submit your faculty requirements to the College of Computer Studies</p>
+            <p>Submit your faculty requirements to the College of Computer Studies · Upload freely, admin will review and approve</p>
         </div>
         <div class="semester-badge">
             <span class="semester-label">Current Semester:</span>
@@ -140,6 +141,8 @@
 <script src="../../config/.env.js"></script>
 <script src="../../config/config.js"></script>
 <script src="../../shared/global.js"></script>
+<script src="../resc/js/notification-service.js"></script>
+<script src="../resc/js/notification-bell.js"></script>
 <script src="includes/sidebar.js"></script>
 <script src="../resc/js/faculty-specific.js"></script>
 <script src="../resc/js/audit-logger.js"></script>
@@ -147,6 +150,23 @@
 <script>
     loadHeader();
     loadSidebar('faculty-upload');
+    
+    // Initialize notification bell after header is rendered
+    setTimeout(() => {
+        if (typeof NotificationBell !== 'undefined') {
+            const container = document.getElementById('notificationBellContainer');
+            if (container) {
+                window.notificationBellInstance = new NotificationBell({
+                    containerId: 'notificationBellContainer',
+                    maxNotifications: 10
+                });
+            } else {
+                console.warn('notificationBellContainer not found for notification bell initialization');
+            }
+        } else {
+            console.warn('NotificationBell class not defined');
+        }
+    }, 200);
 </script>
 </body>
 </html>

@@ -313,7 +313,7 @@ function createReportContent(type) {
             ${plpImgTag}
             <div style="text-align:center;flex:1;padding:0 10px;">
                 <h1 style="margin:0;color:#145a2e;font-size:20px;font-weight:bold;">PAMANTASAN NG LUNGSOD NG PASIG</h1>
-                <h2 style="margin:4px 0 0 0;color:#555;font-size:13px;">College of Computer Studies</h2>
+                <h2 style="margin:4px 0 0 0;color:#555;font-size:13px;">${department}</h2>
                 <h3 style="margin:4px 0 0 0;color:#145a2e;font-size:12px;">Faculty Submission Report</h3>
             </div>
             ${deptImgTag}

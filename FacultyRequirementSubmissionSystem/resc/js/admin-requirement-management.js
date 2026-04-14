@@ -480,6 +480,22 @@ async function handleSaveRequirement(e) {
                 null,
                 created || requirementData
             );
+
+            // NOTIFICATION: Notify all professors in the department about new requirement
+            if (created?.id && requirementData.department_id) {
+                const notifResult = await notifyNewRequirement(
+                    requirementData.department_id,  // Department ID
+                    created.id,                      // New requirement ID
+                    title,                           // Requirement name
+                    requirementData.deadline,        // Deadline
+                    user.id                          // Admin who created it
+                );
+                if (notifResult.error) {
+                    console.warn('Could not create new requirement notifications:', notifResult.error);
+                } else {
+                    console.log('✓ Professors notified of new requirement');
+                }
+            }
         }
 
         showNotification(

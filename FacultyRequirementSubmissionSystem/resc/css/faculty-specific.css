@@ -75,6 +75,9 @@ body {
 /* User pill & Dropdown Menu */
 .user-menu-wrapper {
     position: relative;
+    display: flex;
+    align-items: center;
+    gap: 1.2rem;
 }
 
 .user-info {
@@ -1706,7 +1709,6 @@ body {
     background: #f4faf6;
 }
 
-/* ── Upload result summary bar ── */
 .upload-summary {
     display: none;
     align-items: center;

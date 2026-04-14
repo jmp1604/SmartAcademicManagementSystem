@@ -89,6 +89,7 @@ function loadHeader() {
                 </div>
             </div>
             <div style="display:flex;align-items:center;gap:1rem;">
+                <div id="notificationBellContainer"></div>
                 <div class="supabase-indicator" id="supabaseIndicator" title="Checking Connection...">
                     <div class="status-light"></div>
                 </div>

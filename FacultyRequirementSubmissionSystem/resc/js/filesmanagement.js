@@ -288,12 +288,11 @@ async function enrichSubmissionsData() {
             });
             console.log('✓ Requirements loaded:', requirements.length, 'for semester:', activeSemesterId, 'department:', userDepartmentId);
         }
-
-        // Enrich each submission
         allSubmissions = allSubmissions.map(submission => ({
             ...submission,
             _professor:   professorMap[submission.professor_id]   || null,
-            _requirement: requirementMap[submission.requirement_id] || null
+            _requirement: requirementMap[submission.requirement_id] || null,
+            department_id: userDepartmentId 
         }));
 
     } catch (err) {
@@ -557,11 +556,50 @@ async function handleReviewSubmission(action) {
             .update(updateData)
             .eq('id', currentSubmissionId);
 
-        if (error) throw error;
-        console.log('✓ Submission status updated');
+        if (error) {
+            console.error('Database error updating submission:', error);
+            throw error;
+        }
+        console.log('✓ Submission status updated in database');
+
+        const submission = allSubmissions.find(s => s.id === currentSubmissionId);
+        console.log('Full submission object:', JSON.stringify(submission)); 
+        console.log('Found submission in memory:', submission ? 'yes' : 'no');
+        console.log('Submission department_id:', submission?.department_id, 'Professor ID:', submission?.professor_id, 'Requirement ID:', submission?.requirement_id);
+        if (submission?.professor_id) {
+            if (action === 'approved') {
+                const notifResult = await notifySubmissionApproved(
+                    submission.professor_id,       
+                    currentSubmissionId,         
+                    submission.requirement_id,      
+                    submission.department_id,        
+                    user?.id                         
+                );
+                if (notifResult.error) {
+                    console.warn('Could not create approval notification:', notifResult.error);
+                } else {
+                    console.log('✓ Professor notified of approval');
+                }
+            } else if (action === 'rejected') {
+                const notifResult = await notifySubmissionRejected(
+                    submission.professor_id,         // Professor ID
+                    currentSubmissionId,             // Submission ID
+                    submission.requirement_id,       // Requirement ID
+                    submission.department_id,        // Department ID (now directly on submission)
+                    remarks,                         // Rejection remarks
+                    user?.id                         // Admin ID who rejected
+                );
+                if (notifResult.error) {
+                    console.warn('Could not create rejection notification:', notifResult.error);
+                } else {
+                    console.log('✓ Professor notified of rejection');
+                }
+            }
+        }
+        // Update notification badge after creating notifications
+        await updateNotificationBadge();
 
         // AUDIT: log submission approval/rejection
-        const submission = allSubmissions.find(s => s.id === currentSubmissionId);
         const submissionName = `Submission for requirement ${submission?.requirement_id}` || `Submission ${currentSubmissionId}`;
         const oldStatus = { status: 'pending' };
         const newStatus = { status: action, reviewed_by: user?.id, reviewed_at: new Date().toISOString(), remarks: remarks };
