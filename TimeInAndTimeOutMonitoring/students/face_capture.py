@@ -116,10 +116,14 @@ def upload_to_supabase():
     session["count"] = 0
     session["paths"] = []
 
+    
 def generate_frames():
     frame_count = 0        
     process_every_n = 3    
     last_locs = []         
+    
+    # Track recent face center positions to measure stability
+    center_history = []    
 
     while True:
         success, frame = cap.read()
@@ -169,41 +173,89 @@ def generate_frames():
                 axes = (rx, ry)
                 
                 is_aligned = False
+                is_steady = False     
                 aligned_face = None
+                current_center = None 
+                
+                guidance_text = "Looking for face..." 
 
                 if last_locs:
-                    for (t, r, b, l) in last_locs:
-                        face_cx = (l + r) // 2
-                        face_cy = (t + b) // 2
+                    # Find the largest face in the frame
+                    largest_face = max(last_locs, key=lambda rect: (rect[1]-rect[3])*(rect[2]-rect[0]))
+                    t, r, b, l = largest_face
+                    
+                    face_cx = (l + r) // 2
+                    face_cy = (t + b) // 2
+                    face_w = r - l 
+                    
+                    if rx > 0 and ry > 0:
+                        # 1. STRICTER CENTER CHECK: Must be very close to the center
+                        normalized_dist = ((face_cx - cx)**2 / (rx**2)) + ((face_cy - cy)**2 / (ry**2))
                         
-                        if rx > 0 and ry > 0:
-                            normalized_dist = ((face_cx - cx)**2 / (rx**2)) + ((face_cy - cy)**2 / (ry**2))
-                            if normalized_dist <= 0.85:  
+                        if normalized_dist <= 0.4:  # Reduced from 0.85
+                            # 2. STRICTER SIZE CHECK: Force the user to fill the oval
+                            if face_w < rx * 1.3:   # Increased from 0.9. Face must be wider
+                                guidance_text = "Come closer! Fill the oval."
+                            elif face_w > rx * 1.8: # Face is too large
+                                guidance_text = "Move back a little."
+                            else:
                                 is_aligned = True
                                 aligned_face = (t, r, b, l)
-                                break
+                                current_center = (face_cx, face_cy)
+                        else:
+                            guidance_text = "Center your face exactly in the oval"
                 
-                guide_color = (0, 255, 0) if is_aligned else (255, 255, 255)
+                # --- STABILITY CHECK ALGORITHM ---
+                if is_aligned and current_center:
+                    center_history.append(current_center)
+                    if len(center_history) > 8: 
+                        center_history.pop(0)
+                    
+                    if len(center_history) >= 5:
+                        cxs = [pt[0] for pt in center_history]
+                        cys = [pt[1] for pt in center_history]
+                        
+                        max_movement_x = max(cxs) - min(cxs)
+                        max_movement_y = max(cys) - min(cys)
+                        
+                        if max_movement_x < 10 and max_movement_y < 10: 
+                            is_steady = True
+                else:
+                    center_history.clear() 
+                # --------------------------------------
+
+                # Guide turns Green only if Aligned AND Steady. Orange if moving.
+                guide_color = (0, 255, 0) if (is_aligned and is_steady) else ((0, 165, 255) if is_aligned else (255, 255, 255))
                 cv2.ellipse(display, (cx, cy), axes, 0, 0, 360, guide_color, 2)
                 
                 if not is_aligned:
-                    cv2.putText(display, "Align face within the oval", (cx - 130, cy - ry - 20), 
+                    text_size = cv2.getTextSize(guidance_text, cv2.FONT_HERSHEY_SIMPLEX, 0.6, 2)[0]
+                    cv2.putText(display, guidance_text, (cx - text_size[0]//2, cy - ry - 20), 
                                 cv2.FONT_HERSHEY_SIMPLEX, 0.6, (255, 255, 255), 2)
                     
                     for (t, r, b, l) in last_locs:
                         cv2.rectangle(display, (l, t), (r, b), (0, 0, 255), 2)
 
-                    # NEW: Reset the countdown timer if they move out of alignment
                     session["align_start_t"] = 0 
-
+                    session["countdown_done"] = False
+                
+                # --- UNSTEADY WARNING ---
+                elif not is_steady:
+                    cv2.putText(display, "Hold still!", (cx - 45, cy - ry - 20), 
+                                cv2.FONT_HERSHEY_SIMPLEX, 0.7, (0, 165, 255), 2)
+                    t, r, b, l = aligned_face
+                    cv2.rectangle(display, (l, t), (r, b), (0, 165, 255), 2)
+                    
+                    session["align_start_t"] = 0 
+                    session["countdown_done"] = False
+                
+                # --- PROCEED (Aligned and Steady) ---
                 else:
                     t, r, b, l = aligned_face
                     cv2.rectangle(display, (l, t), (r, b), (0, 255, 0), 2)
                     
-                    # --- NEW: COUNTDOWN LOGIC ---
-                    is_countdown = (session["count"] == 0 and not session.get("countdown_done", False))
-                    
-                    if is_countdown:
+                    # --- COUNTDOWN LOGIC ---
+                    if not session.get("countdown_done", False):
                         if session.get("align_start_t", 0) == 0:
                             session["align_start_t"] = time.time()
                             
@@ -211,27 +263,23 @@ def generate_frames():
                         remaining = 3 - int(elapsed)
                         
                         if remaining > 0:
-                            # 1. The Instruction Text (Centered)
-                            msg = "Hold steady, place your face in the oval..."
-                            # Measure the text to center it perfectly
+                            msg = "Hold steady, capturing in..."
                             msg_size = cv2.getTextSize(msg, cv2.FONT_HERSHEY_SIMPLEX, 0.6, 2)[0]
                             msg_x = cx - (msg_size[0] // 2)
                             cv2.putText(display, msg, (msg_x, cy - ry - 45),
                                         cv2.FONT_HERSHEY_SIMPLEX, 0.6, (0, 255, 255), 2)
                             
-                            # 2. The Big Countdown Number (Centered below the text)
                             num_str = str(remaining)
                             num_size = cv2.getTextSize(num_str, cv2.FONT_HERSHEY_SIMPLEX, 1.2, 3)[0]
                             num_x = cx - (num_size[0] // 2)
                             cv2.putText(display, num_str, (num_x, cy - ry - 10),
                                         cv2.FONT_HERSHEY_SIMPLEX, 1.2, (0, 255, 255), 3)
                         else:
-                            # Countdown Finished!
                             session["countdown_done"] = True
-                            session["last_t"] = 0 # Force immediate capture of the first photo
+                            session["last_t"] = 0 
 
-                    # --- EXISTING CAPTURE LOGIC (Only runs after countdown is done) ---
-                    if session.get("countdown_done", False) or session["count"] > 0:
+                    # --- CAPTURE LOGIC ---
+                    else:
                         cv2.putText(display, f"PHOTO {session['count']+1}/5", (l, t-10),
                                     cv2.FONT_HERSHEY_SIMPLEX, 0.7, (0, 255, 0), 2)
 
@@ -269,11 +317,11 @@ def generate_frames():
                                 session["count"] += 1
                                 session["last_t"] = time.time()
 
-                progress_w = int((session["count"] / 5) * (w - 40))
-                cv2.rectangle(display, (20, h-40), (20+progress_w, h-20), (0, 255, 0), -1)
-                cv2.rectangle(display, (20, h-40), (w-20, h-20), (255, 255, 255), 2)
+            progress_w = int((session["count"] / 5) * (w - 40))
+            cv2.rectangle(display, (20, h-40), (20+progress_w, h-20), (0, 255, 0), -1)
+            cv2.rectangle(display, (20, h-40), (w-20, h-20), (255, 255, 255), 2)
 
-            elif session["count"] >= 5:
+            if session["count"] >= 5:
                 session["syncing"] = True
                 threading.Thread(target=upload_to_supabase).start()
 

@@ -533,46 +533,6 @@ async function autoSaveReport(exportType) {
     }
 }
 
-// ── EXPORT CSV ──
-window.exportCSV = function() { exportToCSV(false); }
-window.rmExportCSV = function() { exportToCSV(true); }
-
-async function exportToCSV(isReport) {
-    if (filteredAttendance.length === 0) {
-        alert("No records to export.");
-        return;
-    }
-    if (!checkDuplicateWarning('CSV')) return;
-
-    const cols = ['#','Student ID','Name','Course','Section','Subject Code','Subject Name','Laboratory','Professor','Session Date','Time In','Time Out','Duration','Status','Face'];
-    const lines = [
-        cols.join(','),
-        ...filteredAttendance.map((r,i) => {
-            let dur = r.duration_minutes ? `${r.duration_minutes}m` : '—';
-            if (!r.time_out && r.time_in) {
-                const mins = Math.round((new Date() - new Date(r.time_in)) / 60000);
-                dur = `${mins}m (ongoing)`;
-            }
-            const tIn = r.time_in ? new Date(r.time_in).toLocaleTimeString('en-US', {hour:'numeric',minute:'2-digit'}) : '—';
-            const tOut = r.time_out ? new Date(r.time_out).toLocaleTimeString('en-US', {hour:'numeric',minute:'2-digit'}) : (!r.time_out && r.time_in ? 'Still inside' : '—');
-            const status = r.time_in_status === 'late' ? `Late (${r.late_minutes}m)` : 'On Time';
-            const face = r.verified_by_facial_recognition ? 'Yes' : 'No';
-
-            return [
-                i+1, r.id_number, `"${r.student_full_name || r.student_name}"`, r.course, r.class_section,
-                r.subject_code, `"${r.subject_name}"`, r.lab_code, `"${r.professor_name}"`,
-                r.session_date, `"${tIn}"`, `"${tOut}"`, `"${dur}"`, `"${status}"`, `"${face}"`
-            ].join(',');
-        })
-    ];
-    const a = document.createElement('a');
-    a.href = URL.createObjectURL(new Blob([lines.join('\n')], {type:'text/csv'}));
-    const dateStr = document.getElementById('filterDate').value || 'All_Dates';
-    a.download = `Attendance_Report_${dateStr}.csv`;
-    a.click();
-
-    await autoSaveReport('CSV');
-}
 // ── PRINT ──────────────────────────────────────────────────
 window.printReport = async function() {
     if (filteredAttendance.length === 0) { alert("No records to print."); return; }
@@ -821,41 +781,81 @@ window.downloadPDF = async function() {
         alert('There was an error generating the PDF. Check the console.');
     }
 };
-// ── EXCEL ──────────────────────────────────────────────────
+// ── EXCEL ────────────────────────────────────────────────────
 window.exportExcel = async function() {
     if (filteredAttendance.length === 0) { alert("No records to export."); return; }
     if (!checkDuplicateWarning('Excel')) return;
 
     if (!window.XLSX) {
-        return window.exportCSV(); // Fallback
+        alert('Excel library not loaded. Please refresh the page.');
+        return;
     }
-    const wb = XLSX.utils.book_new();
 
-    const headers = ['#','Student ID','Name','Course','Section','Subject Code','Subject Name','Laboratory','Professor','Session Date','Time In','Time Out','Duration','Status','Face'];
-                  
+    const wb = XLSX.utils.book_new();
+    
+    const headers = [
+        '#', 'Student ID', 'Student Name', 'Course', 'Section', 
+        'Subject Code', 'Lab Room', 'Professor', 'Date', 
+        'Time In', 'Time Out', 'Duration', 'Status', 'Face Recognition'
+    ];
+    
     const rows = filteredAttendance.map((r, i) => {
         let dur = r.duration_minutes ? `${r.duration_minutes}m` : '—';
         if (!r.time_out && r.time_in) {
             const mins = Math.round((new Date() - new Date(r.time_in)) / 60000);
-            dur = `${mins}m`;
+            dur = `${mins}m (ongoing)`;
         }
+        
         const tIn = r.time_in ? new Date(r.time_in).toLocaleTimeString('en-US', {hour:'numeric',minute:'2-digit'}) : '—';
-        const tOut = r.time_out ? new Date(r.time_out).toLocaleTimeString('en-US', {hour:'numeric',minute:'2-digit'}) : (!r.time_out && r.time_in ? 'Still inside' : '—');
-        const status = r.time_in_status === 'late' ? `Late (${r.late_minutes}m)` : 'On Time';
-        const face = r.verified_by_facial_recognition ? 'Yes' : 'No';
+        const tOut = r.time_out ? new Date(r.time_out).toLocaleTimeString('en-US', {hour:'numeric',minute:'2-digit'}) : (!r.time_out && r.time_in ? 'In Lab' : '—');
+        
+        const isLate = r.time_in_status === 'late';
+        const status = isLate ? `Late (${r.late_minutes}m)` : 'On Time';
+        const face = r.verified_by_facial_recognition ? 'Registered' : 'Manual';
 
         return [
-            i+1, r.id_number, r.student_full_name || r.student_name, r.course, r.class_section,
-            r.subject_code, r.subject_name, r.lab_code, r.professor_name,
-            r.session_date, tIn, tOut, dur, status.toUpperCase(), face.toUpperCase()
+            i + 1, 
+            r.id_number, 
+            r.student_full_name || r.student_name, 
+            r.course || '—', 
+            r.class_section,
+            r.subject_code, 
+            r.lab_code, 
+            (r.professor_name || '—'),
+            r.session_date, 
+            tIn, 
+            tOut, 
+            dur, 
+            status, 
+            face
         ];
     });
 
     const dataSheet = XLSX.utils.aoa_to_sheet([headers, ...rows]);
-    XLSX.utils.book_append_sheet(wb, dataSheet, 'Attendance');
 
-    const dateStr = document.getElementById('filterDate').value || 'All_Dates';
-    XLSX.writeFile(wb, `Attendance_Report_${dateStr.replace(/\//g,'-')}.xlsx`);
+    // Clean column widths for Excel
+    dataSheet['!cols'] = [
+        { wch: 5 },  // #
+        { wch: 15 }, // Student ID
+        { wch: 25 }, // Name
+        { wch: 10 }, // Course
+        { wch: 10 }, // Section
+        { wch: 15 }, // Subject Code
+        { wch: 10 }, // Lab
+        { wch: 20 }, // Professor
+        { wch: 15 }, // Date
+        { wch: 12 }, // Time In
+        { wch: 12 }, // Time Out
+        { wch: 15 }, // Duration
+        { wch: 15 }, // Status
+        { wch: 15 }  // Face
+    ];
 
+    XLSX.utils.book_append_sheet(wb, dataSheet, 'Attendance Records');
+    
+    // Get date filter for the filename
+    const filterD = document.getElementById('filterDate') ? document.getElementById('filterDate').value : 'All_Dates';
+    XLSX.writeFile(wb, `Attendance_Report_${filterD.replace(/\//g,'-')}.xlsx`);
+    
     await autoSaveReport('Excel');
 };

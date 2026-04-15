@@ -182,6 +182,7 @@ load_all_faces()
 schedule_cache   = {}   # { student_id: [(schedule_id, start, end, day)] }
 session_cache    = {}   # { schedule_id: (session_id, status) }
 attendance_cache = {}   # { (session_id, student_id): record }
+acknowledged_done = set()  # <--- NEW: Tracks which ended sessions the student has already seen!
 cache_lock       = threading.Lock()
 last_cache_refresh = 0
 CACHE_TTL        = 60   # seconds
@@ -247,13 +248,13 @@ def td_to_secs(td):
         parts = td.split(':')
         return int(parts[0])*3600 + int(parts[1])*60 + int(parts[2]) if len(parts) == 3 else 0
     return 0
-
 # ─────────────────────────────────────────────
 # Supabase DB helpers
 # ─────────────────────────────────────────────
 def find_professor_schedule(professor_id, today):
     day_name = today.strftime("%A")
 
+    # The .order("start_time") guarantees chronological sorting Morning -> Evening
     result = supabase.table("lab_schedules")\
         .select("schedule_id, section, start_time, end_time, subjects(subject_code), laboratory_rooms(lab_code)")\
         .eq("professor_id", professor_id)\
@@ -266,7 +267,6 @@ def find_professor_schedule(professor_id, today):
     output    = []
 
     for sch in schedules:
-        # FIX 1: Use cache instead of individual DB call per schedule
         session_id, session_status = get_session_cached(sch["schedule_id"])
 
         output.append({
@@ -282,13 +282,10 @@ def find_professor_schedule(professor_id, today):
 
     return output
 
-
 # FIX 2: Batched student query — one joined query instead of two
 def find_student_schedule(student_id, today):
     day_name = today.strftime("%A")
-    print(f"  [find_student_schedule] student_id={student_id} day={day_name} date={today}")
 
-    # Single joined query replaces the old two-step enrollment → schedule lookup
     result = supabase.table("schedule_enrollments")\
         .select("schedule_id, lab_schedules!inner(schedule_id, start_time, end_time, day_of_week, status)")\
         .eq("student_id", student_id)\
@@ -296,56 +293,59 @@ def find_student_schedule(student_id, today):
         .execute()
 
     rows = result.data or []
-    print(f"  [find_student_schedule] enrolled rows={len(rows)}")
 
-    if not rows:
-        print(f"  [find_student_schedule] → NO ENROLLMENTS FOUND")
-        return None
-
-    # Filter to today's active schedules locally (no extra DB round-trip)
     matching = [
         r for r in rows
         if r.get("lab_schedules") and
            r["lab_schedules"].get("day_of_week") == day_name and
            r["lab_schedules"].get("status") == "active"
     ]
-    print(f"  [find_student_schedule] schedules matching today+active={len(matching)}")
 
     if not matching:
-        print(f"  [find_student_schedule] → NO ACTIVE SCHEDULES FOR TODAY")
-        return None
+        return ("NOT_ENROLLED",) 
 
-    best, priority     = None, 99
-    cancelled_fallback = None
+    matching.sort(key=lambda x: td_to_secs(x["lab_schedules"]["start_time"] or "00:00:00"))
+
+    best, priority = None, 99
 
     for row in matching:
-        sch        = row["lab_schedules"]
+        sch = row["lab_schedules"]
         schedule_id = sch["schedule_id"]
-
-        # FIX 1: Use session cache instead of a DB call
         session_id, session_status = get_session_cached(schedule_id)
 
-        print(f"  [find_student_schedule] checking schedule={schedule_id} session_status={session_status}")
+        is_student_done = False
+        if session_id:
+            rec = get_attendance_cached(session_id, student_id)
+            if rec and rec.get("time_in") and rec.get("time_out"):
+                is_student_done = True
 
         if session_status == "cancelled":
-            if cancelled_fallback is None:
-                cancelled_fallback = (schedule_id, sch["start_time"], sch["end_time"],
-                                      session_id, "cancelled")
             continue
 
-        rank = {'ongoing': 1, 'dismissing': 1, 'scheduled': 2,
-                'not_created': 3, 'completed': 4}.get(session_status, 5)
+        # --- SMART JUMP LOGIC (UPDATED) ---
+        if is_student_done or session_status == "completed":
+            # Show the popup exactly ONCE, then skip it forever
+            if session_id and (student_id, session_id) not in acknowledged_done:
+                acknowledged_done.add((student_id, session_id))
+                # Return it this one time so the UI shows "Completed" or "Ended"
+                return (schedule_id, sch["start_time"], sch["end_time"], session_id, session_status)
+            else:
+                # They already saw it! Skip to the next schedule
+                continue
+
+        # Rank the remaining active classes
+        rank = {'ongoing': 1, 'dismissing': 1, 'scheduled': 2, 'not_created': 3}.get(session_status, 5)
+
         if rank < priority:
             priority = rank
-            best = (schedule_id, sch["start_time"], sch["end_time"],
-                    session_id, session_status)
+            best = (schedule_id, sch["start_time"], sch["end_time"], session_id, session_status)
+
         if priority == 1:
             break
 
-    if best is None and cancelled_fallback is not None:
-        best = cancelled_fallback
+    if best is None:
+        return ("ALL_DONE",) 
 
-    print(f"  [find_student_schedule] → best={best}")
     return best
 
 
@@ -471,6 +471,39 @@ def handle_recognized(meta, today, now):
 def _push(payload):
     attendee_queue.put(json.dumps(payload))
     print(f"  → PUSH [{payload['action']}] {payload['name']}")
+# ─────────────────────────────────────────────
+# Supabase DB helpers
+# ─────────────────────────────────────────────
+def find_professor_schedule(professor_id, today):
+    day_name = today.strftime("%A")
+
+    # The .order("start_time") guarantees chronological sorting Morning -> Evening
+    result = supabase.table("lab_schedules")\
+        .select("schedule_id, section, start_time, end_time, subjects(subject_code), laboratory_rooms(lab_code)")\
+        .eq("professor_id", professor_id)\
+        .eq("day_of_week", day_name)\
+        .eq("status", "active")\
+        .order("start_time")\
+        .execute()
+
+    schedules = result.data or []
+    output    = []
+
+    for sch in schedules:
+        session_id, session_status = get_session_cached(sch["schedule_id"])
+
+        output.append({
+            "schedule_id":    sch["schedule_id"],
+            "section":        sch["section"],
+            "subject_code":   sch["subjects"]["subject_code"] if sch.get("subjects") else "N/A",
+            "lab_code":       sch["laboratory_rooms"]["lab_code"] if sch.get("laboratory_rooms") else "N/A",
+            "start_time":     sch["start_time"] or "00:00:00",
+            "end_time":       sch["end_time"]   or "00:00:00",
+            "session_id":     session_id,
+            "session_status": session_status,
+        })
+
+    return output    
 
 # ─────────────────────────────────────────────
 # Professor flow
@@ -483,7 +516,7 @@ def _handle_professor(meta, today, now):
     if not all_schedules:
         print(f"  → No active schedule on {today.strftime('%A')}")
         return _push({"role":"professor","professor_id":pid,"employee_id":emp_id,
-                       "name":name,"action":"NO_SCHEDULE","session_id":None,
+                       "name":name,"action":"ALL_DONE","session_id":None,
                        "error":"You have no class scheduled today.",
                        "timestamp":now.strftime("%Y-%m-%d %H:%M:%S")})
 
@@ -502,23 +535,69 @@ def _handle_professor(meta, today, now):
 
         print(f"  → Checking {sched['subject_code']} {s:%I:%M %p}–{e:%I:%M %p} | status={session_status}")
 
-        if session_status == "cancelled":
-            print(f"     → Cancelled, skipping")
-            continue
+        # --- 1. SMART JUMP LOGIC ---
+        # Skip completely if already acknowledged
+        prof_track_key = (pid, schedule_id)
+        
+        if session_status in ("completed", "cancelled"):
+            if prof_track_key not in acknowledged_done:
+                acknowledged_done.add(prof_track_key)
+                action_type = "SESSION_ENDED" if session_status == "completed" else "SESSION_CANCELLED"
+                msg = "Session successfully completed!" if session_status == "completed" else "This session was voided/cancelled."
+                print(f"     → Acknowledging {session_status} once")
+                return _push({"role":"professor","professor_id":pid,"employee_id":emp_id,
+                               "name":name,"action":action_type,"session_id":session_id,"schedule":sched,
+                               "error":msg,"timestamp":now.strftime("%Y-%m-%d %H:%M:%S")})
+            else:
+                print(f"     → Already acknowledged {session_status}, jumping to next...")
+                continue # Already acknowledged, instantly drop and check next schedule
 
+        # --- 2. Check future window ---
         if now < w:
             mins = int((w - now).total_seconds() / 60)
             print(f"     → Too early ({mins} min until window opens)")
-            if closest_future_time is None or s < closest_future_time:
-                closest_future_schedule = sched
-                closest_future_time     = s
-            continue
+            closest_future_schedule = sched
+            closest_future_time     = s
+            break # Because schedules are sorted, this is the very next one. Stop looking.
 
-        if now > e:
-            print(f"     → Already ended")
-            continue
+        # --- 3. Check 45-min Auto-Void Rule ---
+        if session_status in ("scheduled", "not_created", None) and now > void_cutoff:
+            print(f"     → AUTO-VOID (past {PROFESSOR_START_WINDOW}-min window)")
+            
+            # Create session if it doesn't exist so we can void it properly
+            if not session_id:
+                now_store, _ = get_now()
+                insert_result = supabase.table("lab_sessions").insert({
+                    "schedule_id":  schedule_id,
+                    "session_date": str(today),
+                    "status":       "cancelled",
+                    "notes":        f"System Auto-Void: 45-minute grace period elapsed",
+                    "created_at":   now_store.isoformat()
+                }).execute()
+                session_id = insert_result.data[0]["session_id"]
+            else:
+                now_store, _ = get_now()
+                supabase.table("lab_sessions").update({
+                    "status":     "cancelled",
+                    "notes":      f"System Auto-Void: 45-minute grace period elapsed",
+                    "updated_at": now_store.isoformat()
+                }).eq("session_id", session_id).execute()
+            
+            update_session_cache(schedule_id, session_id, "cancelled")
+            
+            # Add to acknowledged tracking and show void popup once
+            acknowledged_done.add(prof_track_key)
+            return _push({"role":"professor","professor_id":pid,"employee_id":emp_id,
+                           "name":name,"action":"SESSION_CANCELLED","session_id":session_id,"schedule":sched,
+                           "error":"Class auto-voided: 45-minute start window elapsed.",
+                           "timestamp":now.strftime("%Y-%m-%d %H:%M:%S")})
 
-        # Create session if not yet created
+        # --- 4. Class Completely Missed ---
+        if now > e and session_status in ("scheduled", "not_created", None):
+            print(f"     → Class completely missed. Skipping...")
+            continue # Background thread voids this. Next scan will catch it as cancelled.
+
+        # --- 5. Valid Active Class: Create Session if entering valid window ---
         if not session_id:
             now_store, _ = get_now()
             insert_result = supabase.table("lab_sessions").insert({
@@ -529,24 +608,9 @@ def _handle_professor(meta, today, now):
             }).execute()
             session_id     = insert_result.data[0]["session_id"]
             session_status = "scheduled"
-            # FIX 1: Update cache after creating session
             update_session_cache(schedule_id, session_id, session_status)
 
-        # Auto-void if past start window
-        if session_status == "scheduled" and now > void_cutoff:
-            print(f"     → AUTO-VOID (past {PROFESSOR_START_WINDOW}-min window)")
-            now_store, _ = get_now()
-            supabase.table("lab_sessions").update({
-                "status":     "cancelled",
-                "notes":      f"Auto-voided: professor did not start within {PROFESSOR_START_WINDOW} minutes",
-                "updated_at": now_store.isoformat()
-            }).eq("session_id", session_id).execute()
-            # FIX 1: Update cache after voiding
-            update_session_cache(schedule_id, session_id, "cancelled")
-            print(f"     → Voided session {session_id}, continuing...")
-            continue
-
-        # Determine action
+        # --- 6. Determine action ---
         if session_status in ("scheduled", "not_created"):
             action = "START"
         elif session_status == "ongoing":
@@ -563,9 +627,6 @@ def _handle_professor(meta, today, now):
                 action = "DISMISS"
         elif session_status == "dismissing":
             action = "END"
-        elif session_status == "completed":
-            print(f"     → Already completed, checking next schedule...")
-            continue
         else:
             action = "START"
 
@@ -574,6 +635,7 @@ def _handle_professor(meta, today, now):
                        "name":name,"action":action,"session_id":session_id,"schedule":sched,
                        "timestamp":now.strftime("%Y-%m-%d %H:%M:%S")})
 
+    # If NO schedules matched current time
     print(f"  → No valid schedule in current window")
     if closest_future_schedule:
         window_open = closest_future_time - datetime.timedelta(minutes=30)
@@ -583,9 +645,11 @@ def _handle_professor(meta, today, now):
                        "schedule":closest_future_schedule,
                        "error":f"Next class {closest_future_schedule['subject_code']} starts at {closest_future_time:%I:%M %p}. Window opens at {window_open:%I:%M %p} ({mins_until} min from now).",
                        "timestamp":now.strftime("%Y-%m-%d %H:%M:%S")})
+    
+    # All classes have been completed/voided
     return _push({"role":"professor","professor_id":pid,"employee_id":emp_id,
-                   "name":name,"action":"NO_VALID_SCHEDULE","session_id":None,
-                   "error":"No valid schedule available. All classes have ended or been voided.",
+                   "name":name,"action":"ALL_DONE","session_id":None,
+                   "error":"You have no more classes for today.",
                    "timestamp":now.strftime("%Y-%m-%d %H:%M:%S")})
 
 # ─────────────────────────────────────────────
@@ -596,37 +660,32 @@ def _handle_student(meta, today, now):
     print(f"\n[STUDENT] {name} @ {now:%H:%M:%S} | today={today.strftime('%A')}")
 
     row = find_student_schedule(sid, today)
-    if not row:
-        print(f"  → No enrolled schedule on {today.strftime('%A')}")
+
+    if row and row[0] == "NOT_ENROLLED":
         return _push({"role":"student","student_id":sid,"id_number":id_num,
                        "name":name,"action":"NOT_ENROLLED","session_id":None,
                        "error":"You are not enrolled in any subject with a schedule today.",
                        "timestamp":now.strftime("%Y-%m-%d %H:%M:%S")})
 
+    if row and row[0] == "ALL_DONE":
+        return _push({"role":"student","student_id":sid,"id_number":id_num,
+                       "name":name,"action":"ALL_DONE","session_id":None,
+                       "error":"You have no more classes for today.",
+                       "timestamp":now.strftime("%Y-%m-%d %H:%M:%S")})
+
+    if not row:
+        return _push({"role":"student", "action":"NOT_ENROLLED", "error":"No schedule found."})
+
     schedule_id, start_td, end_td, session_id, status = row
 
     s = datetime.datetime.combine(today, datetime.time()) + datetime.timedelta(seconds=td_to_secs(start_td))
     e = datetime.datetime.combine(today, datetime.time()) + datetime.timedelta(seconds=td_to_secs(end_td))
-    print(f"  → Schedule {s:%I:%M %p}–{e:%I:%M %p}")
-    print(f"  → session_id={session_id} status={status}")
-
-    if status == "cancelled":
-        return _push({"role":"student","student_id":sid,"id_number":id_num,
-                       "name":name,"action":"SESSION_CANCELLED","session_id":None,
-                       "error":"The session was voided — professor did not start within the required time.",
-                       "timestamp":now.strftime("%Y-%m-%d %H:%M:%S")})
 
     if status in ("not_created", "scheduled", None) or session_id is None:
         return _push({"role":"student","student_id":sid,"id_number":id_num,
-                       "name":name,"action":"SESSION_NOT_STARTED","session_id":None,
-                       "error":f"Professor has not started the session yet. Class starts at {s:%I:%M %p}.",
-                       "timestamp":now.strftime("%Y-%m-%d %H:%M:%S")})
-
-    if status == "completed":
-        return _push({"role":"student","student_id":sid,"id_number":id_num,
-                       "name":name,"action":"SESSION_ENDED","session_id":session_id,
-                       "error":"The session has already ended.",
-                       "timestamp":now.strftime("%Y-%m-%d %H:%M:%S")})
+                   "name":name,"action":"SESSION_NOT_STARTED","session_id":None,
+                   "error":f"Professor has not started the session yet. Class starts at {s:%I:%M %p}.",
+                   "timestamp":now.strftime("%Y-%m-%d %H:%M:%S")})
 
     # Late detection
     sess_result = supabase.table("lab_sessions")\
@@ -644,32 +703,32 @@ def _handle_student(meta, today, now):
         if now > grace_cutoff:
             is_late      = True
             late_minutes = int((now - session_start_dt).total_seconds() / 60)
-            print(f"  → LATE by {late_minutes} min")
-        else:
-            print(f"  → ON TIME (grace cutoff {grace_cutoff:%I:%M %p})")
 
-    # FIX 4: Use attendance cache instead of direct DB call
     rec = get_attendance_cached(session_id, sid)
 
-    if rec is None:
+    # --- DETERMINE ACTION ---
+    if rec and rec.get("time_in") and rec.get("time_out"):
+        action = "COMPLETED"
+    elif status == "completed":
+        # If they never timed in, but the session is over
+        return _push({"role":"student","student_id":sid,"id_number":id_num,
+                       "name":name,"action":"SESSION_ENDED","session_id":session_id,
+                       "error":"This session has already ended.",
+                       "timestamp":now.strftime("%Y-%m-%d %H:%M:%S")})
+    elif rec is None:
         action = "IN"
     elif rec["time_in"] and not rec["time_out"]:
         if status == "ongoing":
-            print(f"  → CANNOT_TIME_OUT — session is 'ongoing', not yet dismissing")
             return _push({"role":"student","student_id":sid,"id_number":id_num,
                            "name":name,"action":"CANNOT_TIME_OUT","session_id":session_id,
                            "error":"Professor has not allowed dismissal yet.",
                            "timestamp":now.strftime("%Y-%m-%d %H:%M:%S")})
         action = "OUT"
-    else:
-        action = "COMPLETED"
 
-    print(f"  → Attendance action: {action}")
     _push({"role":"student","student_id":sid,"id_number":id_num,
            "name":name,"action":action,"session_id":session_id,
            "is_late":is_late,"late_minutes":late_minutes,
            "timestamp":now.strftime("%Y-%m-%d %H:%M:%S")})
-
 # ─────────────────────────────────────────────
 # Camera + frame generator
 # ─────────────────────────────────────────────
@@ -901,63 +960,121 @@ def shutdown():
         print(f"Error during shutdown: {e}")
         return jsonify({"success": False, "error": str(e)})
     
-
+    
 def session_cleaner_worker():
-    """Background thread to auto-end expired sessions every 60 seconds."""
+    """Background thread to auto-end expired sessions and auto-void missed sessions every 60 seconds."""
     while True:
         try:
             now_store, now_local = get_now()
             today = datetime.date.today()
+            day_name = today.strftime("%A")
             current_time_str = now_local.strftime("%H:%M:%S")
 
-            # 1. Find sessions that are 'ongoing' or 'dismissing' for today
+            # 1. Find sessions that are 'ongoing', 'dismissing', OR 'scheduled'
             res = supabase.table("lab_sessions")\
-                .select("session_id, lab_schedules(end_time)")\
+                .select("session_id, status, lab_schedules(start_time, end_time)")\
                 .eq("session_date", str(today))\
-                .in_("status", ["ongoing", "dismissing"])\
+                .in_("status", ["ongoing", "dismissing", "scheduled"])\
                 .execute()
 
             for sess in (res.data or []):
-                end_time = sess.get("lab_schedules", {}).get("end_time")
+                sch = sess.get("lab_schedules", {})
+                start_time = sch.get("start_time")
+                end_time = sch.get("end_time")
+                status = sess.get("status")
                 
-                # 2. If current time is past the scheduled end_time, terminate it
+                # Check the two distinct expiration rules
+                is_expired = False
+                is_voided_by_45_min_rule = False
+
                 if end_time and current_time_str > end_time:
+                    is_expired = True # Rule 2: Past End Time
+                elif status == "scheduled" and start_time:
+                    # Rule 1: Past 45-minute start window
+                    start_dt = datetime.datetime.combine(today, datetime.time.fromisoformat(start_time))
+                    deadline = start_dt + datetime.timedelta(minutes=45)
+                    if now_local > deadline:
+                        is_expired = True
+                        is_voided_by_45_min_rule = True
+
+                if is_expired:
                     session_id = sess["session_id"]
                     
-                    # Mark session completed
-                    supabase.table("lab_sessions").update({
-                        "status": "completed",
-                        "actual_end_time": end_time,
-                        "notes": "System Auto-End: Schedule time elapsed",
-                        "updated_at": now_store.isoformat()
-                    }).eq("session_id", session_id).execute()
-
-                    # Auto time-out students still 'IN'
-                    att_res = supabase.table("lab_attendance")\
-                        .select("attendance_id, time_in")\
-                        .eq("session_id", session_id)\
-                        .is_("time_out", "null")\
-                        .execute()
-
-                    for att in (att_res.data or []):
-                        # Calculate duration based on the scheduled end time
-                        time_in_dt = parse_dt(att["time_in"])
-                        # Create a datetime for today at the scheduled end_time
-                        end_dt = datetime.datetime.combine(today, datetime.time.fromisoformat(end_time))
-                        duration = int((end_dt - time_in_dt).total_seconds() / 60)
-                        
-                        supabase.table("lab_attendance").update({
-                            "time_out": end_dt.isoformat(),
-                            "duration_minutes": max(0, duration),
+                    if status == "scheduled":
+                        reason = "System Auto-Void: 45-minute grace period elapsed" if is_voided_by_45_min_rule else "System Auto-Void: Class ended without professor starting it"
+                        supabase.table("lab_sessions").update({
+                            "status": "cancelled",
+                            "notes": reason,
                             "updated_at": now_store.isoformat()
-                        }).eq("attendance_id", att["attendance_id"]).execute()
-                    
-                    print(f"Cleanup: Auto-ended expired session {session_id}")
+                        }).eq("session_id", session_id).execute()
+                        print(f"Cleanup: Auto-voided unstarted session {session_id}")
+                    else:
+                        supabase.table("lab_sessions").update({
+                            "status": "completed",
+                            "actual_end_time": end_time,
+                            "notes": "System Auto-End: Schedule time elapsed",
+                            "updated_at": now_store.isoformat()
+                        }).eq("session_id", session_id).execute()
+
+                        att_res = supabase.table("lab_attendance")\
+                            .select("attendance_id, time_in")\
+                            .eq("session_id", session_id)\
+                            .is_("time_out", "null")\
+                            .execute()
+
+                        for att in (att_res.data or []):
+                            time_in_dt = parse_dt(att["time_in"])
+                            end_dt = datetime.datetime.combine(today, datetime.time.fromisoformat(end_time))
+                            duration = int((end_dt - time_in_dt).total_seconds() / 60)
+                            supabase.table("lab_attendance").update({
+                                "time_out": end_dt.isoformat(),
+                                "duration_minutes": max(0, duration),
+                                "updated_at": now_store.isoformat()
+                            }).eq("attendance_id", att["attendance_id"]).execute()
+                        print(f"Cleanup: Auto-ended expired session {session_id}")
+
+            # 2. Find Phantom Schedules (Never scanned, so session was never created in DB)
+            sched_res = supabase.table("lab_schedules")\
+                .select("schedule_id, start_time, end_time")\
+                .eq("day_of_week", day_name)\
+                .eq("status", "active")\
+                .execute()
+            
+            for sch in (sched_res.data or []):
+                start_time = sch.get("start_time")
+                end_time = sch.get("end_time")
+                
+                is_expired = False
+                if end_time and current_time_str > end_time:
+                    is_expired = True
+                elif start_time:
+                    start_dt = datetime.datetime.combine(today, datetime.time.fromisoformat(start_time))
+                    deadline = start_dt + datetime.timedelta(minutes=45)
+                    if now_local > deadline:
+                        is_expired = True
+
+                if is_expired:
+                    sess_check = supabase.table("lab_sessions")\
+                        .select("session_id")\
+                        .eq("schedule_id", sch["schedule_id"])\
+                        .eq("session_date", str(today))\
+                        .execute()
+                        
+                    if not sess_check.data:
+                        supabase.table("lab_sessions").insert({
+                            "schedule_id": sch["schedule_id"],
+                            "session_date": str(today),
+                            "status": "cancelled",
+                            "notes": "System Auto-Void: 45-minute grace period elapsed",
+                            "created_at": now_store.isoformat(),
+                            "updated_at": now_store.isoformat()
+                        }).execute()
+                        print(f"Cleanup: Inserted auto-void for phantom schedule {sch['schedule_id']}")
 
         except Exception as e:
             print(f"Cleaner Error: {e}")
         
-        time.sleep(60) # Run once per minute
+        time.sleep(60)
 
 # Start the cleaner thread at the bottom of your file (before app.run)
 threading.Thread(target=session_cleaner_worker, daemon=True).start()

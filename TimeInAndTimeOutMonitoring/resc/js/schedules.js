@@ -163,6 +163,9 @@ async function loadSchedulesData() {
         document.getElementById('statActive').textContent = META.active;
         document.getElementById('statInactive').textContent = META.inactive;
 
+
+        // NEW: Populate dropdowns dynamically based on loaded schedules
+        populateDynamicFilters();
         renderTable(allSchedules);
 
     } catch (error) {
@@ -224,36 +227,68 @@ function renderTable(data) {
         </tr>
     `).join('');
 }
-
 // ────────────────────────────────────────────
 // 2. FILTERS
 // ────────────────────────────────────────────
+function populateDynamicFilters() {
+    const subjectFilter = document.getElementById('subjectFilter');
+    const sectionFilter = document.getElementById('sectionFilter');
+
+    if (!subjectFilter || !sectionFilter) return;
+
+    // Get unique subjects
+    const subjects = [...new Set(allSchedules.map(s => s.subjects?.subject_code).filter(Boolean))].sort();
+    
+    // Get unique student sections (e.g., "BSIT-3A")
+    const sections = [...new Set(allSchedules.map(s => s.display_section).filter(Boolean))].sort();
+
+    subjectFilter.innerHTML = '<option value="all">All Subjects</option>' + subjects.map(s => `<option value="${escapeHtml(s)}">${escapeHtml(s)}</option>`).join('');
+    sectionFilter.innerHTML = '<option value="all">All Students</option>' + sections.map(s => `<option value="${escapeHtml(s)}">${escapeHtml(s)}</option>`).join('');
+}
+
 function initFilters() {
     const search = document.getElementById('searchInput');
     const day = document.getElementById('dayFilter');
     const status = document.getElementById('statusFilter');
     const lab = document.getElementById('labFilter');
+    
+    // New filters
+    const subject = document.getElementById('subjectFilter');
+    const semester = document.getElementById('semesterFilter');
+    const section = document.getElementById('sectionFilter');
 
     function apply() {
         const q = search.value.toLowerCase().trim();
         const d = day.value, st = status.value, l = lab.value;
+        const sb = subject?.value || 'all', sem = semester?.value || 'all', sec = section?.value || 'all';
         
         const filtered = allSchedules.filter(s => {
             const searchStr = `${s.profFullName} ${s.subjects?.subject_code} ${s.subjects?.subject_name} ${s.display_section} ${s.laboratory_rooms?.lab_code}`.toLowerCase();
+            
             const matchQ = !q || searchStr.includes(q);
             const matchD = d === 'all' || s.day_of_week === d;
             const matchSt = st === 'all' || s.status === st;
             const matchL = l === 'all' || s.laboratory_rooms?.lab_code === l;
-            return matchQ && matchD && matchSt && matchL;
+            
+            const matchSb = sb === 'all' || s.subjects?.subject_code === sb;
+            const matchSem = sem === 'all' || s.semester === sem;
+            const matchSec = sec === 'all' || s.display_section === sec;
+
+            return matchQ && matchD && matchSt && matchL && matchSb && matchSem && matchSec;
         });
         renderTable(filtered);
     }
 
     search.addEventListener('input', apply);
-    [day, status, lab].forEach(el => el.addEventListener('change', apply));
+    [day, status, lab, subject, semester, section].forEach(el => {
+        if(el) el.addEventListener('change', apply);
+    });
 
     document.getElementById('clearFilters').addEventListener('click', () => {
         search.value = ''; day.value = 'all'; status.value = 'all'; lab.value = 'all';
+        if(subject) subject.value = 'all';
+        if(semester) semester.value = 'all';
+        if(section) section.value = 'all';
         renderTable(allSchedules);
     });
 }
