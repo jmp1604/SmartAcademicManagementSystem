@@ -24,7 +24,6 @@ document.addEventListener('DOMContentLoaded', async () => {
     initFilters();
     initConflictChecker();
 });
-
 // ────────────────────────────────────────────
 // 1. DATA LOADING (Dropdowns & Main Table)
 // ────────────────────────────────────────────
@@ -41,6 +40,10 @@ async function loadDropdowns() {
         // Fetch active/reserved labs
         const { data: labs } = await supabaseClient
             .from('laboratory_rooms').select('lab_id, lab_code, lab_name').in('status', ['available', 'reserved']).order('lab_code');
+
+        // NEW: Fetch active semesters from the database
+        const { data: semestersData } = await supabaseClient
+            .from('semesters').select('id, name').eq('is_active', true).order('start_date', { ascending: false });
 
         // Fetch course, year, and section from students table and format as "BSIT-3A"
         const { data: studentsData } = await supabaseClient
@@ -69,6 +72,20 @@ async function loadDropdowns() {
         const secSelect = document.getElementById('section');
         secSelect.innerHTML = '<option value="" disabled selected>-- Select Section --</option>' + 
             uniqueSections.map(sec => `<option value="${sec}">${sec}</option>`).join('');
+
+        // NEW: Populate Semester Form Dropdown
+        const semFormSelect = document.getElementById('semester');
+        if (semFormSelect) {
+            semFormSelect.innerHTML = '<option value="" disabled selected>-- Select Semester --</option>' +
+                (semestersData || []).map(sem => `<option value="${escapeHtml(sem.name)}">${escapeHtml(sem.name)}</option>`).join('');
+        }
+
+        // NEW: Populate Semester Filter Dropdown
+        const semFilter = document.getElementById('semesterFilter');
+        if (semFilter) {
+            semFilter.innerHTML = '<option value="all">All Semesters</option>' +
+                (semestersData || []).map(sem => `<option value="${escapeHtml(sem.name)}">${escapeHtml(sem.name)}</option>`).join('');
+        }
 
         // Populate Filter Dropdown for Labs
         const labFilter = document.getElementById('labFilter');
