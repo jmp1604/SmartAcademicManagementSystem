@@ -7,7 +7,6 @@ let allAttendance = [];
 let filteredAttendance = [];
 let META = {};
 
-
 // ────────────────────────────────────────────
 // UTILITY
 // ────────────────────────────────────────────
@@ -34,53 +33,67 @@ document.addEventListener('DOMContentLoaded', async () => {
         return;
     }
     
-   const today = new Date();
-// Format date correctly as YYYY-MM-DD in local timezone
-const yyyy = today.getFullYear();
-const mm   = String(today.getMonth() + 1).padStart(2, '0');
-const dd   = String(today.getDate()).padStart(2, '0');
-document.getElementById('filterDate').value = `${yyyy}-${mm}-${dd}`;
+    const today = new Date();
+    // Format date correctly as YYYY-MM-DD in local timezone
+    const yyyy = today.getFullYear();
+    const mm   = String(today.getMonth() + 1).padStart(2, '0');
+    const dd   = String(today.getDate()).padStart(2, '0');
+    document.getElementById('filterDate').value = `${yyyy}-${mm}-${dd}`;
 
     META.genDate = today.toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric', hour: '2-digit', minute: '2-digit' });
 
-    await loadDropdowns();
-    await loadAttendanceData(); // Initial load based on default date
+    await loadAttendanceData(); 
+
+    // Automatically update dropdowns and table when the Date changes
+    document.getElementById('filterDate').addEventListener('change', () => {
+        populateDynamicFilters();
+        executeClientFilter();
+    });
 });
 
 // ────────────────────────────────────────────
-// 1. DATA LOADING 
+// 1. DATA LOADING & DYNAMIC DROPDOWNS
 // ────────────────────────────────────────────
-async function loadDropdowns() {
-    try {
-        // Fetch active professors
-        const { data: profs } = await supabaseClient
-            .from('professors').select('professor_id, first_name, last_name').order('last_name');
-        
-        // Fetch active subjects
-        const { data: subjects } = await supabaseClient
-            .from('subjects').select('subject_id, subject_code, subject_name').order('subject_code');
-        
-        // Fetch active labs
-        const { data: labs } = await supabaseClient
-            .from('laboratory_rooms').select('lab_id, lab_code, lab_name').order('lab_code');
+function populateDynamicFilters() {
+    const date = document.getElementById('filterDate').value;
+    
+    // Base dropdowns on the data matching the current date (or all data if date is cleared)
+    const baseData = date ? allAttendance.filter(a => a.session_date === date) : allAttendance;
 
-        // Fetch distinct sections from schedules
-        const { data: sectionsData } = await supabaseClient
-            .from('lab_schedules').select('section').not('section', 'is', null);
-        const uniqueSections = [...new Set(sectionsData.map(s => s.section))].sort();
+    const subMap = new Map();
+    const labMap = new Map();
+    const profMap = new Map();
+    const secSet = new Set();
 
-        // Populate Dropdowns
-        populateSelect('filterProf', profs, p => p.professor_id, p => `${p.last_name}, ${p.first_name}`);
-        populateSelect('filterSubject', subjects, s => s.subject_id, s => `${s.subject_code} - ${s.subject_name}`);
-        populateSelect('filterLab', labs, l => l.lab_id, l => `${l.lab_code} - ${l.lab_name}`);
-        
-        const secSelect = document.getElementById('filterSection');
-        secSelect.innerHTML = '<option value="">All Sections</option>' + 
-            uniqueSections.map(sec => `<option value="${sec}">${sec}</option>`).join('');
+    // Scan the attendance records to find unique subjects, labs, profs, and sections
+    baseData.forEach(a => {
+        if (a.subject_id) subMap.set(a.subject_id, { id: a.subject_id, code: a.subject_code, name: a.subject_name });
+        if (a.lab_id) labMap.set(a.lab_id, { id: a.lab_id, code: a.lab_code, name: a.lab_name });
+        if (a.professor_id) profMap.set(a.professor_id, { id: a.professor_id, name: a.professor_name });
+        if (a.class_section) secSet.add(a.class_section);
+    });
 
-    } catch (error) {
-        console.error("Error loading dropdowns:", error);
-    }
+    // Remember current selections so they don't reset if they are still valid
+    const currentSub = document.getElementById('filterSubject').value;
+    const currentLab = document.getElementById('filterLab').value;
+    const currentProf = document.getElementById('filterProf').value;
+    const currentSec = document.getElementById('filterSection').value;
+
+    // Populate the HTML dropdowns
+    populateSelect('filterSubject', Array.from(subMap.values()).sort((a,b) => a.code.localeCompare(b.code)), s => s.id, s => `${s.code} - ${s.name}`);
+    populateSelect('filterLab', Array.from(labMap.values()).sort((a,b) => a.code.localeCompare(b.code)), l => l.id, l => `${l.code} - ${l.name}`);
+    populateSelect('filterProf', Array.from(profMap.values()).sort((a,b) => a.name.localeCompare(b.name)), p => p.id, p => p.name);
+
+    const secSelect = document.getElementById('filterSection');
+    const sortedSecs = Array.from(secSet).sort();
+    secSelect.innerHTML = '<option value="">All Sections</option>' + 
+        sortedSecs.map(sec => `<option value="${escapeHtml(sec)}">${escapeHtml(sec)}</option>`).join('');
+
+    // Restore previous selections if they exist in the new filtered list
+    if (currentSub && subMap.has(currentSub)) document.getElementById('filterSubject').value = currentSub;
+    if (currentLab && labMap.has(currentLab)) document.getElementById('filterLab').value = currentLab;
+    if (currentProf && profMap.has(currentProf)) document.getElementById('filterProf').value = currentProf;
+    if (currentSec && secSet.has(currentSec)) document.getElementById('filterSection').value = currentSec;
 }
 
 function populateSelect(id, data, valFn, textFn) {
@@ -94,7 +107,6 @@ async function loadAttendanceData() {
     const tbody = document.getElementById('attendanceBody');
     tbody.innerHTML = `<tr><td colspan="11" class="empty-state"><i class="fa-solid fa-spinner fa-spin"></i><p>Loading attendance data...</p></td></tr>`;
 
-    // Build query based on current filters
     let query = supabaseClient
         .from('lab_attendance')
         .select(`
@@ -111,26 +123,18 @@ async function loadAttendanceData() {
             )
         `)
         .order('time_in', { ascending: false });
-
-    // Apply DB-level filters if possible (Note: deeply nested filtering in Supabase JS can be tricky, 
-    // so we will fetch the date, and filter the rest client-side for speed and simplicity)
-    const dateFilter = document.getElementById('filterDate').value;
-    // We fetch all records, then filter client side because filtering on nested joins (like lab_sessions.session_date) 
-    // requires a different syntax in PostgREST that can sometimes exclude parents entirely.
     
     try {
         const { data, error } = await query;
         if (error) {
-    console.error('Supabase error details:', error); // ← already there
-    console.error('Error code:', error.code);
-    console.error('Error message:', error.message);
-    console.error('Error details:', error.details);
-    console.error('Error hint:', error.hint);
-    throw error;
-}
-        
+            console.error('Supabase error details:', error);
+            console.error('Error code:', error.code);
+            console.error('Error message:', error.message);
+            console.error('Error details:', error.details);
+            console.error('Error hint:', error.hint);
+            throw error;
+        }
 
-        // Flatten data for easier handling and apply client-side filters
         allAttendance = data.filter(d => d.lab_sessions && d.students && d.lab_sessions.lab_schedules).map(d => {
             const st = d.students;
             const sess = d.lab_sessions;
@@ -145,7 +149,6 @@ async function loadAttendanceData() {
                 duration_minutes: d.duration_minutes,
                 verified_by_facial_recognition: d.verified_by_facial_recognition,
                 
-                // Student
                 student_id: st.student_id,
                 id_number: st.id_number,
                 student_name: `${st.first_name} ${st.last_name}`,
@@ -156,7 +159,6 @@ async function loadAttendanceData() {
                 profile_picture: st.profile_picture,
                 initials: (st.first_name[0] + st.last_name[0]).toUpperCase(),
 
-                // Session/Schedule
                 session_id: sess.session_id,
                 session_date: sess.session_date,
                 actual_start_time: sess.actual_start_time,
@@ -165,23 +167,23 @@ async function loadAttendanceData() {
                 sched_start: sch.start_time,
                 sched_end: sch.end_time,
                 
-                // Subject
                 subject_id: sch.subjects.subject_id,
                 subject_code: sch.subjects.subject_code,
                 subject_name: sch.subjects.subject_name,
                 
-                // Professor
                 professor_id: sch.professors.professor_id,
                 professor_name: `${sch.professors.first_name} ${sch.professors.last_name}`,
                 
-                // Lab
                 lab_id: sch.laboratory_rooms.lab_id,
                 lab_code: sch.laboratory_rooms.lab_code,
                 lab_name: sch.laboratory_rooms.lab_name
             };
         });
 
-        executeClientFilter(); // Applies UI filters and renders
+        // Populate dropdowns based on the fetched data
+        populateDynamicFilters();
+        
+        executeClientFilter(); 
 
     } catch (error) {
         console.error('Error fetching attendance:', error);
@@ -198,7 +200,6 @@ window.applyFilters = function() {
 
 window.resetFilters = function() {
     document.getElementById('filterSearch').value = '';
-    // Keep the date filter, just reset the others
     document.getElementById('filterSubject').value = '';
     document.getElementById('filterLab').value = '';
     document.getElementById('filterProf').value = '';
@@ -217,9 +218,7 @@ function executeClientFilter() {
     const stat = document.getElementById('filterStatus').value;
 
     filteredAttendance = allAttendance.filter(a => {
-        // Date is our primary filter
         if (date && a.session_date !== date) return false;
-        
         if (sub && a.subject_id != sub) return false;
         if (lab && a.lab_id != lab) return false;
         if (prof && a.professor_id != prof) return false;
@@ -395,13 +394,13 @@ window.showDetail = function(id) {
 }
 
 window.closeModal = function() { document.getElementById('detailModal').classList.remove('on'); }
+
 // ────────────────────────────────────────────
-// 4. REPORT MODAL & EXPORT (Laboratories Theme)
+// 4. REPORT MODAL & EXPORT
 // ────────────────────────────────────────────
 
-let existingReportsToday = []; // Tracks reports to prevent exact duplicates
+let existingReportsToday = []; 
 
-// ── Pre-fetch Duplicates ──
 window.fetchTodayReports = async function() {
     const dateStr = new Date().toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' });
     try {
@@ -425,7 +424,6 @@ window.fetchTodayReports = async function() {
 };
 
 window.openReportModal = async function() {
-    // Populate stats
     document.getElementById('rmDisplayDate').textContent = document.getElementById('filterDate').value || 'All Dates';
     document.getElementById('rmRecordCount').textContent = META.total;
     document.getElementById('rmGenDate').textContent = META.genDate;
@@ -470,12 +468,11 @@ window.openReportModal = async function() {
     }).join('');
     
     document.getElementById('rmOverlay').classList.add('on');
-    await window.fetchTodayReports(); // Prepare duplicate checker
+    await window.fetchTodayReports(); 
 };
 
 window.closeReportModal = function() { document.getElementById('rmOverlay').classList.remove('on'); }
 
-// Close modals on Escape
 document.addEventListener('keydown', e => {
     if (e.key === 'Escape') { if(typeof closeModal==='function') closeModal(); closeReportModal(); }
 });
@@ -489,7 +486,6 @@ function formatTime12Hour(timeString) {
     return `${h}:${minutes} ${ampm}`;
 }
 
-// ── Smart Duplicate Check Helper ──
 function checkDuplicateWarning(exportType) {
     const dateStr = new Date().toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' });
     const filterDate = document.getElementById('filterDate').value || 'All Dates';
@@ -506,7 +502,6 @@ function checkDuplicateWarning(exportType) {
     return true; 
 }
 
-// ── Auto-save helper ──────────────────────────────────────────
 async function autoSaveReport(exportType) {
     const dateStr    = new Date().toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' });
     const filterDate = document.getElementById('filterDate').value || 'All Dates';
@@ -587,7 +582,6 @@ window.printReport = async function() {
         *{margin:0;padding:0;box-sizing:border-box}
         body{font-family:Arial,sans-serif;padding:20px;font-size:10px;color:#111}
         
-        /* ── INK-SAVER WHITE BANNER HEADER ── */
         .header-container { 
             background-color: #ffffff; color: #000000; text-align: center; 
             margin-bottom: 20px; padding: 20px 15px; border: 2px solid #000000; border-radius: 8px;
@@ -634,7 +628,6 @@ window.printReport = async function() {
 };
 
 // ── PDF ────────────────────────────────────────────────────
-// ── PDF ────────────────────────────────────────────────────
 window.downloadPDF = async function() {
     if (filteredAttendance.length === 0) { alert("No records to export."); return; }
     if (!checkDuplicateWarning('PDF')) return;
@@ -670,7 +663,6 @@ window.downloadPDF = async function() {
         const centerX = pageW / 2;
         const headerHeight = 45; 
         
-        // ── DRAW THIN HEADER BORDER (WHITE BG) ──
         doc.setDrawColor(0, 0, 0);
         doc.setLineWidth(0.1);
         doc.rect(10, 5, pageW - 20, headerHeight, 'S');
@@ -679,7 +671,6 @@ window.downloadPDF = async function() {
         if (plpData) doc.addImage(plpData, 'PNG', centerX - 85, 10, logoSize, logoSize);
         if (ccsData) doc.addImage(ccsData, 'PNG', centerX + 67, 10, logoSize, logoSize);
 
-        // ── CENTERED HEADER TEXT (BLACK) ──
         doc.setTextColor(0, 0, 0);
         doc.setFontSize(16); doc.setFont('helvetica', 'bold');
         doc.text('PAMANTASAN NG LUNGSOD NG PASIG', centerX, 18, { align: 'center' });
@@ -781,6 +772,7 @@ window.downloadPDF = async function() {
         alert('There was an error generating the PDF. Check the console.');
     }
 };
+
 // ── EXCEL ────────────────────────────────────────────────────
 window.exportExcel = async function() {
     if (filteredAttendance.length === 0) { alert("No records to export."); return; }
@@ -833,27 +825,25 @@ window.exportExcel = async function() {
 
     const dataSheet = XLSX.utils.aoa_to_sheet([headers, ...rows]);
 
-    // Clean column widths for Excel
     dataSheet['!cols'] = [
-        { wch: 5 },  // #
-        { wch: 15 }, // Student ID
-        { wch: 25 }, // Name
-        { wch: 10 }, // Course
-        { wch: 10 }, // Section
-        { wch: 15 }, // Subject Code
-        { wch: 10 }, // Lab
-        { wch: 20 }, // Professor
-        { wch: 15 }, // Date
-        { wch: 12 }, // Time In
-        { wch: 12 }, // Time Out
-        { wch: 15 }, // Duration
-        { wch: 15 }, // Status
-        { wch: 15 }  // Face
+        { wch: 5 },  
+        { wch: 15 }, 
+        { wch: 25 }, 
+        { wch: 10 }, 
+        { wch: 10 }, 
+        { wch: 15 }, 
+        { wch: 10 }, 
+        { wch: 20 }, 
+        { wch: 15 }, 
+        { wch: 12 }, 
+        { wch: 12 }, 
+        { wch: 15 }, 
+        { wch: 15 }, 
+        { wch: 15 }  
     ];
 
     XLSX.utils.book_append_sheet(wb, dataSheet, 'Attendance Records');
     
-    // Get date filter for the filename
     const filterD = document.getElementById('filterDate') ? document.getElementById('filterDate').value : 'All_Dates';
     XLSX.writeFile(wb, `Attendance_Report_${filterD.replace(/\//g,'-')}.xlsx`);
     
