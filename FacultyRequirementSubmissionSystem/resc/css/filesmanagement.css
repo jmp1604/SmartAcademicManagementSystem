@@ -86,6 +86,13 @@
     color: #991b1b;
 }
 
+.badge-status.status-overdue {
+    background: #fed7aa;
+    color: #92400e;
+    font-weight: 700;
+    border: 1px solid #fdba74;
+}
+
 /* Action buttons */
 .action-buttons {
     display: flex;

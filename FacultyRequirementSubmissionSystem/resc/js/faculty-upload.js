@@ -35,6 +35,23 @@ document.addEventListener('DOMContentLoaded', async function () {
     if (!await loadActiveSemester()) return;
     await loadCategories();
     initUploadForm();
+    
+    // Check for upcoming deadline reminders
+    if (typeof checkAndNotifyDeadlines === 'function') {
+        checkAndNotifyDeadlines().catch(err => console.error('Error checking deadlines:', err));
+    }
+});
+
+document.addEventListener('visibilitychange', async function () {
+    if (!document.hidden) {
+        await loadActiveSemester();
+        await loadCategories();
+    }
+});
+
+window.addEventListener('focus', async function () {
+    await loadActiveSemester();
+    await loadCategories();
 });
 
 async function loadCategories() {
@@ -48,14 +65,27 @@ async function loadCategories() {
         }
 
         let categoryIds = null;
+        let requirementsByCategory = {};
         if (departmentId) {
             const { data: reqs, error: reqErr } = await supabaseClient
                 .from('requirements')
-                .select('category_id')
+                .select('id, category_id, deadline, name')
                 .eq('department_id', departmentId)
                 .eq('semester_id', activeSemesterId);
 
             if (reqErr || !reqs?.length) { showNoCategoriesMessage(); return; }
+
+            // Map requirements by category and store deadline info
+            reqs.forEach(req => {
+                if (!requirementsByCategory[req.category_id]) {
+                    requirementsByCategory[req.category_id] = [];
+                }
+                requirementsByCategory[req.category_id].push({
+                    id: req.id,
+                    deadline: req.deadline,
+                    name: req.name
+                });
+            });
 
             categoryIds = [...new Set(reqs.map(r => r.category_id).filter(Boolean))];
             if (!categoryIds.length) { showNoCategoriesMessage(); return; }
@@ -67,7 +97,7 @@ async function loadCategories() {
 
         if (error || !categories?.length) { showNoCategoriesMessage(); return; }
 
-        renderCategories(categories);
+        renderCategories(categories, requirementsByCategory);
         updateUploadStatistics();
     } catch (err) {
         console.error('loadCategories error:', err);
@@ -75,7 +105,7 @@ async function loadCategories() {
     }
 }
 
-function renderCategories(categories) {
+function renderCategories(categories, requirementsByCategory = {}) {
     const grid = document.getElementById('categoriesGridUpload');
     if (!grid) return;
     document.getElementById('noCategoriesMessage').style.display = 'none';
@@ -83,12 +113,37 @@ function renderCategories(categories) {
     grid.innerHTML = categories.map(cat => {
         let icon = cat.icon || '📁';
         if (icon.includes('fa-')) icon = `<i class="${icon}"></i>`;
-        return `<div class="category-card"
+        
+        // Get deadline info for this category
+        const catRequirements = requirementsByCategory[cat.id] || [];
+        let deadlineHtml = '';
+        let isOverdue = false;
+        
+        if (catRequirements.length > 0) {
+            const req = catRequirements[0]; // Use first requirement of this category
+            if (req.deadline) {
+                const deadline = new Date(req.deadline);
+                const now = new Date();
+                isOverdue = now > deadline;
+                
+                const deadlineStr = deadline.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+                const deadlineTime = deadline.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' });
+                
+                const overdueBadge = isOverdue ? '<span class="deadline-badge overdue">⚠️ Overdue</span>' : '';
+                deadlineHtml = `<div class="deadline-info ${isOverdue ? 'overdue' : ''}">
+                    ${overdueBadge}
+                    <small>Due: ${deadlineStr} ${deadlineTime}</small>
+                </div>`;
+            }
+        }
+        
+        return `<div class="category-card ${isOverdue ? 'overdue-card' : ''}"
                      data-category-id="${cat.id}"
                      data-category-name="${escapeHtml(cat.name)}">
                     <div class="category-icon">${icon}</div>
                     <div class="category-name">${escapeHtml(cat.name)}</div>
                     <div class="category-description">${escapeHtml(cat.description || '')}</div>
+                    ${deadlineHtml}
                 </div>`;
     }).join('');
 
@@ -289,25 +344,27 @@ async function submitAll() {
 
     const requirement = await fetchRequirement(categoryId, sessionUser.departmentId);
     if (!requirement) return;
-
-    // Block re-uploads: one submission per requirement per semester per professor
-    const { data: existing, error: checkErr } = await supabaseClient
-        .from('submissions')
-        .select('id')
-        .eq('professor_id',   sessionUser.id)
-        .eq('requirement_id', requirement.id)
-        .eq('semester_id',    activeSemesterId)
-        .maybeSingle();
-
-    if (checkErr) {
-        console.error('Error checking existing submission:', checkErr);
-        alert('Could not verify submission status. Please try again.');
-        return;
+    
+    // Check if submission is overdue
+    let isOverdue = false;
+    let overdueWarning = '';
+    if (requirement.deadline) {
+        const deadline = new Date(requirement.deadline);
+        const now = new Date();
+        isOverdue = now > deadline;
+        if (isOverdue) {
+            const daysOverdue = Math.floor((now - deadline) / (1000 * 60 * 60 * 24));
+            overdueWarning = `\n\n⚠️ WARNING: This requirement is OVERDUE by ${daysOverdue} day(s). Your submission will be marked as late.`;
+        }
     }
 
-    if (existing) {
-        alert('You have already submitted a file for this requirement this semester.\n\nOnly one submission is allowed per requirement per semester.');
-        return;
+    // Multiple submissions allowed - admin will review and approve/reject each one
+    // Professors can freely submit as many times as needed per requirement
+    
+    // Warn if overdue
+    if (isOverdue) {
+        const proceed = confirm(`You are submitting after the deadline.${overdueWarning}\n\nDo you want to proceed?`);
+        if (!proceed) return;
     }
 
     /* lock UI */
@@ -326,7 +383,7 @@ async function submitAll() {
             semester_id:    activeSemesterId,
             status:         'pending',
             submitted_at:   new Date().toISOString(),
-            remarks:        description,
+            remarks:        description
         })
         .select()
         .single();
@@ -362,6 +419,72 @@ async function submitAll() {
         renderQueue();
     }
 
+    // NOTIFICATION: Notify admin of new submission
+    if (successCount > 0 && submission?.id && sessionUser.departmentId) {
+        try {
+            console.log('Attempting to notify admin - Department ID:', sessionUser.departmentId);
+            
+            // Get the admin/department head for this department
+            const { data: adminData, error: adminErr } = await supabaseClient
+                .from('admins')
+                .select('admin_id')
+                .eq('department_id', sessionUser.departmentId)
+                .limit(1)
+                .single();
+
+            console.log('Admin query result - Error:', adminErr, 'Data:', adminData);
+            
+            if (adminErr) {
+                console.warn('Error querying admin for notification:', adminErr);
+                // Try to find ANY admin for this department (fallback)
+                const { data: fallbackAdmins, error: fallbackErr } = await supabaseClient
+                    .from('admins')
+                    .select('admin_id')
+                    .eq('department_id', sessionUser.departmentId)
+                    .limit(1);
+                
+                if (!fallbackErr && fallbackAdmins?.length > 0) {
+                    const adminId = fallbackAdmins[0].admin_id;
+                    console.log('Found admin via fallback query:', adminId);
+                    
+                    const notifResult = await notifyAdminNewSubmission(
+                        adminId,                                 // Admin's ID
+                        submission.id,                           // Submission ID
+                        requirement?.id,                         // Requirement ID
+                        sessionUser.departmentId,                // Department ID
+                        `${sessionUser.firstName || ''} ${sessionUser.lastName || ''}`.trim() // Professor name
+                    );
+                    if (notifResult.error) {
+                        console.warn('Could not create admin notification:', notifResult.error);
+                    } else {
+                        console.log('✓ Admin notified of new submission (via fallback)');
+                    }
+                }
+            } else if (adminData?.admin_id) {
+                console.log('Found admin:', adminData.admin_id);
+                
+                const notifResult = await notifyAdminNewSubmission(
+                    adminData.admin_id,                      // Admin's ID
+                    submission.id,                           // Submission ID
+                    requirement?.id,                         // Requirement ID
+                    sessionUser.departmentId,                // Department ID
+                    `${sessionUser.firstName || ''} ${sessionUser.lastName || ''}`.trim() // Professor name
+                );
+                if (notifResult.error) {
+                    console.warn('Could not create admin notification:', notifResult.error);
+                } else {
+                    console.log('✓ Admin notified of new submission');
+                }
+            } else {
+                console.warn('No admin found for department:', sessionUser.departmentId);
+            }
+        } catch (notifErr) {
+            console.error('Exception while notifying admin:', notifErr);
+        }
+    } else {
+        console.log('Skipping admin notification - successCount:', successCount, 'submissionId:', submission?.id, 'departmentId:', sessionUser.departmentId);
+    }
+
     submitBtn.disabled = false;
     if (addMore) addMore.disabled = false;
 
@@ -374,10 +497,12 @@ async function submitAll() {
     updateUploadStatistics();
 
     if (failCount === 0) {
+        // Stay on same requirement for easy re-submission
         setTimeout(() => {
             document.getElementById('upload-form').reset();
             resetQueue();
-            moveToStep(1);
+            document.getElementById('file-description').value = '';
+            // User can add more files or go back to categories
         }, 1800);
     }
 }

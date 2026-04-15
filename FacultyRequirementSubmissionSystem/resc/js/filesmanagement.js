@@ -274,6 +274,7 @@ async function enrichSubmissionsData() {
                 name,
                 title,
                 category_id,
+                deadline,
                 categories(name)
             `)
             .eq('semester_id', activeSemesterId)
@@ -288,12 +289,11 @@ async function enrichSubmissionsData() {
             });
             console.log('✓ Requirements loaded:', requirements.length, 'for semester:', activeSemesterId, 'department:', userDepartmentId);
         }
-
-        // Enrich each submission
         allSubmissions = allSubmissions.map(submission => ({
             ...submission,
             _professor:   professorMap[submission.professor_id]   || null,
-            _requirement: requirementMap[submission.requirement_id] || null
+            _requirement: requirementMap[submission.requirement_id] || null,
+            department_id: userDepartmentId 
         }));
 
     } catch (err) {
@@ -357,13 +357,27 @@ function renderSubmissions() {
         const dateStr = formatDate(submission.submitted_at);
         const sizeStr = formatFileSize(fileSize);
 
+        // Check if submission is overdue
         let statusBadge = '';
-        if (submission.status === 'pending') {
-            statusBadge = '<span class="badge-status status-pending">Pending</span>';
-        } else if (submission.status === 'approved') {
-            statusBadge = '<span class="badge-status status-approved">Approved</span>';
-        } else if (submission.status === 'rejected') {
-            statusBadge = '<span class="badge-status status-rejected">Rejected</span>';
+        let isOverdue = false;
+        if (requirement.deadline) {
+            const deadline = new Date(requirement.deadline);
+            const submittedAt = new Date(submission.submitted_at);
+            isOverdue = submittedAt > deadline;
+            if (isOverdue) {
+                const daysLate = Math.floor((submittedAt - deadline) / (1000 * 60 * 60 * 24));
+                statusBadge = `<span class="badge-status status-overdue" title="Submitted ${daysLate} day(s) late">⚠️ Late</span>`;
+            }
+        }
+        
+        if (!isOverdue) {
+            if (submission.status === 'pending') {
+                statusBadge = '<span class="badge-status status-pending">Pending</span>';
+            } else if (submission.status === 'approved') {
+                statusBadge = '<span class="badge-status status-approved">Approved</span>';
+            } else if (submission.status === 'rejected') {
+                statusBadge = '<span class="badge-status status-rejected">Rejected</span>';
+            }
         }
 
         const deptLower = department.toLowerCase();
@@ -557,11 +571,50 @@ async function handleReviewSubmission(action) {
             .update(updateData)
             .eq('id', currentSubmissionId);
 
-        if (error) throw error;
-        console.log('✓ Submission status updated');
+        if (error) {
+            console.error('Database error updating submission:', error);
+            throw error;
+        }
+        console.log('✓ Submission status updated in database');
+
+        const submission = allSubmissions.find(s => s.id === currentSubmissionId);
+        console.log('Full submission object:', JSON.stringify(submission)); 
+        console.log('Found submission in memory:', submission ? 'yes' : 'no');
+        console.log('Submission department_id:', submission?.department_id, 'Professor ID:', submission?.professor_id, 'Requirement ID:', submission?.requirement_id);
+        if (submission?.professor_id) {
+            if (action === 'approved') {
+                const notifResult = await notifySubmissionApproved(
+                    submission.professor_id,       
+                    currentSubmissionId,         
+                    submission.requirement_id,      
+                    submission.department_id,        
+                    user?.id                         
+                );
+                if (notifResult.error) {
+                    console.warn('Could not create approval notification:', notifResult.error);
+                } else {
+                    console.log('✓ Professor notified of approval');
+                }
+            } else if (action === 'rejected') {
+                const notifResult = await notifySubmissionRejected(
+                    submission.professor_id,         // Professor ID
+                    currentSubmissionId,             // Submission ID
+                    submission.requirement_id,       // Requirement ID
+                    submission.department_id,        // Department ID (now directly on submission)
+                    remarks,                         // Rejection remarks
+                    user?.id                         // Admin ID who rejected
+                );
+                if (notifResult.error) {
+                    console.warn('Could not create rejection notification:', notifResult.error);
+                } else {
+                    console.log('✓ Professor notified of rejection');
+                }
+            }
+        }
+        // Update notification badge after creating notifications
+        await updateNotificationBadge();
 
         // AUDIT: log submission approval/rejection
-        const submission = allSubmissions.find(s => s.id === currentSubmissionId);
         const submissionName = `Submission for requirement ${submission?.requirement_id}` || `Submission ${currentSubmissionId}`;
         const oldStatus = { status: 'pending' };
         const newStatus = { status: action, reviewed_by: user?.id, reviewed_at: new Date().toISOString(), remarks: remarks };
@@ -609,9 +662,47 @@ async function handleReviewSubmission(action) {
 
 
 async function deleteSubmission(submissionId) {
-    if (!confirm('Are you sure you want to delete this submission? This action cannot be undone.')) return;
-
     try {
+        // Fetch submission to check status and get details
+        const { data: submission } = await supabaseClient
+            .from('submissions')
+            .select('status, requirements(name), submission_files(file_name)')
+            .eq('id', submissionId)
+            .single();
+
+        if (!submission) {
+            alert('Submission not found.');
+            return;
+        }
+
+        const requirementName = submission.requirements?.name || 'Unknown Requirement';
+        const fileName = submission.submission_files?.[0]?.file_name || 'the file';
+        const status = submission.status || 'unknown';
+
+        // Admins can delete any submission, but provide warnings
+        let confirmMessage = `Delete submission: "${fileName}"\n`;
+        confirmMessage += `Requirement: ${requirementName}\n`;
+        confirmMessage += `Status: ${status.toUpperCase()}\n\n`;
+        
+        if (status === 'approved') {
+            confirmMessage += 'WARNING: This is an APPROVED submission. Deleting it may require re-verification by the professor.\n\n';
+        } else if (status === 'pending') {
+            confirmMessage += 'This submission is pending review.\n\n';
+        } else if (status === 'rejected') {
+            confirmMessage += 'This submission was previously rejected.\n\n';
+        }
+        
+        confirmMessage += 'This action cannot be undone. Continue?';
+
+        if (!confirm(confirmMessage)) return;
+
+        // Capture submission record before deletion for audit log
+        const { data: submissionToDelete } = await supabaseClient
+            .from('submissions')
+            .select('*')
+            .eq('id', submissionId)
+            .single();
+
         const { error } = await supabaseClient
             .from('submissions')
             .delete()
@@ -619,7 +710,13 @@ async function deleteSubmission(submissionId) {
 
         if (error) throw error;
 
-        alert('Submission deleted successfully.');
+        // AUDIT: log admin submission deletion
+        const adminUser = getCurrentUser();
+        const submissionName = `Submission for ${requirementName}`;
+        await auditLog('DELETE_SUBMISSION_ADMIN', 'submissions', submissionId, submissionName, submissionToDelete || null, null);
+
+        console.log('✓ Submission deleted by admin:', adminUser.firstName, adminUser.lastName);
+        alert(`Submission "${fileName}" deleted successfully.`);
         await loadSubmissions();
 
     } catch (err) {

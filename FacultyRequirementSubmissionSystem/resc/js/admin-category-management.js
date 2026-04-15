@@ -63,6 +63,12 @@ async function loadCategories() {
 
         categories = data || [];
         console.log('Loaded categories for department:', categories.length);
+        
+        // Fetch file counts for each category
+        for (let category of categories) {
+            category.file_count = await getFilesCountForCategory(category.id);
+        }
+        
         updateStats();
         renderCategories(categories);
 
@@ -70,6 +76,56 @@ async function loadCategories() {
         console.error('Error loading categories:', error);
         showNotification('Error loading categories', 'error');
         showEmptyState();
+    }
+}
+
+async function getFilesCountForCategory(categoryId) {
+    try {
+        // Get all requirements for this category
+        const { data: requirements, error: reqError } = await supabaseClient
+            .from('requirements')
+            .select('id')
+            .eq('category_id', categoryId);
+
+        if (reqError || !requirements || requirements.length === 0) {
+            return 0;
+        }
+
+        const requirementIds = requirements.map(r => r.id);
+
+        // Get distinct submissions (one file per submission, most recent)
+        const { data: submissions, error: subError } = await supabaseClient
+            .from('submissions')
+            .select('id')
+            .in('requirement_id', requirementIds);
+
+        if (subError || !submissions) {
+            return 0;
+        }
+
+        const submissionIds = submissions.map(s => s.id);
+        
+        if (submissionIds.length === 0) {
+            return 0;
+        }
+
+        // Count only approved submissions (files that are actually finalized)
+        // This prevents counting draft or rejected submissions
+        const { count, error: countError } = await supabaseClient
+            .from('submissions')
+            .select('*', { count: 'exact', head: true })
+            .in('id', submissionIds)
+            .eq('status', 'approved');
+
+        if (countError) {
+            console.error('Error counting approved submissions:', countError);
+            return submissionIds.length; // Fallback to total submissions
+        }
+
+        return count || 0;
+    } catch (error) {
+        console.error('Error getting file count for category:', error);
+        return 0;
     }
 }
 
@@ -88,75 +144,64 @@ function updateStats() {
 }
 
 function renderCategories(categoriesToRender) {
-    const grid = document.getElementById('categoriesGrid');
+    const tableBody = document.getElementById('categoryTableBody');
+    const categoriesGrid = document.getElementById('categoriesGrid');
     const emptyState = document.getElementById('emptyState');
 
     if (categoriesToRender.length === 0) {
-        grid.innerHTML = '';
-        emptyState.style.display = 'block';
+        if (tableBody) tableBody.innerHTML = '';
+        if (categoriesGrid) categoriesGrid.style.display = 'none';
+        if (emptyState) emptyState.style.display = 'block';
         return;
     }
 
-    emptyState.style.display = 'none';
+    if (categoriesGrid) categoriesGrid.style.display = 'block';
+    if (emptyState) emptyState.style.display = 'none';
 
-    grid.innerHTML = categoriesToRender.map(category => {
+    if (!tableBody) return;
+
+    tableBody.innerHTML = categoriesToRender.map(category => {
         const fileCount = category.file_count || 0;
         const createdDate = new Date(category.created_at).toLocaleDateString('en-US', {
             year: 'numeric',
-            month: 'numeric',
+            month: 'short',
             day: 'numeric'
         });
-        const colors = ['#fef3c7', '#dbeafe', '#fce7f3', '#e0e7ff', '#d1fae5', '#fef2f2'];
-        const colorIndex = categories.indexOf(category) % colors.length;
-        const bgColor = colors[colorIndex] || colors[0];
+        const statusBadge = `<span class="status-badge ${category.status}">${category.status}</span>`;
 
         return `
-            <div class="category-card">
-                <div class="category-header">
-                    <div class="category-icon" style="background: ${bgColor};">
-                        <i class="${category.icon || 'fas fa-folder'}"></i>
+            <tr>
+                <td><strong>${escapeHtml(category.name)}</strong></td>
+                <td>${escapeHtml(category.description || '—')}</td>
+                <td>${statusBadge}</td>
+                <td>${fileCount}</td>
+                <td>${createdDate}</td>
+                <td>
+                    <div class="action-buttons">
+                        <button class="btn-icon" onclick="editCategory('${category.id}')" title="Edit">
+                            <svg viewBox="0 0 24 24"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
+                        </button>
+                        <button class="btn-icon" onclick="toggleCategoryStatus('${category.id}')" title="${category.status === 'active' ? 'Deactivate' : 'Activate'}">
+                            ${category.status === 'active' ? '<svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><line x1="8" y1="12" x2="16" y2="12"/></svg>' : '<svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><polyline points="12 8 12 16 16 12"/></svg>'}
+                        </button>
+                        <button class="btn-icon btn-danger" onclick="confirmDeleteCategory('${category.id}')" title="Delete">
+                            <svg viewBox="0 0 24 24"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>
+                        </button>
                     </div>
-                    <div class="category-info">
-                        <div class="category-name">${escapeHtml(category.name)}</div>
-                        <div class="category-description">${escapeHtml(category.description || 'No description')}</div>
-                    </div>
-                </div>
-                <div class="category-meta">
-                    <div class="meta-item">
-                        <span class="meta-label">Status</span>
-                        <span class="status-badge ${category.status}">${category.status}</span>
-                    </div>
-                    <div class="meta-item">
-                        <span class="meta-label">Files</span>
-                        <span class="meta-value">📎 ${fileCount}</span>
-                    </div>
-                    <div class="meta-item">
-                        <span class="meta-label">Created</span>
-                        <span class="meta-value">${createdDate}</span>
-                    </div>
-                </div>
-                <div class="category-actions">
-                    <button class="btn-edit" onclick="editCategory('${category.id}')">
-                        <svg viewBox="0 0 24 24"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
-                        Edit
-                    </button>
-                    <button class="btn-deactivate" onclick="toggleCategoryStatus('${category.id}')">
-                        <svg viewBox="0 0 24 24"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
-                        ${category.status === 'active' ? 'Deactivate' : 'Activate'}
-                    </button>
-                    <button class="btn-delete" onclick="confirmDeleteCategory('${category.id}')">
-                        <svg viewBox="0 0 24 24"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>
-                        Delete
-                    </button>
-                </div>
-            </div>
+                </td>
+            </tr>
         `;
     }).join('');
 }
 
 function showEmptyState() {
-    document.getElementById('categoriesGrid').innerHTML = '';
-    document.getElementById('emptyState').style.display = 'block';
+    const categoriesGrid = document.getElementById('categoriesGrid');
+    const tableBody = document.getElementById('categoryTableBody');
+    const emptyState = document.getElementById('emptyState');
+    
+    if (tableBody) tableBody.innerHTML = '';
+    if (categoriesGrid) categoriesGrid.style.display = 'none';
+    if (emptyState) emptyState.style.display = 'block';
 }
 
 function initializeEventListeners() {

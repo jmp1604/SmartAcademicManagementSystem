@@ -230,6 +230,22 @@ async function loadDepartments() {
 
         requirements = data || [];
         console.log('Loaded requirements for department:', requirements.length);
+        
+        // Fetch semester name for display
+        if (activeSemesterId) {
+            const { data: semData } = await supabaseClient
+                .from('semesters')
+                .select('name')
+                .eq('id', activeSemesterId)
+                .single();
+            
+            if (semData) {
+                requirements.forEach(req => {
+                    req.semesterName = semData.name;
+                });
+            }
+        }
+        
         updateStats();
         renderRequirements(requirements);
 
@@ -273,6 +289,7 @@ function renderRequirements(requirementsToRender) {
 
     tbody.innerHTML = requirementsToRender.map(requirement => {
         const categoryName = requirement.categories?.name || 'N/A';
+        const semesterName = requirement.semesterName || activeSemesterName || 'N/A';
         const deadline = requirement.deadline 
             ? new Date(requirement.deadline).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
             : 'No deadline';
@@ -281,7 +298,6 @@ function renderRequirements(requirementsToRender) {
             day: 'numeric',
             year: 'numeric'
         });
-        const semester = requirement.semester || 'N/A';
         const isMandatory = requirement.is_mandatory 
             ? '<span class="badge badge-danger">Required</span>' 
             : '<span class="badge badge-gray">Optional</span>';
@@ -296,7 +312,7 @@ function renderRequirements(requirementsToRender) {
                     ${requirement.description ? `<br><small style="color:#888;">${escapeHtml(requirement.description.substring(0, 60))}${requirement.description.length > 60 ? '...' : ''}</small>` : ''}
                 </td>
                 <td>${escapeHtml(categoryName)}</td>
-                <td>${escapeHtml(semester)}</td>
+                <td>${escapeHtml(semesterName)}</td>
                 <td>${deadline}</td>
                 <td>${isMandatory}</td>
                 <td>${statusBadge}</td>
@@ -317,25 +333,21 @@ function renderRequirements(requirementsToRender) {
 }
 
 function initializeEventListeners() {
-    // Create button
     const btnCreate = document.getElementById('btnCreateRequirement');
     if (btnCreate) {
         btnCreate.addEventListener('click', openCreateModal);
     }
 
-    // Form submit
     const form = document.getElementById('requirementForm');
     if (form) {
         form.addEventListener('submit', handleSaveRequirement);
     }
 
-    // Search
     const searchInput = document.getElementById('searchRequirements');
     if (searchInput) {
         searchInput.addEventListener('input', handleSearch);
     }
 
-    // Filters
     const categoryFilter = document.getElementById('categoryFilter');
     if (categoryFilter) {
         categoryFilter.addEventListener('change', applyFilters);
@@ -346,7 +358,6 @@ function initializeEventListeners() {
         statusFilter.addEventListener('change', applyFilters);
     }
 
-    // Delete confirm
     const btnConfirmDelete = document.getElementById('btnConfirmDelete');
     if (btnConfirmDelete) {
         btnConfirmDelete.addEventListener('click', handleDeleteRequirement);
@@ -360,12 +371,10 @@ function openCreateModal() {
     document.getElementById('requirementId').value = '';
     document.querySelector('input[name="requirementStatus"][value="active"]').checked = true;
     
-    // Auto-select active semester
     if (activeSemesterId) {
         document.getElementById('requirementSemester').value = activeSemesterId;
     }
     
-    // Display user's department (read-only)
     document.getElementById('requirementDepartment').value = userDepartmentName;
     
     document.getElementById('requirementModal').style.display = 'flex';
@@ -393,10 +402,18 @@ async function editRequirement(id) {
     document.getElementById('requirementDepartment').value = userDepartmentName;
     document.getElementById('requirementSemester').value = requirement.semester_id || '';
     
-    // Format deadline for datetime-local input
+    // Format deadline for datetime-local input (use local time, not UTC)
     if (requirement.deadline) {
         const date = new Date(requirement.deadline);
-        const formattedDate = date.toISOString().slice(0, 16);
+        // Format as local time for datetime-local input
+        // datetime-local expects: YYYY-MM-DDTHH:mm
+        const year = date.getFullYear();
+        const month = String(date.getMonth() + 1).padStart(2, '0');
+        const day = String(date.getDate()).padStart(2, '0');
+        const hours = String(date.getHours()).padStart(2, '0');
+        const minutes = String(date.getMinutes()).padStart(2, '0');
+        const formattedDate = `${year}-${month}-${day}T${hours}:${minutes}`;
+        console.log('Formatted deadline for input:', requirement.deadline, '→', formattedDate);
         document.getElementById('requirementDeadline').value = formattedDate;
     }
     
@@ -415,7 +432,7 @@ async function handleSaveRequirement(e) {
     const description = document.getElementById('requirementDescription').value.trim();
     const categoryId = document.getElementById('requirementCategory').value;
     const semester = document.getElementById('requirementSemester').value;
-    const deadline = document.getElementById('requirementDeadline').value;
+    const deadlineInput = document.getElementById('requirementDeadline').value;
     const isMandatory = document.getElementById('requirementMandatory').checked;
     const status = document.querySelector('input[name="requirementStatus"]:checked').value;
 
@@ -433,13 +450,32 @@ async function handleSaveRequirement(e) {
         return;
     }
 
+    // Convert deadline from datetime-local to ISO timestamp (handling PHP timezone UTC+8)
+    let deadline = null;
+    if (deadlineInput) {
+        try {
+            // datetime-local gives us local time, but JavaScript interprets it as UTC
+            // We need to convert it to actual UTC
+            const localDate = new Date(deadlineInput);
+            const offsetInMinutes = localDate.getTimezoneOffset(); // Returns -480 for UTC+8
+            // Subtract the timezone offset to get the actual UTC time
+            const utcTime = new Date(localDate.getTime() + offsetInMinutes * 60 * 1000);
+            deadline = utcTime.toISOString();
+            console.log('Deadline (UTC+8):', deadlineInput, '→ UTC:', deadline);
+        } catch (err) {
+            console.error('Error converting deadline:', err);
+            showNotification('Error processing deadline format', 'error');
+            return;
+        }
+    }
+
     const requirementData = {
         name: title,  // Map 'title' to 'name' column
         description: description || null,
         category_id: categoryId,
         department_id: user.departmentId,  // Always use user's department
         semester_id: semester || null,
-        deadline: deadline || null,
+        deadline: deadline,
         is_mandatory: isMandatory,
         status
     };
@@ -451,12 +487,30 @@ async function handleSaveRequirement(e) {
             const oldRequirement = requirements.find(r => r.id === currentEditId);
             // Update existing requirement (don't change department_id)
             const { department_id, ...updateData } = requirementData;
+            
+            console.log('Updating requirement', currentEditId, 'with data:', updateData);
+            
+            // Use basic update first to check for errors
             result = await supabaseClient
                 .from('requirements')
                 .update(updateData)
                 .eq('id', currentEditId);
 
-            if (result.error) throw result.error;
+            console.log('Update result:', result);
+
+            if (result.error) {
+                console.error('❌ Update error:', result.error);
+                throw result.error;
+            }
+
+            // Check if update affected any rows
+            if (result.status >= 400) {
+                const errorMsg = `Update failed with status ${result.status}`;
+                console.error('❌', errorMsg);
+                throw new Error(errorMsg);
+            }
+
+            console.log('✓ Requirement updated successfully in database');
 
             // AUDIT: log requirement update
             await auditLog('UPDATE_REQUIREMENT', 'requirements', currentEditId, title,
@@ -467,12 +521,17 @@ async function handleSaveRequirement(e) {
             // Create new requirement
             requirementData.created_by = user.id;
             
+            console.log('Creating new requirement with data:', requirementData);
+            
             result = await supabaseClient
                 .from('requirements')
                 .insert([requirementData])
                 .select();
 
-            if (result.error) throw result.error;
+            if (result.error) {
+                console.error('❌ Insert error:', result.error);
+                throw result.error;
+            }
 
             // AUDIT: log requirement creation
             const created = result.data?.[0];
@@ -480,6 +539,22 @@ async function handleSaveRequirement(e) {
                 null,
                 created || requirementData
             );
+
+            // NOTIFICATION: Notify all professors in the department about new requirement
+            if (created?.id && requirementData.department_id) {
+                const notifResult = await notifyNewRequirement(
+                    requirementData.department_id,  // Department ID
+                    created.id,                      // New requirement ID
+                    title,                           // Requirement name
+                    requirementData.deadline,        // Deadline
+                    user.id                          // Admin who created it
+                );
+                if (notifResult.error) {
+                    console.warn('Could not create new requirement notifications:', notifResult.error);
+                } else {
+                    console.log('✓ Professors notified of new requirement');
+                }
+            }
         }
 
         showNotification(

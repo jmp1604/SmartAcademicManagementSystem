@@ -40,6 +40,7 @@ function loadHeader() {
             </div>
         </div>
         <div class="user-menu-wrapper">
+            <div id="notificationBellContainer"></div>
             <div class="user-info">
                 <div class="user-avatar" id="userAvatar">--</div>
                 <span class="user-name" id="userName">Loading...</span>
