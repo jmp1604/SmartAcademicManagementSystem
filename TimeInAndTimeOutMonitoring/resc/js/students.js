@@ -84,6 +84,8 @@ async function loadStudents() {
         if (error) throw error;
 
         allStudents = students || [];
+        // NEW: Populate dropdowns based on available data
+        populateDynamicFilters();
 
         const total      = allStudents.length;
         const registered = allStudents.filter(s => s.facial_dataset_path).length;
@@ -161,14 +163,33 @@ function renderTable(students) {
 // ══════════════════════════════════════════════════════════
 // 3. FILTERS & SEARCH
 // ══════════════════════════════════════════════════════════
+function populateDynamicFilters() {
+    const courseFilter = document.getElementById('courseFilter');
+    const ysFilter = document.getElementById('yearSectionFilter');
+
+    if (!courseFilter || !ysFilter) return;
+
+    // Get unique courses, sort them alphabetically, and ignore empties
+    const courses = [...new Set(allStudents.map(s => s.course).filter(Boolean))].sort();
+    
+    // Get unique Year & Section combos (e.g. "1A", "3B"), sort them, and ignore empties
+    const yearSecs = [...new Set(allStudents.map(s => `${s.year_level || ''}${s.section || ''}`).filter(val => val.length > 0))].sort();
+
+    // Populate dropdowns while keeping the default "All" option
+    courseFilter.innerHTML = '<option value="">All Programs</option>' + courses.map(c => `<option value="${c}">${c}</option>`).join('');
+    ysFilter.innerHTML = '<option value="">All Yr & Sec</option>' + yearSecs.map(ys => `<option value="${ys}">${ys}</option>`).join('');
+}
+
 function initFilters() {
     const searchInput  = document.getElementById('searchInput');
     const statusFilter = document.getElementById('statusFilter');
     const faceFilter   = document.getElementById('faceFilter');
     const sortFilter   = document.getElementById('sortFilter');
+    const courseFilter = document.getElementById('courseFilter');
+    const ysFilter     = document.getElementById('yearSectionFilter');
 
-    [searchInput, statusFilter, faceFilter, sortFilter].forEach(el => {
-        el.addEventListener(el.tagName === 'INPUT' ? 'input' : 'change', applyFilters);
+    [searchInput, statusFilter, faceFilter, sortFilter, courseFilter, ysFilter].forEach(el => {
+        if(el) el.addEventListener(el.tagName === 'INPUT' ? 'input' : 'change', applyFilters);
     });
 
     document.getElementById('clearFilters').addEventListener('click', () => {
@@ -176,25 +197,39 @@ function initFilters() {
         statusFilter.value = '';
         faceFilter.value = '';
         sortFilter.value = '';
+        if (courseFilter) courseFilter.value = '';
+        if (ysFilter) ysFilter.value = '';
         applyFilters();
     });
 }
 
 function applyFilters() {
-    const q  = document.getElementById('searchInput').value.toLowerCase().trim();
-    const st = document.getElementById('statusFilter').value;
-    const fc = document.getElementById('faceFilter').value;
-    const so = document.getElementById('sortFilter').value;
+    const q   = document.getElementById('searchInput').value.toLowerCase().trim();
+    const st  = document.getElementById('statusFilter').value;
+    const fc  = document.getElementById('faceFilter').value;
+    const so  = document.getElementById('sortFilter').value;
+    const crs = document.getElementById('courseFilter')?.value;
+    const ys  = document.getElementById('yearSectionFilter')?.value;
 
     let filtered = allStudents.filter(s => {
         const formattedId = formatStudentId(s.id_number || '').toLowerCase();
+        
+        // 1. Text Search
         const matchQ  = !q || s.id_number?.toLowerCase().includes(q)
                            || formattedId.includes(q)
                            || s.first_name?.toLowerCase().includes(q)
                            || s.last_name?.toLowerCase().includes(q);
+                           
+        // 2. Status & Face Check
         const matchSt = !st || (s.status || 'active').toLowerCase() === st;
         const matchFc = !fc || (fc === 'registered' ? !!s.facial_dataset_path : !s.facial_dataset_path);
-        return matchQ && matchSt && matchFc;
+        
+        // 3. NEW: Program & Year/Section Check
+        const matchCrs = !crs || s.course === crs;
+        const sYS = `${s.year_level || ''}${s.section || ''}`;
+        const matchYS = !ys || sYS === ys;
+
+        return matchQ && matchSt && matchFc && matchCrs && matchYS;
     });
 
     if (so === 'az') filtered.sort((a, b) => a.last_name.localeCompare(b.last_name));
@@ -202,7 +237,6 @@ function applyFilters() {
 
     renderTable(filtered);
 }
-
 // ══════════════════════════════════════════════════════════
 // 4. ADD / EDIT STUDENT
 // ══════════════════════════════════════════════════════════
@@ -477,7 +511,6 @@ function clearAddStudentDups() {
         if (el) { el.classList.remove('show', 'ok'); el.innerHTML = ''; }
     });
 }
-
 // ══════════════════════════════════════════════════════════
 // 7. FACE REGISTRATION SEARCH
 // ══════════════════════════════════════════════════════════
@@ -492,13 +525,13 @@ async function searchStudent() {
     searchBtn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Searching...';
 
     try {
-        // ✅ FIX: Strip dash so both "23-00223" and "2300223" match the DB's raw digits
-        const rawId = rawStudentId(studentId);
+        // ✅ FIX: Format the ID to ENSURE it has the dash (e.g., 23-00223) to match Supabase
+        const searchId = formatStudentId(studentId);
 
         const { data: s, error } = await supabaseClient
             .from('students')
             .select('id_number, first_name, middle_name, last_name, course, year_level, section, email, facial_dataset_path')
-            .eq('id_number', rawId)
+            .eq('id_number', searchId)
             .single();
 
         if (error || !s) {
@@ -515,10 +548,10 @@ async function searchStudent() {
 
         const rb = document.getElementById('registerFaceBtn');
         rb.style.display = hasFace ? 'none' : 'block';
-        rb.dataset.studentId = rawId;
+        rb.dataset.studentId = searchId; // Store the dashed ID for the redirect
 
         document.getElementById('studentInfo').innerHTML = `
-            <div class="info-item"><label>Student ID</label><div class="value">${escHtml(formatStudentId(s.id_number))}</div></div>
+            <div class="info-item"><label>Student ID</label><div class="value">${escHtml(searchId)}</div></div>
             <div class="info-item"><label>Full Name</label><div class="value">${escHtml(s.first_name)} ${escHtml(s.middle_name || '')} ${escHtml(s.last_name)}</div></div>
             <div class="info-item"><label>Course</label><div class="value">${escHtml(s.course || '-')}</div></div>
             <div class="info-item"><label>Year &amp; Section</label><div class="value">${s.year_level || ''}${escHtml(s.section || '')}</div></div>

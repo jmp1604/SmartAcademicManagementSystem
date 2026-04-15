@@ -532,6 +532,7 @@ td {
 
     await autoSaveReport('Print');
 }
+
 async function downloadPDF() {
     if (!checkDuplicateWarning('PDF')) return;
 
@@ -624,14 +625,17 @@ async function downloadPDF() {
     });
 
     doc.save(`Laboratory_Report_${new Date().toISOString().split('T')[0]}.pdf`);
+    await autoSaveReport('PDF');
 }
+
 
 // ── Excel ─────────────────────────────────────────────────────
 async function exportExcel() {
     if (!checkDuplicateWarning('Excel')) return;
 
     if (!window.XLSX) {
-        return exportCSV(); // Fallback if SheetJS fails
+        showToast('Excel library not loaded. Please refresh the page.', true);
+        return;
     }
 
     const wb = XLSX.utils.book_new();

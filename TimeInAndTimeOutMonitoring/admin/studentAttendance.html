@@ -113,8 +113,6 @@
                     <h2><i class="fa-solid fa-table-list"></i> Attendance Records</h2>
                     <div style="display:flex;align-items:center;gap:10px">
                         <span class="record-badge"><span id="recordCountBadge">0</span> records</span>
-                        <button class="export-btn" onclick="exportCSV()"><i class="fa-solid fa-download"></i> CSV</button>
-                        <button class="export-btn excel" onclick="exportExcel()"><i class="fa-solid fa-file-excel"></i> Excel</button>
                     </div>
                 </div>
                 <div style="overflow-x:auto">
@@ -160,11 +158,11 @@
                     <span class="rm-chip amber"><i class="fa-solid fa-clock"></i> <span id="rmLateChip">0</span> Late</span>
                     <span class="rm-chip green"><i class="fa-solid fa-check-double"></i> <span id="rmOnTimeChip">0</span> On Time</span>
                 </div>
-                <div class="rm-tb-right">
-                    <button class="rm-btn print" onclick="printReport()"><i class="fa-solid fa-print"></i> Print</button>
-                    <button class="rm-btn pdf"   onclick="downloadPDF()"><i class="fa-solid fa-file-pdf"></i> PDF</button>
-                    <button class="rm-btn excel" onclick="rmExportCSV()"><i class="fa-solid fa-file-excel"></i> Excel / CSV</button>
-                </div>
+           <div class="rm-tb-right">
+    <button class="rm-btn print" onclick="printReport()"><i class="fa-solid fa-print"></i> Print</button>
+    <button class="rm-btn pdf" onclick="downloadPDF()"><i class="fa-solid fa-file-pdf"></i> PDF</button>
+    <button class="rm-btn excel" onclick="exportExcel()"><i class="fa-solid fa-file-excel"></i> Excel</button>
+</div>
             </div>
             <div class="rm-body">
                 <table class="rm-table">
