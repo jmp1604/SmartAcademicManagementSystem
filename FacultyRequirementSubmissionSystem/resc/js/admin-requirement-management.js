@@ -402,10 +402,18 @@ async function editRequirement(id) {
     document.getElementById('requirementDepartment').value = userDepartmentName;
     document.getElementById('requirementSemester').value = requirement.semester_id || '';
     
-    // Format deadline for datetime-local input
+    // Format deadline for datetime-local input (use local time, not UTC)
     if (requirement.deadline) {
         const date = new Date(requirement.deadline);
-        const formattedDate = date.toISOString().slice(0, 16);
+        // Format as local time for datetime-local input
+        // datetime-local expects: YYYY-MM-DDTHH:mm
+        const year = date.getFullYear();
+        const month = String(date.getMonth() + 1).padStart(2, '0');
+        const day = String(date.getDate()).padStart(2, '0');
+        const hours = String(date.getHours()).padStart(2, '0');
+        const minutes = String(date.getMinutes()).padStart(2, '0');
+        const formattedDate = `${year}-${month}-${day}T${hours}:${minutes}`;
+        console.log('Formatted deadline for input:', requirement.deadline, '→', formattedDate);
         document.getElementById('requirementDeadline').value = formattedDate;
     }
     
@@ -424,7 +432,7 @@ async function handleSaveRequirement(e) {
     const description = document.getElementById('requirementDescription').value.trim();
     const categoryId = document.getElementById('requirementCategory').value;
     const semester = document.getElementById('requirementSemester').value;
-    const deadline = document.getElementById('requirementDeadline').value;
+    const deadlineInput = document.getElementById('requirementDeadline').value;
     const isMandatory = document.getElementById('requirementMandatory').checked;
     const status = document.querySelector('input[name="requirementStatus"]:checked').value;
 
@@ -442,13 +450,32 @@ async function handleSaveRequirement(e) {
         return;
     }
 
+    // Convert deadline from datetime-local to ISO timestamp (handling PHP timezone UTC+8)
+    let deadline = null;
+    if (deadlineInput) {
+        try {
+            // datetime-local gives us local time, but JavaScript interprets it as UTC
+            // We need to convert it to actual UTC
+            const localDate = new Date(deadlineInput);
+            const offsetInMinutes = localDate.getTimezoneOffset(); // Returns -480 for UTC+8
+            // Subtract the timezone offset to get the actual UTC time
+            const utcTime = new Date(localDate.getTime() + offsetInMinutes * 60 * 1000);
+            deadline = utcTime.toISOString();
+            console.log('Deadline (UTC+8):', deadlineInput, '→ UTC:', deadline);
+        } catch (err) {
+            console.error('Error converting deadline:', err);
+            showNotification('Error processing deadline format', 'error');
+            return;
+        }
+    }
+
     const requirementData = {
         name: title,  // Map 'title' to 'name' column
         description: description || null,
         category_id: categoryId,
         department_id: user.departmentId,  // Always use user's department
         semester_id: semester || null,
-        deadline: deadline || null,
+        deadline: deadline,
         is_mandatory: isMandatory,
         status
     };
@@ -460,12 +487,30 @@ async function handleSaveRequirement(e) {
             const oldRequirement = requirements.find(r => r.id === currentEditId);
             // Update existing requirement (don't change department_id)
             const { department_id, ...updateData } = requirementData;
+            
+            console.log('Updating requirement', currentEditId, 'with data:', updateData);
+            
+            // Use basic update first to check for errors
             result = await supabaseClient
                 .from('requirements')
                 .update(updateData)
                 .eq('id', currentEditId);
 
-            if (result.error) throw result.error;
+            console.log('Update result:', result);
+
+            if (result.error) {
+                console.error('❌ Update error:', result.error);
+                throw result.error;
+            }
+
+            // Check if update affected any rows
+            if (result.status >= 400) {
+                const errorMsg = `Update failed with status ${result.status}`;
+                console.error('❌', errorMsg);
+                throw new Error(errorMsg);
+            }
+
+            console.log('✓ Requirement updated successfully in database');
 
             // AUDIT: log requirement update
             await auditLog('UPDATE_REQUIREMENT', 'requirements', currentEditId, title,
@@ -476,12 +521,17 @@ async function handleSaveRequirement(e) {
             // Create new requirement
             requirementData.created_by = user.id;
             
+            console.log('Creating new requirement with data:', requirementData);
+            
             result = await supabaseClient
                 .from('requirements')
                 .insert([requirementData])
                 .select();
 
-            if (result.error) throw result.error;
+            if (result.error) {
+                console.error('❌ Insert error:', result.error);
+                throw result.error;
+            }
 
             // AUDIT: log requirement creation
             const created = result.data?.[0];

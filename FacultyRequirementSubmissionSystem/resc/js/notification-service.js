@@ -183,6 +183,116 @@ async function notifyNewRequirement(departmentId, requirementId, requirementName
     }
 }
 
+// Check requirements for upcoming deadlines and send notifications
+async function checkAndNotifyDeadlines() {
+    console.log('🔍 checkAndNotifyDeadlines() called');
+    try {
+        const user = getCurrentUser();
+        console.log('📌 Current user:', user);
+        if (!user?.id) {
+            console.log('❌ No user logged in, skipping deadline notifications');
+            return;
+        }
+
+        if (!supabaseClient) {
+            console.error('❌ Supabase client not initialized');
+            return;
+        }
+
+        console.log('📡 Fetching requirements from database...');
+        // Get all active requirements for this professor's department
+        const { data: requirements, error } = await supabaseClient
+            .from('requirements')
+            .select('id, name, deadline, department_id')
+            .eq('department_id', user.departmentId)
+            .not('deadline', 'is', null);
+
+        console.log('📊 Fetch result - Error:', error, 'Requirements count:', requirements?.length);
+
+        if (error) {
+            console.error('❌ Error fetching requirements:', error);
+            return;
+        }
+
+        if (!requirements || requirements.length === 0) {
+            console.log('⚠️ No requirements with deadlines found');
+            return;
+        }
+
+        console.log('✅ Found', requirements.length, 'requirement(s) with deadlines');
+        
+        const now = new Date();
+        console.log('⏰ Current time:', now.toISOString(), '(local:', now.toLocaleString(), ')');
+
+        // Check each requirement and send notification based on deadline windows
+        for (const req of requirements) {
+            const deadline = new Date(req.deadline);
+            const daysUntil = Math.ceil((deadline - now) / (1000 * 60 * 60 * 24));
+
+            console.log(`📋 Requirement: "${req.name}"`);
+            console.log(`   Deadline: ${deadline.toISOString()} (local: ${deadline.toLocaleString()})`);
+            console.log(`   Now: ${now.toISOString()} (local: ${now.toLocaleString()})`);
+            console.log(`   Days until: ${daysUntil}`);
+
+            // Determine which notification window applies (using <= instead of exact match)
+            let notificationWindow = null;
+            if (daysUntil <= 1) {
+                notificationWindow = 'deadline_reminder_1day';
+                console.log(`✓ Within 1-day window!`);
+            } else if (daysUntil <= 3) {
+                notificationWindow = 'deadline_reminder_3day';
+                console.log(`✓ Within 3-day window!`);
+            } else if (daysUntil <= 7) {
+                notificationWindow = 'deadline_reminder_7day';
+                console.log(`✓ Within 7-day window!`);
+            } else {
+                console.log(`✗ NOT in any notification window (${daysUntil} days - checking for <= 7, <= 3, <= 1)`);
+            }
+
+            // If within a notification window, check if we already sent it
+            if (notificationWindow) {
+                console.log(`Checking notification for "${req.name}" (window: ${notificationWindow})`);
+
+                // Check if we already notified for this deadline window
+                const { data: existingNotif, error: notifCheckErr } = await supabaseClient
+                    .from('faculty_requirement_notifications')
+                    .select('id')
+                    .eq('recipient_id', user.id)
+                    .eq('related_requirement_id', req.id)
+                    .eq('notification_type', 'deadline_reminder')
+                    .gte('created_at', new Date(now.getTime() - 24 * 60 * 60 * 1000).toISOString()) // Within last 24 hours
+                    .limit(1);
+
+                if (notifCheckErr) {
+                    console.warn('Error checking existing notifications:', notifCheckErr);
+                    continue;
+                }
+
+                // Only send if no recent notification for this requirement
+                if (!existingNotif || existingNotif.length === 0) {
+                    const result = await notifyDeadlineReminder(
+                        user.id,
+                        req.id,
+                        req.department_id,
+                        req.deadline,
+                        req.name
+                    );
+
+                    if (!result.error) {
+                        console.log(`✓ Deadline notification sent for "${req.name}" (${daysUntil} days left)`);
+                    }
+                } else {
+                    console.log(`⊘ Notification already sent for "${req.name}" in the last 24 hours`);
+                }
+            } else {
+                console.log(`✗ NOT in notification window for "${req.name}" (${daysUntil} days - checking for [7, 3, 1])`);
+            }
+        }
+    } catch (err) {
+        console.error('Exception in checkAndNotifyDeadlines:', err);
+    }
+}
+
 async function getUnreadNotifications(userId = null) {
     try {
         if (!userId) {

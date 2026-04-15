@@ -115,6 +115,7 @@ async function loadMyFiles() {
                 submission_files(*),
                 requirements!left(
                     name,
+                    deadline,
                     categories:category_id(
                         name,
                         icon
@@ -326,6 +327,17 @@ function renderFiles(submissions) {
                 month: 'short',
                 day: 'numeric'
             });
+            
+            // Check if submission is overdue
+            let overdueBadge = '';
+            if (submission.requirements?.deadline) {
+                const deadline = new Date(submission.requirements.deadline);
+                const submittedAt = new Date(submission.submitted_at);
+                if (submittedAt > deadline) {
+                    const daysLate = Math.floor((submittedAt - deadline) / (1000 * 60 * 60 * 24));
+                    overdueBadge = `<span class="status-badge overdue" title="Submitted ${daysLate} day(s) late">⚠️ Late</span>`;
+                }
+            }
 
             const fileSize = formatBytes(file.file_size);
             const fileName = file.file_name;
@@ -340,7 +352,7 @@ function renderFiles(submissions) {
                     <td>${escapeHtml(semesterName)}</td>
                     <td>${createdDate}</td>
                     <td>${fileSize}</td>
-                    <td>${statusBadge}</td>
+                    <td>${overdueBadge || statusBadge}</td>
                     <td>
                         <div class="action-buttons">
                             <button class="btn-icon view-btn" data-file-url="${file.signed_url}" data-file-name="${escapeHtml(fileName)}" title="View">

@@ -225,6 +225,45 @@ body {
     background: #f4faf6;
 }
 
+/* Overdue category styling */
+.category-card.overdue-card {
+    border-color: #d97706;
+    background: #fef3c7;
+}
+
+.category-card.overdue-card:hover {
+    border-color: #b45309;
+    box-shadow: 0 0 0 3px rgba(217, 119, 6, 0.15);
+}
+
+.deadline-info {
+    margin-top: 0.75rem;
+    padding-top: 0.75rem;
+    border-top: 1px solid var(--border);
+    font-size: 0.75rem;
+    color: var(--text-muted);
+}
+
+.deadline-info.overdue {
+    color: #b45309;
+    font-weight: 600;
+}
+
+.deadline-badge {
+    display: inline-block;
+    padding: 0.25rem 0.5rem;
+    border-radius: 0.35rem;
+    font-size: 0.7rem;
+    font-weight: 600;
+    margin-right: 0.5rem;
+    margin-bottom: 0.25rem;
+}
+
+.deadline-badge.overdue {
+    background-color: #fee2e2;
+    color: #b91c1c;
+}
+
 .cat-icon {
     width: 44px; height: 44px;
     border-radius: .65rem;
@@ -1742,6 +1781,13 @@ body {
 .status-badge.inactive {
     background: #f3f4f6;
     color: #6b7280;
+}
+
+.status-badge.overdue {
+    background: #fed7aa;
+    color: #92400e;
+    font-weight: 700;
+    border: 1px solid #fdba74;
 }
 
 /* Empty State */

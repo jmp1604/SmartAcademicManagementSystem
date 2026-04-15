@@ -274,6 +274,7 @@ async function enrichSubmissionsData() {
                 name,
                 title,
                 category_id,
+                deadline,
                 categories(name)
             `)
             .eq('semester_id', activeSemesterId)
@@ -356,13 +357,27 @@ function renderSubmissions() {
         const dateStr = formatDate(submission.submitted_at);
         const sizeStr = formatFileSize(fileSize);
 
+        // Check if submission is overdue
         let statusBadge = '';
-        if (submission.status === 'pending') {
-            statusBadge = '<span class="badge-status status-pending">Pending</span>';
-        } else if (submission.status === 'approved') {
-            statusBadge = '<span class="badge-status status-approved">Approved</span>';
-        } else if (submission.status === 'rejected') {
-            statusBadge = '<span class="badge-status status-rejected">Rejected</span>';
+        let isOverdue = false;
+        if (requirement.deadline) {
+            const deadline = new Date(requirement.deadline);
+            const submittedAt = new Date(submission.submitted_at);
+            isOverdue = submittedAt > deadline;
+            if (isOverdue) {
+                const daysLate = Math.floor((submittedAt - deadline) / (1000 * 60 * 60 * 24));
+                statusBadge = `<span class="badge-status status-overdue" title="Submitted ${daysLate} day(s) late">⚠️ Late</span>`;
+            }
+        }
+        
+        if (!isOverdue) {
+            if (submission.status === 'pending') {
+                statusBadge = '<span class="badge-status status-pending">Pending</span>';
+            } else if (submission.status === 'approved') {
+                statusBadge = '<span class="badge-status status-approved">Approved</span>';
+            } else if (submission.status === 'rejected') {
+                statusBadge = '<span class="badge-status status-rejected">Rejected</span>';
+            }
         }
 
         const deptLower = department.toLowerCase();

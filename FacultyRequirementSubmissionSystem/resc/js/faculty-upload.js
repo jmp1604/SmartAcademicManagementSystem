@@ -35,6 +35,11 @@ document.addEventListener('DOMContentLoaded', async function () {
     if (!await loadActiveSemester()) return;
     await loadCategories();
     initUploadForm();
+    
+    // Check for upcoming deadline reminders
+    if (typeof checkAndNotifyDeadlines === 'function') {
+        checkAndNotifyDeadlines().catch(err => console.error('Error checking deadlines:', err));
+    }
 });
 
 document.addEventListener('visibilitychange', async function () {
@@ -60,14 +65,27 @@ async function loadCategories() {
         }
 
         let categoryIds = null;
+        let requirementsByCategory = {};
         if (departmentId) {
             const { data: reqs, error: reqErr } = await supabaseClient
                 .from('requirements')
-                .select('category_id')
+                .select('id, category_id, deadline, name')
                 .eq('department_id', departmentId)
                 .eq('semester_id', activeSemesterId);
 
             if (reqErr || !reqs?.length) { showNoCategoriesMessage(); return; }
+
+            // Map requirements by category and store deadline info
+            reqs.forEach(req => {
+                if (!requirementsByCategory[req.category_id]) {
+                    requirementsByCategory[req.category_id] = [];
+                }
+                requirementsByCategory[req.category_id].push({
+                    id: req.id,
+                    deadline: req.deadline,
+                    name: req.name
+                });
+            });
 
             categoryIds = [...new Set(reqs.map(r => r.category_id).filter(Boolean))];
             if (!categoryIds.length) { showNoCategoriesMessage(); return; }
@@ -79,7 +97,7 @@ async function loadCategories() {
 
         if (error || !categories?.length) { showNoCategoriesMessage(); return; }
 
-        renderCategories(categories);
+        renderCategories(categories, requirementsByCategory);
         updateUploadStatistics();
     } catch (err) {
         console.error('loadCategories error:', err);
@@ -87,7 +105,7 @@ async function loadCategories() {
     }
 }
 
-function renderCategories(categories) {
+function renderCategories(categories, requirementsByCategory = {}) {
     const grid = document.getElementById('categoriesGridUpload');
     if (!grid) return;
     document.getElementById('noCategoriesMessage').style.display = 'none';
@@ -95,12 +113,37 @@ function renderCategories(categories) {
     grid.innerHTML = categories.map(cat => {
         let icon = cat.icon || '📁';
         if (icon.includes('fa-')) icon = `<i class="${icon}"></i>`;
-        return `<div class="category-card"
+        
+        // Get deadline info for this category
+        const catRequirements = requirementsByCategory[cat.id] || [];
+        let deadlineHtml = '';
+        let isOverdue = false;
+        
+        if (catRequirements.length > 0) {
+            const req = catRequirements[0]; // Use first requirement of this category
+            if (req.deadline) {
+                const deadline = new Date(req.deadline);
+                const now = new Date();
+                isOverdue = now > deadline;
+                
+                const deadlineStr = deadline.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+                const deadlineTime = deadline.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' });
+                
+                const overdueBadge = isOverdue ? '<span class="deadline-badge overdue">⚠️ Overdue</span>' : '';
+                deadlineHtml = `<div class="deadline-info ${isOverdue ? 'overdue' : ''}">
+                    ${overdueBadge}
+                    <small>Due: ${deadlineStr} ${deadlineTime}</small>
+                </div>`;
+            }
+        }
+        
+        return `<div class="category-card ${isOverdue ? 'overdue-card' : ''}"
                      data-category-id="${cat.id}"
                      data-category-name="${escapeHtml(cat.name)}">
                     <div class="category-icon">${icon}</div>
                     <div class="category-name">${escapeHtml(cat.name)}</div>
                     <div class="category-description">${escapeHtml(cat.description || '')}</div>
+                    ${deadlineHtml}
                 </div>`;
     }).join('');
 
@@ -301,9 +344,28 @@ async function submitAll() {
 
     const requirement = await fetchRequirement(categoryId, sessionUser.departmentId);
     if (!requirement) return;
+    
+    // Check if submission is overdue
+    let isOverdue = false;
+    let overdueWarning = '';
+    if (requirement.deadline) {
+        const deadline = new Date(requirement.deadline);
+        const now = new Date();
+        isOverdue = now > deadline;
+        if (isOverdue) {
+            const daysOverdue = Math.floor((now - deadline) / (1000 * 60 * 60 * 24));
+            overdueWarning = `\n\n⚠️ WARNING: This requirement is OVERDUE by ${daysOverdue} day(s). Your submission will be marked as late.`;
+        }
+    }
 
     // Multiple submissions allowed - admin will review and approve/reject each one
     // Professors can freely submit as many times as needed per requirement
+    
+    // Warn if overdue
+    if (isOverdue) {
+        const proceed = confirm(`You are submitting after the deadline.${overdueWarning}\n\nDo you want to proceed?`);
+        if (!proceed) return;
+    }
 
     /* lock UI */
     const submitBtn = document.getElementById('submit-btn');
@@ -321,7 +383,7 @@ async function submitAll() {
             semester_id:    activeSemesterId,
             status:         'pending',
             submitted_at:   new Date().toISOString(),
-            remarks:        description,
+            remarks:        description
         })
         .select()
         .single();
