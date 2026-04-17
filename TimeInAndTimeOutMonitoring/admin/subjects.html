@@ -73,22 +73,30 @@
                         <label for="searchInput"><i class="fa-solid fa-magnifying-glass"></i> Search</label>
                         <div class="search-container">
                             <input type="text" id="searchInput" placeholder="Search by code or name" />
-                            <button id="clearFilters" class="btn btn-clear">
-                                <i class="fa-solid fa-eraser"></i> Clear Filters
-                            </button>
                         </div>
+                    </div>
+                    <div class="control-group">
+                        <label for="semesterFilter"><i class="fa-solid fa-graduation-cap"></i> Filter by Semester</label>
+                        <select id="semesterFilter" style="padding:10px; border-radius:8px; border:1px solid #e5e7eb; outline:none; font-family:inherit; min-width: 200px;">
+                            <option value="all">Loading Semesters...</option>
+                        </select>
+                    </div>
+                    <div class="control-group" style="display: flex; align-items: flex-end;">
+                        <button id="clearFilters" class="btn btn-clear" style="height: 42px;">
+                            <i class="fa-solid fa-eraser"></i> Clear Filters
+                        </button>
                     </div>
                 </div>
             </div>
 
             <!-- Table -->
-            <div class="table-container">
+<div class="table-container">
                 <table class="subjects-table">
                     <thead>
                         <tr>
                             <th>Subject Code</th>
                             <th>Subject Name</th>
-                            <th>Description</th>
+                            <th>Semester</th> <th>Description</th>
                             <th>Units</th>
                             <th>Schedules</th>
                             <th>Students</th>
@@ -97,7 +105,7 @@
                     </thead>
                     <tbody id="subjectsTableBody">
                         <tr id="loadingRow">
-                            <td colspan="7" class="loading-cell">
+                            <td colspan="8" class="loading-cell">
                                 <i class="fa-solid fa-spinner fa-spin"></i> Loading subjects...
                             </td>
                         </tr>
@@ -115,7 +123,7 @@
                 <h2 id="modalTitle"><i class="fa-solid fa-plus"></i> Add Subject</h2>
                 <button class="close-modal" onclick="closeModal()">&times;</button>
             </div>
-            <form id="subjectForm">
+           <form id="subjectForm">
                 <input type="hidden" id="subjectId">
                 <div class="form-row">
                     <div class="form-group">
@@ -126,6 +134,12 @@
                         <label>Units <span class="required">*</span></label>
                         <input type="number" id="units" required step="0.5" min="0" max="10" placeholder="e.g., 3.0">
                     </div>
+                </div>
+                <div class="form-group">
+                    <label>Semester <span class="required">*</span></label>
+                    <select id="semesterId" required style="width: 100%; padding: 10px; border: 1px solid #e5e7eb; border-radius: 8px; font-family: inherit; outline: none;">
+                        <option value="" disabled selected>-- Loading Semesters... --</option>
+                    </select>
                 </div>
                 <div class="form-group">
                     <label>Subject Name <span class="required">*</span></label>
@@ -169,12 +183,12 @@
 
             <div class="rm-body">
                 <table class="rm-table" id="reportTable">
-                    <thead>
+                  <thead>
                         <tr>
                             <th>#</th>
                             <th>Subject Code</th>
                             <th>Subject Name</th>
-                            <th>Units</th>
+                            <th>Semester</th> <th>Units</th>
                             <th>Active Schedules</th>
                             <th>Enrolled Students</th>
                             <th>Sessions Done</th>
@@ -183,7 +197,7 @@
                     </thead>
                     <tbody id="reportTableBody">
                         <tr>
-                            <td colspan="8" style="text-align:center;padding:40px;color:#9ca3af">
+                            <td colspan="9" style="text-align:center;padding:40px;color:#9ca3af">
                                 <i class="fa-solid fa-spinner fa-spin"></i> Loading report data...
                             </td>
                         </tr>
