@@ -1,27 +1,13 @@
-/**
- * XML Staging Manager
- * Handles XML file storage and movement between staging/permanent buckets
- * Client-side Supabase Storage operations only
- */
-
 class XMLStagingManager {
     constructor(supabaseClient) {
         this.supabase = supabaseClient;
-        this.stagingBucket = 'submission-staging';      // Staging bucket
-        this.permanentBucket = 'faculty-submissions';   // Permanent bucket
+        this.stagingBucket = 'submission-staging';     
+        this.permanentBucket = 'faculty-submissions';   
     }
 
-    /**
-     * Store XML file in staging bucket when submission is pending
-     * @param {string} submissionId - Submission ID
-     * @param {string} xmlContent - XML content
-     * @returns {Promise<{success: boolean, path: string, error?: string}>}
-     */
     async storeXMLInStaging(submissionId, xmlContent) {
         try {
             const fileName = `${submissionId}/metadata.xml`;
-            
-            // Upload XML to staging bucket
             const { data, error } = await this.supabase.storage
                 .from(this.stagingBucket)
                 .upload(fileName, new Blob([xmlContent], { type: 'application/xml' }), {
@@ -43,18 +29,10 @@ class XMLStagingManager {
         }
     }
 
-    /**
-     * Move XML from staging to permanent storage when approved
-     * @param {string} submissionId - Submission ID
-     * @param {string} adminId - Admin ID who approved
-     * @returns {Promise<{success: boolean, path: string, error?: string}>}
-     */
     async moveXMLToPermanent(submissionId, adminId) {
         try {
             const stagingPath = `${submissionId}/metadata.xml`;
             const permanentPath = `approved/${submissionId}/metadata.xml`;
-
-            // Read from staging
             const { data: fileData, error: readError } = await this.supabase.storage
                 .from(this.stagingBucket)
                 .download(stagingPath);
@@ -63,8 +41,6 @@ class XMLStagingManager {
                 console.error('Error reading XML from staging:', readError);
                 return { success: false, error: readError.message };
             }
-
-            // Upload to permanent storage
             const { error: uploadError } = await this.supabase.storage
                 .from(this.permanentBucket)
                 .upload(permanentPath, fileData, {
@@ -76,8 +52,6 @@ class XMLStagingManager {
                 console.error('Error uploading XML to permanent:', uploadError);
                 return { success: false, error: uploadError.message };
             }
-
-            // Store approval record
             const approvalPath = `approved/${submissionId}/approval-record.xml`;
             const approvalXML = XMLGenerator.generateApprovalXML(submissionId, adminId, 'Approved');
             
@@ -88,7 +62,6 @@ class XMLStagingManager {
                     upsert: true
                 });
 
-            // Delete from staging
             await this.supabase.storage
                 .from(this.stagingBucket)
                 .remove([stagingPath]);
@@ -102,18 +75,9 @@ class XMLStagingManager {
         }
     }
 
-    /**
-     * Clean up XML in staging when submission is rejected
-     * @param {string} submissionId - Submission ID
-     * @param {string} adminId - Admin ID who rejected
-     * @param {string} rejectionReason - Reason for rejection
-     * @returns {Promise<{success: boolean, error?: string}>}
-     */
     async cleanupXMLOnRejection(submissionId, adminId, rejectionReason) {
         try {
             const stagingPath = `${submissionId}/metadata.xml`;
-
-            // Store rejection record before cleanup
             const rejectionXML = XMLGenerator.generateRejectionXML(submissionId, adminId, rejectionReason);
             const rejectionPath = `rejected/${submissionId}/rejection-record.xml`;
 
@@ -123,15 +87,12 @@ class XMLStagingManager {
                     cacheControl: '3600',
                     upsert: true
                 });
-
-            // Delete XML from staging
             const { error: deleteError } = await this.supabase.storage
                 .from(this.stagingBucket)
                 .remove([stagingPath]);
 
             if (deleteError) {
                 console.warn('Could not delete staging XML:', deleteError);
-                // Don't fail on this - rejection record is already stored
             }
 
             console.log(`✓ XML cleaned up from staging, rejection record stored`);
@@ -143,12 +104,6 @@ class XMLStagingManager {
         }
     }
 
-    /**
-     * Retrieve XML metadata for a submission
-     * @param {string} submissionId - Submission ID
-     * @param {boolean} isPending - Whether to get from staging
-     * @returns {Promise<{success: boolean, xml?: string, error?: string}>}
-     */
     async retrieveXML(submissionId, isPending = true) {
         try {
             const bucket = isPending ? this.stagingBucket : this.permanentBucket;
@@ -174,10 +129,6 @@ class XMLStagingManager {
         }
     }
 
-    /**
-     * Get list of all XMLs in staging bucket
-     * @returns {Promise<Array>} List of XML files
-     */
     async listStagingXMLs() {
         try {
             const { data, error } = await this.supabase.storage
@@ -201,12 +152,6 @@ class XMLStagingManager {
         }
     }
 
-    /**
-     * Verify XML integrity using stored hash
-     * @param {string} submissionId - Submission ID
-     * @param {File} currentFile - Current file to verify
-     * @returns {Promise<{valid: boolean, message: string}>}
-     */
     async verifyXMLIntegrity(submissionId, currentFile) {
         try {
             const { xml, success } = await this.retrieveXML(submissionId, true);
@@ -214,8 +159,6 @@ class XMLStagingManager {
             if (!success) {
                 return { valid: false, message: 'Could not retrieve XML metadata' };
             }
-
-            // Parse XML and extract stored hash
             const parser = new DOMParser();
             const xmlDoc = parser.parseFromString(xml, 'application/xml');
             const storedHash = xmlDoc.getElementsByTagName('file_hash')[0]?.textContent;
@@ -223,8 +166,6 @@ class XMLStagingManager {
             if (!storedHash) {
                 return { valid: false, message: 'No hash found in XML metadata' };
             }
-
-            // Calculate current file hash
             const currentHash = await XMLGenerator.calculateFileHash(currentFile);
 
             if (storedHash === currentHash) {
@@ -239,8 +180,6 @@ class XMLStagingManager {
         }
     }
 }
-
-// Export for use in other files
 if (typeof module !== 'undefined' && module.exports) {
     module.exports = XMLStagingManager;
 }
