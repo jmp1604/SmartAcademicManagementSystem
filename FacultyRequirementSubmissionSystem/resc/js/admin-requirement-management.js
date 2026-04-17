@@ -259,7 +259,6 @@ async function loadDepartments() {
 function updateStats() {
     const total = requirements.length;
     const active = requirements.filter(r => r.status === 'active').length;
-    const mandatory = requirements.filter(r => r.is_mandatory).length;
     
     // Count total submissions
     let totalSubs = 0;
@@ -269,7 +268,6 @@ function updateStats() {
 
     document.getElementById('totalRequirements').textContent = total;
     document.getElementById('activeRequirements').textContent = active;
-    document.getElementById('mandatoryRequirements').textContent = mandatory;
     document.getElementById('totalSubmissions').textContent = totalSubs;
 }
 
@@ -298,9 +296,6 @@ function renderRequirements(requirementsToRender) {
             day: 'numeric',
             year: 'numeric'
         });
-        const isMandatory = requirement.is_mandatory 
-            ? '<span class="badge badge-danger">Required</span>' 
-            : '<span class="badge badge-gray">Optional</span>';
         const statusBadge = requirement.status === 'active' 
             ? '<span class="badge badge-success">Active</span>' 
             : '<span class="badge badge-gray">Inactive</span>';
@@ -314,7 +309,6 @@ function renderRequirements(requirementsToRender) {
                 <td>${escapeHtml(categoryName)}</td>
                 <td>${escapeHtml(semesterName)}</td>
                 <td>${deadline}</td>
-                <td>${isMandatory}</td>
                 <td>${statusBadge}</td>
                 <td>${createdDate}</td>
                 <td>
@@ -417,8 +411,6 @@ async function editRequirement(id) {
         document.getElementById('requirementDeadline').value = formattedDate;
     }
     
-    document.getElementById('requirementMandatory').checked = requirement.is_mandatory || false;
-    
     // Set status radio
     document.querySelector(`input[name="requirementStatus"][value="${requirement.status}"]`).checked = true;
     
@@ -433,7 +425,6 @@ async function handleSaveRequirement(e) {
     const categoryId = document.getElementById('requirementCategory').value;
     const semester = document.getElementById('requirementSemester').value;
     const deadlineInput = document.getElementById('requirementDeadline').value;
-    const isMandatory = document.getElementById('requirementMandatory').checked;
     const status = document.querySelector('input[name="requirementStatus"]:checked').value;
 
     if (!title || !categoryId) {
@@ -476,7 +467,6 @@ async function handleSaveRequirement(e) {
         department_id: user.departmentId,  // Always use user's department
         semester_id: semester || null,
         deadline: deadline,
-        is_mandatory: isMandatory,
         status
     };
 

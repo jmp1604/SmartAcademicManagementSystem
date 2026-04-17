@@ -171,6 +171,32 @@
     color: #6b7280;
 }
 
+/* Badge styles for requirement status and field indicators */
+.badge {
+    display: inline-block;
+    padding: 0.25rem 0.65rem;
+    border-radius: 0.35rem;
+    font-size: 0.75rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+}
+
+.badge-success {
+    background: #d1fae5;
+    color: #065f46;
+}
+
+.badge-danger {
+    background: #fee2e2;
+    color: #dc2626;
+}
+
+.badge-gray {
+    background: #f3f4f6;
+    color: #6b7280;
+}
+
 .category-actions {
     display: flex;
     gap: .5rem;
