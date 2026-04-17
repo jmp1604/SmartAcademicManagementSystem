@@ -4,6 +4,7 @@ let currentFileUrl = null;
 let currentFileName = null;
 let activeSemesterId = null;
 let activeSemesterName = null;
+let xmlStagingManager = null;
 
 async function resolveFileUrl(raw, fileName) {
     if (!raw) { console.warn('No file URL for:', fileName); return null; }
@@ -57,6 +58,12 @@ document.addEventListener('DOMContentLoaded', async function () {
     if (!isAdmin()) {
         window.location.href = '../../auth/login.html';
         return;
+    }
+
+    // Initialize XML Staging Manager
+    if (typeof XMLStagingManager !== 'undefined' && supabaseClient) {
+        xmlStagingManager = new XMLStagingManager(supabaseClient);
+        console.log('✓ XML Staging Manager initialized');
     }
 
     await loadActiveSemester();
@@ -576,6 +583,33 @@ async function handleReviewSubmission(action) {
             throw error;
         }
         console.log('✓ Submission status updated in database');
+
+        // Handle XML staging operations
+        if (xmlStagingManager) {
+            if (action === 'approved') {
+                // Move XML from staging to permanent storage
+                const xmlMoveResult = await xmlStagingManager.moveXMLToPermanent(currentSubmissionId, user?.id);
+                if (xmlMoveResult.success) {
+                    console.log('✓ XML moved from staging to permanent storage');
+                } else {
+                    console.warn('Could not move XML to permanent storage:', xmlMoveResult.error);
+                }
+            } else if (action === 'rejected') {
+                // Clean up XML from staging
+                const xmlCleanupResult = await xmlStagingManager.cleanupXMLOnRejection(
+                    currentSubmissionId, 
+                    user?.id, 
+                    remarks
+                );
+                if (xmlCleanupResult.success) {
+                    console.log('✓ XML cleaned up from staging');
+                } else {
+                    console.warn('Could not cleanup XML:', xmlCleanupResult.error);
+                }
+            }
+        } else {
+            console.warn('XML Staging Manager not available for XML operations');
+        }
 
         const submission = allSubmissions.find(s => s.id === currentSubmissionId);
         console.log('Full submission object:', JSON.stringify(submission)); 

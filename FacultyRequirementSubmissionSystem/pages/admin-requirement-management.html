@@ -40,10 +40,6 @@
             <div class="stat-label">Active</div>
             <div class="stat-value" id="activeRequirements">0</div>
         </div>
-        <div class="stat-card yellow">
-            <div class="stat-label">Mandatory</div>
-            <div class="stat-value" id="mandatoryRequirements">0</div>
-        </div>
         <div class="stat-card blue">
             <div class="stat-label">Submissions</div>
             <div class="stat-value" id="totalSubmissions">0</div>
@@ -83,7 +79,6 @@
                     <th>Category</th>
                     <th>Semester</th>
                     <th>Deadline</th>
-                    <th>Mandatory</th>
                     <th>Status</th>
                     <th>Created</th>
                     <th>Actions</th>
@@ -156,16 +151,6 @@
                 </div>
 
                 <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem;">
-                    <div class="form-group">
-                        <label>Mandatory</label>
-                        <div class="radio-group">
-                            <label class="radio-label">
-                                <input type="checkbox" id="requirementMandatory"/>
-                                <span>This is a required submission</span>
-                            </label>
-                        </div>
-                    </div>
-
                     <div class="form-group">
                         <label>Status</label>
                         <div class="radio-group">
