@@ -2,6 +2,17 @@ let fileQueue    = [];
 let fileIdCounter = 0;
 let activeSemesterId = null;
 let activeSemesterName = null;
+let xmlStagingManager = null;
+
+// Initialize XML Staging Manager when page loads
+document.addEventListener('DOMContentLoaded', () => {
+    if (typeof XMLStagingManager !== 'undefined' && supabaseClient) {
+        xmlStagingManager = new XMLStagingManager(supabaseClient);
+        console.log('✓ XML Staging Manager initialized');
+    } else {
+        console.warn('XMLStagingManager or supabaseClient not available');
+    }
+});
 
 async function loadActiveSemester() {
     try {
@@ -544,6 +555,65 @@ async function uploadOneFile(file, sessionUser, submissionId, description) {
             .upload(filePath, file);
 
         if (uploadErr) { console.error('Storage upload error:', uploadErr); return false; }
+        console.log('✓ File uploaded to Supabase:', filePath);
+
+        // Calculate file hash for XML integrity
+        let fileHash = '';
+        try {
+            fileHash = await XMLGenerator.calculateFileHash(file);
+            console.log('✓ File hash calculated (SHA256):', fileHash.substring(0, 16) + '...');
+            console.log('  Full hash:', fileHash);
+        } catch (hashErr) {
+            console.warn('⚠ Could not calculate file hash:', hashErr);
+        }
+
+        // Get submission details for XML
+        const { data: submission, error: subErr } = await supabaseClient
+            .from('submissions')
+            .select('id, professor_id, requirement_id, department_id, semester_id, submitted_at')
+            .eq('id', submissionId)
+            .single();
+
+        if (subErr || !submission) {
+            console.warn('⚠ Could not retrieve submission for XML:', subErr);
+            // Continue without XML - not a blocking error
+        } else {
+            // Generate and store XML
+            const fileRecord = {
+                id: submissionId + '_' + Date.now(),
+                file_name: sanitized,
+                file_size: file.size,
+                file_type: file.type,
+                file_url: filePath
+            };
+
+            // Generate XML metadata
+            const xmlContent = XMLGenerator.generateSubmissionXML(submission, fileRecord, fileHash);
+            console.log('📋 XML Generated - Preview:');
+            console.log(xmlContent.substring(0, 300) + '...');
+
+            // Validate XML before storing
+            if (XMLGenerator.validateXML(xmlContent)) {
+                console.log('✓ XML validation passed');
+
+                // Store XML in staging
+                if (xmlStagingManager) {
+                    const xmlResult = await xmlStagingManager.storeXMLInStaging(submissionId, xmlContent);
+                    
+                    if (xmlResult.success) {
+                        console.log('✓✓ XML SUCCESSFULLY STORED IN STAGING BUCKET');
+                        console.log('   Location: submission-staging/' + xmlResult.path);
+                        console.log('   You can verify this in Supabase Storage dashboard');
+                    } else {
+                        console.warn('✗ Could not store XML in staging:', xmlResult.error);
+                    }
+                } else {
+                    console.warn('⚠ XML Staging Manager not initialized');
+                }
+            } else {
+                console.warn('✗ XML validation failed - XML structure issue');
+            }
+        }
 
         const { error: fileErr } = await supabaseClient
             .from('submission_files')
@@ -553,10 +623,15 @@ async function uploadOneFile(file, sessionUser, submissionId, description) {
                 file_url:      filePath,
                 file_size:     file.size,
                 file_type:     file.type,
+                xml_staging_path: submissionId + '/metadata.xml' // Store path to XML in staging
             });
 
         if (fileErr) { console.error('submission_files insert error:', fileErr); return false; }
 
+        console.log('✓ File record saved to database');
+        console.log('═══════════════════════════════════════════════════════');
+        console.log('✓ UPLOAD COMPLETE: File + XML staged successfully');
+        console.log('═══════════════════════════════════════════════════════');
         return true;
     } catch (e) {
         console.error('uploadOneFile exception:', e);
