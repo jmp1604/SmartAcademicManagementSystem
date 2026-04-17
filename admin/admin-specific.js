@@ -101,7 +101,6 @@ function loadHeader() {
         </header>
     `;
 }
-
 function loadSidebar(activePage = '') {
     const sidebarContainer = document.getElementById('sidebar-container');
     if (!sidebarContainer) return;
@@ -121,22 +120,30 @@ function loadSidebar(activePage = '') {
     const departmentManagementClass = activePage === 'admin-department-management' ? 'active' : '';
     const systemSettingsClass = activePage === 'system-settings' ? 'active' : '';
     const studentImportClass = activePage === 'student-import' ? 'active' : '';
-    
+    const subjectsClass = activePage === 'admin-subjects' ? 'active' : ''; // <--- NEW
+
     const backToPortalLink = isSuperAdmin ? '' : `
             <a href="../portal/portal.html" class="nav-item">
-                <svg viewBox="0 0 24 24"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>
                 Back to Portal
             </a>`;
 
     const departmentManagementLink = isSuperAdmin ? `
             <a href="admin-department-management.html" class="nav-item ${departmentManagementClass}">
-                <svg viewBox="0 0 24 24"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>
                 Department Management
+            </a>` : '';
+
+    // <--- NEW: SUBJECTS LINK FOR SUPER ADMINS --->
+    const subjectsLink = isSuperAdmin ? `
+            <a href="admin-subjects.html" class="nav-item ${subjectsClass}">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"></path><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"></path></svg>
+                Subjects Management
             </a>` : '';
 
     const systemSettingsLink = isSuperAdmin ? `
             <a href="system-settings.html" class="nav-item ${systemSettingsClass}">
-                <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="1"/><path d="M12 1v6m0 6v6M4.22 4.22l4.24 4.24m5.08 5.08l4.24 4.24M1 12h6m6 0h6M4.22 19.78l4.24-4.24m5.08-5.08l4.24-4.24"/></svg>
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="1"/><path d="M12 1v6m0 6v6M4.22 4.22l4.24 4.24m5.08 5.08l4.24 4.24M1 12h6m6 0h6M4.22 19.78l4.24-4.24m5.08-5.08l4.24-4.24"/></svg>
                 System Settings
             </a>` : '';
 
@@ -144,14 +151,15 @@ function loadSidebar(activePage = '') {
         <nav class="sidebar">
             ${backToPortalLink}
             <a href="usermanagement.html" class="nav-item ${userManagementClass}">
-                <svg viewBox="0 0 24 24"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
                 User Management
             </a>
             <a href="student-import.html" class="nav-item ${studentImportClass}">
-                <svg viewBox="0 0 24 24"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
                 Student Import
             </a>
             ${departmentManagementLink}
+            ${subjectsLink}
             ${systemSettingsLink}
         </nav>
     `;

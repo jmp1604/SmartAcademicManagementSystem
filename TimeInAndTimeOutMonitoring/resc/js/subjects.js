@@ -33,15 +33,38 @@ async function loadSubjects() {
     setTableLoading(true);
 
     try {
-        // 1. Fetch all subjects
+        // NEW: Fetch active semesters for dropdowns
+        const { data: semestersData, error: semErr } = await supabaseClient
+            .from('semesters')
+            .select('id, name')
+            .eq('is_active', true)
+            .order('start_date', { ascending: false });
+
+        if (semErr) throw semErr;
+
+        // Populate Form Dropdown
+        const formSelect = document.getElementById('semesterId');
+        if (formSelect) {
+            formSelect.innerHTML = '<option value="" disabled selected>-- Select Semester --</option>' +
+                (semestersData || []).map(sem => `<option value="${sem.id}">${escHtml(sem.name)}</option>`).join('');
+        }
+
+        // Populate Filter Dropdown
+        const filterSelect = document.getElementById('semesterFilter');
+        if (filterSelect) {
+            filterSelect.innerHTML = '<option value="all">All Semesters</option>' +
+                (semestersData || []).map(sem => `<option value="${sem.id}">${escHtml(sem.name)}</option>`).join('');
+        }
+
+        // 1. Fetch all subjects (JOIN with semesters to get the name)
         const { data: subjects, error: subErr } = await supabaseClient
             .from('subjects')
-            .select('*')
+            .select('*, semesters(id, name)')
             .order('subject_code', { ascending: true });
 
         if (subErr) throw subErr;
 
-        // 2. Fetch active schedule counts per subject
+        // 2. Fetch active schedule counts per subject  <--- THIS WAS MISSING!
         const { data: schedules, error: schErr } = await supabaseClient
             .from('lab_schedules')
             .select('schedule_id, subject_id')
@@ -124,6 +147,7 @@ async function loadSubjects() {
         reportRows = allSubjects.map(s => ({
             subject_code:      s.subject_code,
             subject_name:      s.subject_name,
+            semester_name:     s.semesters ? s.semesters.name : 'Unassigned',
             description:       s.description || '',
             units:             s.units || 0,
             active_schedules:  s.schedule_count,
@@ -139,7 +163,6 @@ async function loadSubjects() {
         showTableError('Failed to load subjects: ' + (err.message || err));
     }
 }
-
 // ══════════════════════════════════════════════════════════
 // RENDER
 // ══════════════════════════════════════════════════════════
@@ -179,17 +202,18 @@ function renderTable(rows) {
             ? `${s.units} unit${s.units != 1 ? 's' : ''}`
             : '-';
 
-        return `
-        <tr>
+return `
+        <tr data-semester="${s.semester_id || 'all'}">
             <td><span class="subject-code">${escHtml(s.subject_code)}</span></td>
             <td><span class="subject-name">${escHtml(s.subject_name)}</span></td>
+            <td><span class="badge" style="background:#e0f2fe; color:#0369a1;">${s.semesters ? escHtml(s.semesters.name) : '<i>Unassigned</i>'}</span></td>
             <td>${desc}</td>
             <td><span class="badge units">${unitsLabel}</span></td>
             <td><span class="badge schedules"><i class="fa-solid fa-calendar"></i> ${s.schedule_count}</span></td>
             <td><span class="badge students"><i class="fa-solid fa-users"></i> ${s.enrolled_students}</span></td>
-            <td>
+           <td>
                 <div style="display:flex;gap:8px">
-                    <button class="btn-edit" title="Edit subject" onclick='editSubject(${JSON.stringify(s)})'>
+                    <button class="btn-edit" title="Edit subject" onclick="editSubject('${s.subject_id}')">
                         <i class="fa-solid fa-edit"></i>
                     </button>
                     <button class="btn-delete" title="Delete subject" onclick="deleteSubject('${s.subject_id}', '${escHtml(s.subject_code)}')">
@@ -223,6 +247,7 @@ function renderReportTable() {
             <td style="color:#9ca3af;font-size:12px">${i + 1}</td>
             <td><strong style="color:#166534;font-size:14px">${escHtml(r.subject_code)}</strong></td>
             <td>${escHtml(r.subject_name)}</td>
+            <td>${escHtml(r.semester_name)}</td>
             <td style="text-align:center">
                 <span style="background:#fff3cd;color:#92400e;padding:3px 10px;border-radius:12px;font-size:12px;font-weight:700">
                     ${r.units} ${r.units == 1 ? 'unit' : 'units'}
@@ -239,17 +264,20 @@ function renderReportTable() {
 // ══════════════════════════════════════════════════════════
 // CRUD OPERATIONS (Supabase)
 // ══════════════════════════════════════════════════════════
-
 document.getElementById('subjectForm').addEventListener('submit', async function (e) {
     e.preventDefault();
 
     const subjectId   = document.getElementById('subjectId').value.trim();
     const subjectCode = document.getElementById('subjectCode').value.trim();
     const subjectName = document.getElementById('subjectName').value.trim();
+    const semesterId  = document.getElementById('semesterId').value; // <--- ADDED
     const units       = document.getElementById('units').value;
     const description = document.getElementById('description').value.trim();
     const isEdit      = subjectId !== '';
 
+    if (!semesterId) {
+        return showValidationError('Please select a semester.');
+    }
     if (!subjectCode || subjectCode.length < 3) {
         return showValidationError('Subject Code must be at least 3 characters.');
     }
@@ -309,15 +337,17 @@ document.getElementById('subjectForm').addEventListener('submit', async function
 
         btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Saving…';
 
+        // 🚨 ADD THE SEMESTER ID TO THE DATABASE PAYLOAD HERE 🚨
         const payload = {
             subject_code: subjectCode,
             subject_name: subjectName,
+            semester_id:  semesterId,  // <--- ADDED
             units:        unitsVal,
             description:  description || null,
             updated_at:   new Date().toISOString(),
         };
 
-        let saveErr;
+       let saveErr;
         if (isEdit) {
             const { error } = await supabaseClient
                 .from('subjects')
@@ -334,6 +364,11 @@ document.getElementById('subjectForm').addEventListener('submit', async function
         if (saveErr) throw saveErr;
 
         showToast(isEdit ? 'Subject updated successfully!' : 'Subject added successfully!');
+        
+        // 🚨 FIX: Restore the button to its original state so the span isn't permanently deleted!
+        btn.disabled = false;
+        btn.innerHTML = orig;
+        
         closeModal();
         await loadSubjects();
 
@@ -383,28 +418,33 @@ async function deleteSubject(subjectId, subjectCode) {
 // ══════════════════════════════════════════════════════════
 // MODAL HELPERS
 // ══════════════════════════════════════════════════════════
-
 function openAddModal() {
     document.getElementById('subjectForm').reset();
     document.getElementById('subjectId').value = '';
+    document.getElementById('semesterId').value = ''; // <--- ADDED
     document.getElementById('modalTitle').innerHTML = '<i class="fa-solid fa-plus"></i> Add Subject';
     document.getElementById('submitBtnText').textContent = 'Add Subject';
     clearAllValidation();
     openModal();
 }
 
-function editSubject(subject) {
+function editSubject(id) {
+    // FIX: Look up the subject data using the ID
+    const subject = allSubjects.find(s => s.subject_id === id);
+    if (!subject) return;
+
     document.getElementById('subjectId').value    = subject.subject_id;
     document.getElementById('subjectCode').value  = subject.subject_code;
     document.getElementById('subjectName').value  = subject.subject_name;
+    document.getElementById('semesterId').value   = subject.semester_id || ''; 
     document.getElementById('description').value  = subject.description || '';
     document.getElementById('units').value        = subject.units || '';
+    
     document.getElementById('modalTitle').innerHTML = '<i class="fa-solid fa-edit"></i> Edit Subject';
     document.getElementById('submitBtnText').textContent = 'Update Subject';
     clearAllValidation();
     openModal();
 }
-
 function openModal() {
     document.getElementById('subjectModal').classList.add('active');
     document.body.style.overflow = 'hidden';
@@ -817,6 +857,8 @@ async function exportExcel() {
 // REAL-TIME VALIDATION (input listeners)
 // ══════════════════════════════════════════════════════════
 
+
+
 function bindEvents() {
     document.getElementById('subjectCode').addEventListener('input', function () {
         this.value = this.value.toUpperCase().replace(/[^A-Z0-9]/g, '');
@@ -872,16 +914,25 @@ function bindEvents() {
         }
     });
 
-    document.getElementById('searchInput').addEventListener('input', function () {
-        const q = this.value.toLowerCase();
+  function applyFilters() {
+        const q = document.getElementById('searchInput').value.toLowerCase();
+        const sem = document.getElementById('semesterFilter').value;
+
         document.querySelectorAll('#subjectsTableBody tr').forEach(row => {
-            row.style.display = row.textContent.toLowerCase().includes(q) ? '' : 'none';
+            if (row.id === 'loadingRow') return;
+            const textMatch = row.textContent.toLowerCase().includes(q);
+            const semMatch = sem === 'all' || row.dataset.semester === sem;
+            row.style.display = (textMatch && semMatch) ? '' : 'none';
         });
-    });
+    }
+
+    document.getElementById('searchInput').addEventListener('input', applyFilters);
+    document.getElementById('semesterFilter').addEventListener('change', applyFilters);
 
     document.getElementById('clearFilters').addEventListener('click', function () {
         document.getElementById('searchInput').value = '';
-        document.querySelectorAll('#subjectsTableBody tr').forEach(row => row.style.display = '');
+        document.getElementById('semesterFilter').value = 'all';
+        applyFilters();
     });
 
     document.getElementById('subjectModal').addEventListener('click', function (e) {

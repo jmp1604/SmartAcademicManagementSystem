@@ -30,56 +30,104 @@ document.addEventListener('DOMContentLoaded', async () => {
 // ────────────────────────────────────────────
 async function loadDropdowns() {
     try {
+        // 1. Fetch ALL semesters to populate dropdowns, and identify the active one
+        const { data: semestersData } = await supabaseClient
+            .from('semesters')
+            .select('id, name, start_date, is_active')
+            .order('start_date', { ascending: false });
+
+        const activeSem = semestersData?.find(s => s.is_active === true) || null;
+
+        // Extract School Year from name (e.g., "2025-2026" from "2nd Semester 2025-2026")
+        let activeSchoolYear = '';
+        if (activeSem) {
+            const yearMatch = activeSem.name.match(/\d{4}-\d{4}/);
+            activeSchoolYear = yearMatch ? yearMatch[0] : `${new Date(activeSem.start_date).getFullYear()}-${new Date(activeSem.start_date).getFullYear() + 1}`;
+        }
+
+        // Populate Modal Form Semester Dropdown and Auto-Select Active
+        const semesterSelect = document.getElementById('semester');
+        if (semesterSelect) {
+            semesterSelect.innerHTML = (semestersData || []).map(sem =>
+                `<option value="${escapeHtml(sem.name)}" ${activeSem && activeSem.id === sem.id ? 'selected' : ''}>${escapeHtml(sem.name)}</option>`
+            ).join('');
+        }
+
+        // Auto-fill School Year and lock it as the default so form.reset() doesn't clear it
+        const schoolYearInput = document.getElementById('schoolYear');
+        if (schoolYearInput && activeSchoolYear) {
+            schoolYearInput.value = activeSchoolYear;
+            schoolYearInput.defaultValue = activeSchoolYear; 
+        }
+
+        // Populate Semester Filter Dropdown at the top of the page
+        const semesterFilter = document.getElementById('semesterFilter');
+        if (semesterFilter) {
+            semesterFilter.innerHTML = '<option value="all">All Semesters</option>' +
+                (semestersData || []).map(sem => `<option value="${escapeHtml(sem.name)}">${escapeHtml(sem.name)}</option>`).join('');
+        }
+
         // Fetch active professors
         const { data: profs } = await supabaseClient
             .from('professors').select('professor_id, employee_id, first_name, last_name').eq('status', 'active').order('last_name');
-        
-        // Fetch active subjects
-        const { data: subjects } = await supabaseClient
-            .from('subjects').select('subject_id, subject_code, subject_name').order('subject_code');
-        
+
+        // 2. Fetch subjects, but ONLY those linked to the active semester
+        let subjectQuery = supabaseClient
+            .from('subjects')
+            .select('subject_id, subject_code, subject_name')
+            .order('subject_code');
+
+        if (activeSem) {
+            subjectQuery = subjectQuery.eq('semester_id', activeSem.id);
+        }
+        const { data: subjects } = await subjectQuery;
+
         // Fetch active/reserved labs
         const { data: labs } = await supabaseClient
             .from('laboratory_rooms').select('lab_id, lab_code, lab_name').in('status', ['available', 'reserved']).order('lab_code');
 
-        // Fetch course, year, and section from students table and format as "BSIT-3A"
+        // Fetch course, year, and section from students table
         const { data: studentsData } = await supabaseClient
             .from('students').select('course, year_level, section');
-            
-        const uniqueSections = [...new Set(studentsData.map(s => {
+
+        const uniqueSections = [...new Set((studentsData || []).map(s => {
             const course = s.course ? s.course.trim() : '';
             const year   = s.year_level ? s.year_level.toString().trim() : '';
             const sec    = s.section ? s.section.trim() : '';
-            
+
             if (!course && !year && !sec) return null;
-            
+
             let combined = '';
             if (course) combined += course;
             if (course && (year || sec)) combined += '-';
             combined += `${year}${sec}`;
-            
+
             return combined;
         }).filter(Boolean))].sort();
 
         // Populate Form Dropdowns
         populateSelect('professorId', profs, p => p.professor_id, p => `${p.first_name} ${p.last_name} (${p.employee_id})`);
+
+        // This subject dropdown will now ONLY contain subjects from the active semester!
         populateSelect('subjectId', subjects, s => s.subject_id, s => `${s.subject_code} - ${s.subject_name}`);
+
         populateSelect('labId', labs, l => l.lab_id, l => `${l.lab_code} - ${l.lab_name}`);
-        
+
         const secSelect = document.getElementById('section');
-        secSelect.innerHTML = '<option value="" disabled selected>-- Select Section --</option>' + 
+        secSelect.innerHTML = '<option value="" disabled selected>-- Select Section --</option>' +
             uniqueSections.map(sec => `<option value="${sec}">${sec}</option>`).join('');
 
         // Populate Filter Dropdown for Labs
         const labFilter = document.getElementById('labFilter');
-        labFilter.innerHTML = '<option value="all">All Laboratories</option>' + 
-            labs.map(l => `<option value="${l.lab_code}">${l.lab_code} - ${l.lab_name}</option>`).join('');
+        if (labFilter) {
+            labFilter.innerHTML = '<option value="all">All Laboratories</option>' +
+                (labs || []).map(l => `<option value="${l.lab_code}">${l.lab_code} - ${l.lab_name}</option>`).join('');
+        }
 
     } catch (error) {
         console.error("Error loading dropdowns:", error);
     }
 }
-
 function populateSelect(id, data, valFn, textFn) {
     const select = document.getElementById(id);
     const options = data ? data.map(item => `<option value="${valFn(item)}">${escapeHtml(textFn(item))}</option>`).join('') : '';
