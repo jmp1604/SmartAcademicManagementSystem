@@ -221,11 +221,12 @@ function parseCSV(text) {
 function validateRow(row, index) {
     const errors   = [];
     const warnings = [];
+    const normalizedId = String(row.studentId || '').trim();
 
-    if (!row.studentId) {
+    if (!normalizedId) {
         errors.push('Student ID is required');
-    } else if (!/^\d{7}$/.test(row.studentId.replace(/-/g, ''))) {
-        errors.push('Student ID should be a 7-digit number');
+    } else if (!/^\d{2}-\d{5}$/.test(normalizedId)) {
+        errors.push('Student ID must be in format NN-NNNNN (e.g. 23-00269)');
     }
 
     if (!row.firstName)  errors.push('First Name is required');
@@ -249,7 +250,7 @@ function validateRow(row, index) {
                  : warnings.length > 0 ? 'warning'
                  : 'ok';
 
-    return { ...row, email, errors, warnings, status, rowIndex: index + 2 };
+    return { ...row, studentId: normalizedId, email, errors, warnings, status, rowIndex: index + 2 };
 }
 
 function renderPreview() {
@@ -482,7 +483,7 @@ function downloadStudentTemplate() {
     ];
 
     const sampleRow = [
-        '2300221',
+        '23-00221',
         'Juan',
         'Santos',
         'Dela Cruz',
