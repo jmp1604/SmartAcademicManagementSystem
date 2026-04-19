@@ -44,9 +44,18 @@
                     </div>
                 </div>
                 
-                <button class="btn-report" onclick="openReportModal()">
-                    <i class="fa-solid fa-file-chart-column"></i> Generate Report
-                </button>
+                <div class="page-actions">
+                    <input type="file" id="xmlScheduleInput" accept=".xml,text/xml,application/xml" style="display:none">
+                    <button class="btn-report" onclick="triggerScheduleXmlImport()">
+                        <i class="fa-solid fa-file-arrow-up"></i> Import XML
+                    </button>
+                    <button class="btn-report" onclick="downloadScheduleXmlTemplate()">
+                        <i class="fa-solid fa-file-code"></i> XML Template
+                    </button>
+                    <button class="btn-report" onclick="openReportModal()">
+                        <i class="fa-solid fa-file-chart-column"></i> Generate Report
+                    </button>
+                </div>
                 <button class="btn-add-sched" id="addScheduleBtn">
                     <i class="fa-solid fa-plus-circle"></i> Add Schedule
                 </button>
@@ -331,6 +340,7 @@
                     <button class="rm-btn print" onclick="printReport()"><i class="fa-solid fa-print"></i> Print</button>
                     <button class="rm-btn pdf"  onclick="downloadPDF()"><i class="fa-solid fa-file-pdf"></i> PDF</button>
                     <button class="rm-btn excel" onclick="exportCSV()"><i class="fa-solid fa-file-excel"></i> Excel / CSV</button>
+                    <button class="rm-btn excel" onclick="exportXML()"><i class="fa-solid fa-file-code"></i> XML</button>
                 </div>
             </div>
             <div class="rm-body">

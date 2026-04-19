@@ -20,6 +20,20 @@ document.addEventListener('DOMContentLoaded', async () => {
     initFilters();
 });
 
+function notifyUser(message, isError = false) {
+    const toast = document.getElementById('toast');
+    if (!toast) {
+        alert(message);
+        return;
+    }
+
+    const iconClass = isError ? 'fa-triangle-exclamation' : 'fa-circle-check';
+    toast.innerHTML = `<i class="fa-solid ${iconClass}"></i><span>${escapeHtml(message)}</span>`;
+    toast.style.background = isError ? 'var(--red)' : 'var(--green-dark)';
+    toast.className = `toast on ${isError ? 'error' : 'success'}`;
+    setTimeout(() => toast.classList.remove('on'), 3500);
+}
+
 // ────────────────────────────────────────────
 // 1. DATA LOADING 
 // ────────────────────────────────────────────
@@ -338,7 +352,9 @@ function escapeHtml(str) {
     return String(str).replace(/[&<>"']/g, m => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[m]));
 }
 
-window.openReportModal = function() {
+window.openReportModal = async function() {
+    await fetchTodayReports();
+
     document.getElementById('rmTotalChip').textContent = META.total;
     document.getElementById('rmEnrolledChip').textContent = META.enrolled;
     document.getElementById('rmEnrollmentsChip').textContent = META.enrollments;
@@ -403,8 +419,8 @@ async function autoSaveReport(exportType) {
     try {
         const { error } = await supabaseClient.from('las_reports').insert([payload]);
         if (error) throw error;
-        
-        if (typeof showToast === 'function') showToast(`${exportType} exported & report saved!`, true);
+
+        notifyUser(`${exportType} exported and report saved.`);
         
         existingReportsToday.push({
             name: payload.report_name,

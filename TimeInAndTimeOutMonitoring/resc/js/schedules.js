@@ -5,6 +5,8 @@
 
 let allSchedules = [];
 let META = { total: 0, active: 0, inactive: 0, date: '' };
+const SCHEDULE_STATUSES = new Set(['active', 'inactive']);
+const DAY_VALUES = new Set(['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday']);
 
 document.addEventListener('DOMContentLoaded', async () => {
     if (!supabaseClient) {
@@ -20,10 +22,421 @@ document.addEventListener('DOMContentLoaded', async () => {
     document.getElementById('schoolYear').value = `${yr}-${yr+1}`;
 
     await loadDropdowns();
+    bindScheduleXmlImportInput();
     await loadSchedulesData();
     initFilters();
     initConflictChecker();
 });
+
+function bindScheduleXmlImportInput() {
+    const input = document.getElementById('xmlScheduleInput');
+    if (!input) return;
+
+    input.addEventListener('change', async (event) => {
+        await importSchedulesXml(event);
+    });
+}
+
+function escapeXml(value) {
+    return String(value || '').replace(/[<>&'\"]/g, (ch) => ({
+        '<': '&lt;',
+        '>': '&gt;',
+        '&': '&amp;',
+        "'": '&apos;',
+        '"': '&quot;'
+    }[ch]));
+}
+
+window.downloadScheduleXmlTemplate = function() {
+    const template = `<?xml version="1.0" encoding="UTF-8"?>
+<schedules>
+  <schedule>
+        <professor_employee_id>443562323</professor_employee_id>
+        <subject_code>COMP101</subject_code>
+        <section>Computer Science-1A</section>
+        <lab_code>LAB 1</lab_code>
+    <day_of_week>Monday</day_of_week>
+        <start_time>08:30</start_time>
+        <end_time>10:00</end_time>
+        <semester>2nd</semester>
+    <school_year>2025-2026</school_year>
+    <status>active</status>
+  </schedule>
+    <schedule>
+        <professor_employee_id>443562323</professor_employee_id>
+        <subject_code>IT105</subject_code>
+        <section>Computer Science-1A</section>
+        <lab_code>LAB 1</lab_code>
+        <day_of_week>Monday</day_of_week>
+        <start_time>10:30</start_time>
+        <end_time>12:00</end_time>
+        <semester>2nd</semester>
+        <school_year>2025-2026</school_year>
+        <status>active</status>
+    </schedule>
+    <schedule>
+        <professor_employee_id>773562323</professor_employee_id>
+        <subject_code>COMP101</subject_code>
+        <section>Computer Engineering-1A</section>
+        <lab_code>LAB 2</lab_code>
+        <day_of_week>Monday</day_of_week>
+        <start_time>13:00</start_time>
+        <end_time>14:30</end_time>
+        <semester>2nd</semester>
+        <school_year>2025-2026</school_year>
+        <status>active</status>
+    </schedule>
+</schedules>`;
+
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(new Blob([template], { type: 'application/xml' }));
+    a.download = 'Schedules_Import_Template.xml';
+    a.click();
+    URL.revokeObjectURL(a.href);
+};
+
+window.triggerScheduleXmlImport = function() {
+    const input = document.getElementById('xmlScheduleInput');
+    if (!input) return;
+    input.click();
+};
+
+function xmlNodeValue(node, key) {
+    const child = node.getElementsByTagName(key)[0];
+    if (child && child.textContent) return child.textContent.trim();
+
+    const attr = node.getAttribute(key);
+    if (attr) return attr.trim();
+
+    return '';
+}
+
+function parseScheduleXmlEntries(xmlDoc) {
+    const nodes = Array.from(xmlDoc.getElementsByTagName('schedule'));
+    return nodes.map((node) => {
+        const day = xmlNodeValue(node, 'day_of_week');
+        const normalizedDay = DAY_VALUES.has(day) ? day : '';
+        const rawStatus = xmlNodeValue(node, 'status').toLowerCase();
+        const normalizedStatus = SCHEDULE_STATUSES.has(rawStatus) ? rawStatus : 'active';
+
+        return {
+            scheduleId: xmlNodeValue(node, 'schedule_id'),
+            professorEmployeeId: xmlNodeValue(node, 'professor_employee_id'),
+            subjectCode: xmlNodeValue(node, 'subject_code'),
+            section: xmlNodeValue(node, 'section'),
+            labCode: xmlNodeValue(node, 'lab_code'),
+            dayOfWeek: normalizedDay,
+            startTime: xmlNodeValue(node, 'start_time'),
+            endTime: xmlNodeValue(node, 'end_time'),
+            semester: xmlNodeValue(node, 'semester'),
+            schoolYear: xmlNodeValue(node, 'school_year'),
+            status: normalizedStatus
+        };
+    });
+}
+
+function normalizeTimeValue(value) {
+    if (!value) return '';
+    const match = /^([01]\d|2[0-3]):([0-5]\d)(?::[0-5]\d)?$/.exec(value.trim());
+    if (!match) return '';
+    return `${match[1]}:${match[2]}:00`;
+}
+
+function normalizeSemesterText(value) {
+    return String(value || '')
+        .toLowerCase()
+        .replace(/semester/g, '')
+        .replace(/\s+/g, ' ')
+        .trim();
+}
+
+function semesterMatchesActive(importSemester, activeSemesterName) {
+    const imported = normalizeSemesterText(importSemester);
+    const active = normalizeSemesterText(activeSemesterName);
+    if (!imported || !active) return false;
+    return imported === active || imported.includes(active) || active.includes(imported);
+}
+
+function hasTimeOverlap(startA, endA, startB, endB) {
+    return startA < endB && endA > startB;
+}
+
+async function hasActiveScheduleConflict(payload, excludeScheduleId = '') {
+    const { data, error } = await supabaseClient
+        .from('lab_schedules')
+        .select('schedule_id, professor_id, lab_id, start_time, end_time')
+        .eq('day_of_week', payload.day_of_week)
+        .eq('status', 'active');
+
+    if (error) throw error;
+
+    return (data || []).some((row) => {
+        if (excludeScheduleId && row.schedule_id === excludeScheduleId) return false;
+        const overlaps = hasTimeOverlap(payload.start_time, payload.end_time, row.start_time, row.end_time);
+        if (!overlaps) return false;
+        return row.professor_id === payload.professor_id || row.lab_id === payload.lab_id;
+    });
+}
+
+async function importSchedulesXml(event) {
+    const input = event.target;
+    const file = input?.files?.[0];
+    if (!file) return;
+
+    try {
+        const xmlText = await file.text();
+        const parser = new DOMParser();
+        const xmlDoc = parser.parseFromString(xmlText, 'application/xml');
+        if (xmlDoc.querySelector('parsererror')) {
+            throw new Error('Invalid XML format.');
+        }
+
+        const entries = parseScheduleXmlEntries(xmlDoc);
+        if (!entries.length) {
+            throw new Error('No schedule entries found in XML.');
+        }
+
+        const result = await saveScheduleXmlEntries(entries);
+        await loadSchedulesData();
+        showToast(`XML import done: ${result.inserted} added, ${result.updated} updated, ${result.skipped} skipped, ${result.invalid} invalid.`);
+
+        if (result.invalid > 0) {
+            const reasonSummary = buildInvalidReasonSummary(result.invalidReasons);
+            if (reasonSummary) {
+                setTimeout(() => {
+                    showToast(`Invalid reasons: ${reasonSummary}`);
+                }, 1200);
+            }
+        }
+    } catch (error) {
+        console.error('Schedule XML import failed:', error);
+        showToast(`XML import failed: ${error.message || 'Unknown error'}`);
+    } finally {
+        input.value = '';
+    }
+}
+
+function buildInvalidReasonSummary(reasons) {
+    if (!reasons) return '';
+
+    const labels = [
+        ['missing_fields', 'missing fields'],
+        ['invalid_time', 'invalid time format'],
+        ['end_before_start', 'end time <= start time'],
+        ['semester_mismatch', 'semester mismatch'],
+        ['conflict', 'time/professor/lab conflict'],
+        ['reference_not_found', 'reference not found'],
+        ['row_error', 'other row errors']
+    ];
+
+    return labels
+        .filter(([key]) => (reasons[key] || 0) > 0)
+        .map(([key, label]) => `${label}: ${reasons[key]}`)
+        .join(' | ');
+}
+
+async function saveScheduleXmlEntries(entries) {
+    const summary = {
+        inserted: 0,
+        updated: 0,
+        skipped: 0,
+        invalid: 0,
+        invalidReasons: {
+            missing_fields: 0,
+            invalid_time: 0,
+            end_before_start: 0,
+            semester_mismatch: 0,
+            conflict: 0,
+            reference_not_found: 0,
+            row_error: 0
+        }
+    };
+
+    function markInvalid(reasonKey) {
+        summary.invalid++;
+        if (summary.invalidReasons[reasonKey] !== undefined) {
+            summary.invalidReasons[reasonKey]++;
+        } else {
+            summary.invalidReasons.row_error++;
+        }
+    }
+
+    const employeeIds = [...new Set(entries.map(e => e.professorEmployeeId).filter(Boolean))];
+    const subjectCodes = [...new Set(entries.map(e => e.subjectCode).filter(Boolean))];
+    const labCodes = [...new Set(entries.map(e => e.labCode).filter(Boolean))];
+
+    const { data: professors, error: profErr } = await supabaseClient
+        .from('professors')
+        .select('professor_id, employee_id')
+        .in('employee_id', employeeIds)
+        .eq('status', 'active');
+    if (profErr) throw profErr;
+
+    const { data: activeSemesterRows, error: activeSemErr } = await supabaseClient
+        .from('semesters')
+        .select('id, name')
+        .eq('is_active', true)
+        .limit(1);
+    if (activeSemErr) throw activeSemErr;
+
+    const activeSemester = activeSemesterRows && activeSemesterRows.length ? activeSemesterRows[0] : null;
+
+    let subjectQuery = supabaseClient
+        .from('subjects')
+        .select('subject_id, subject_code')
+        .in('subject_code', subjectCodes);
+
+    if (activeSemester) {
+        subjectQuery = subjectQuery.eq('semester_id', activeSemester.id);
+    }
+
+    const { data: subjects, error: subjErr } = await subjectQuery;
+    if (subjErr) throw subjErr;
+
+    const { data: labs, error: labErr } = await supabaseClient
+        .from('laboratory_rooms')
+        .select('lab_id, lab_code')
+        .in('lab_code', labCodes)
+        .in('status', ['available', 'reserved']);
+    if (labErr) throw labErr;
+
+    const profMap = new Map((professors || []).map(p => [String(p.employee_id), p.professor_id]));
+    const subjMap = new Map((subjects || []).map(s => [String(s.subject_code), s.subject_id]));
+    const labMap = new Map((labs || []).map(l => [String(l.lab_code), l.lab_id]));
+
+    for (const entry of entries) {
+        try {
+            const professorId = profMap.get(String(entry.professorEmployeeId || ''));
+            const subjectId = subjMap.get(String(entry.subjectCode || ''));
+            const labId = labMap.get(String(entry.labCode || ''));
+            const startTime = normalizeTimeValue(entry.startTime);
+            const endTime = normalizeTimeValue(entry.endTime);
+
+            const payload = {
+                professor_id: professorId,
+                subject_id: subjectId,
+                section: entry.section,
+                lab_id: labId,
+                day_of_week: entry.dayOfWeek,
+                start_time: startTime,
+                end_time: endTime,
+                semester: entry.semester,
+                school_year: entry.schoolYear,
+                status: entry.status
+            };
+
+            if (!payload.professor_id || !payload.subject_id || !payload.lab_id) {
+                markInvalid('reference_not_found');
+                continue;
+            }
+
+            if (!payload.section || !payload.day_of_week || !payload.semester || !payload.school_year) {
+                markInvalid('missing_fields');
+                continue;
+            }
+
+            if (!payload.start_time || !payload.end_time) {
+                markInvalid('invalid_time');
+                continue;
+            }
+
+            if (payload.end_time <= payload.start_time) {
+                markInvalid('end_before_start');
+                continue;
+            }
+
+            if (activeSemester && !semesterMatchesActive(payload.semester, activeSemester.name)) {
+                markInvalid('semester_mismatch');
+                continue;
+            }
+
+            if (entry.scheduleId) {
+                const { data: existingById, error: existingIdErr } = await supabaseClient
+                    .from('lab_schedules')
+                    .select('schedule_id')
+                    .eq('schedule_id', entry.scheduleId)
+                    .limit(1);
+                if (existingIdErr) throw existingIdErr;
+
+                if (existingById && existingById.length) {
+                    if (payload.status === 'active') {
+                        const hasConflict = await hasActiveScheduleConflict(payload, entry.scheduleId);
+                        if (hasConflict) {
+                            markInvalid('conflict');
+                            continue;
+                        }
+                    }
+
+                    const { error: updateByIdErr } = await supabaseClient
+                        .from('lab_schedules')
+                        .update(payload)
+                        .eq('schedule_id', entry.scheduleId);
+                    if (updateByIdErr) throw updateByIdErr;
+                    summary.updated++;
+                    continue;
+                }
+            }
+
+            const { data: existing, error: existingErr } = await supabaseClient
+                .from('lab_schedules')
+                .select('schedule_id, professor_id, subject_id, section, lab_id, day_of_week, start_time, end_time, semester, school_year, status')
+                .eq('professor_id', payload.professor_id)
+                .eq('subject_id', payload.subject_id)
+                .eq('section', payload.section)
+                .eq('lab_id', payload.lab_id)
+                .eq('day_of_week', payload.day_of_week)
+                .eq('start_time', payload.start_time)
+                .eq('end_time', payload.end_time)
+                .eq('semester', payload.semester)
+                .eq('school_year', payload.school_year)
+                .limit(1);
+            if (existingErr) throw existingErr;
+
+            if (existing && existing.length) {
+                const current = existing[0];
+                if ((current.status || '').toLowerCase() === payload.status) {
+                    summary.skipped++;
+                    continue;
+                }
+
+                if (payload.status === 'active') {
+                    const hasConflict = await hasActiveScheduleConflict(payload, current.schedule_id);
+                    if (hasConflict) {
+                        markInvalid('conflict');
+                        continue;
+                    }
+                }
+
+                const { error: updateErr } = await supabaseClient
+                    .from('lab_schedules')
+                    .update({ status: payload.status })
+                    .eq('schedule_id', current.schedule_id);
+                if (updateErr) throw updateErr;
+                summary.updated++;
+                continue;
+            }
+
+            if (payload.status === 'active') {
+                const hasConflict = await hasActiveScheduleConflict(payload);
+                if (hasConflict) {
+                    markInvalid('conflict');
+                    continue;
+                }
+            }
+
+            const { error: insertErr } = await supabaseClient
+                .from('lab_schedules')
+                .insert([payload]);
+            if (insertErr) throw insertErr;
+            summary.inserted++;
+        } catch (rowErr) {
+            console.warn('Skipping invalid XML schedule row:', rowErr);
+            markInvalid('row_error');
+        }
+    }
+
+    return summary;
+}
 
 // ────────────────────────────────────────────
 // 1. DATA LOADING (Dropdowns & Main Table)
@@ -602,7 +1015,9 @@ async function viewEnrollments(scheduleId) {
 function openSchedModal(id) { document.getElementById(id).classList.add('active'); }
 function closeSchedModal(id) { document.getElementById(id).classList.remove('active'); }
 
-function openReportModal() {
+async function openReportModal() {
+    await fetchTodayReports();
+
     document.getElementById('rmTotalChip').textContent = META.total;
     document.getElementById('rmActiveChip').textContent = META.active;
     document.getElementById('rmInactiveChip').textContent = META.inactive;
@@ -703,7 +1118,7 @@ async function autoSaveReport(exportType) {
         const { error } = await supabaseClient.from('las_reports').insert([payload]);
         if (error) throw error;
         
-        if (typeof showToast === 'function') showToast(`${exportType} exported & report saved!`, true);
+        if (typeof showToast === 'function') showToast(`${exportType} exported and report saved.`);
         
         existingReportsToday.push({
             name: payload.report_name,
@@ -989,4 +1404,49 @@ async function exportExcel() {
     XLSX.writeFile(wb, `Schedules_Report_${new Date().toISOString().split('T')[0]}.xlsx`);
 
     await autoSaveReport('Excel');
+}
+
+async function exportXML() {
+        if (!checkDuplicateWarning('XML')) return;
+
+        const generatedAt = new Date().toISOString();
+        const rows = allSchedules.map((r, i) => `
+    <schedule index="${i + 1}">
+        <schedule_id>${escapeXml(r.schedule_id)}</schedule_id>
+        <professor>${escapeXml(r.profFullName)}</professor>
+        <employee_id>${escapeXml(r.professors?.employee_id || '')}</employee_id>
+        <subject_code>${escapeXml(r.subjects?.subject_code || '')}</subject_code>
+        <subject_name>${escapeXml(r.subjects?.subject_name || '')}</subject_name>
+        <section>${escapeXml(r.display_section || '')}</section>
+        <day_of_week>${escapeXml(r.day_of_week || '')}</day_of_week>
+        <start_time>${escapeXml(r.start_time || '')}</start_time>
+        <end_time>${escapeXml(r.end_time || '')}</end_time>
+        <laboratory_code>${escapeXml(r.laboratory_rooms?.lab_code || '')}</laboratory_code>
+        <laboratory_name>${escapeXml(r.laboratory_rooms?.lab_name || '')}</laboratory_name>
+        <semester>${escapeXml(r.semester || '')}</semester>
+        <school_year>${escapeXml(r.school_year || '')}</school_year>
+        <status>${escapeXml(r.status || '')}</status>
+        <enrolled_count>${escapeXml(String(r.enrolled_count || 0))}</enrolled_count>
+        <sessions_done>${escapeXml(String(r.sessions_done || 0))}</sessions_done>
+    </schedule>`).join('');
+
+        const xml = `<?xml version="1.0" encoding="UTF-8"?>
+<schedules_report>
+    <generated_at>${escapeXml(generatedAt)}</generated_at>
+    <summary>
+        <total>${escapeXml(String(META.total))}</total>
+        <active>${escapeXml(String(META.active))}</active>
+        <inactive>${escapeXml(String(META.inactive))}</inactive>
+    </summary>
+    <schedules>${rows}
+    </schedules>
+</schedules_report>`;
+
+        const a = document.createElement('a');
+        a.href = URL.createObjectURL(new Blob([xml], { type: 'application/xml' }));
+        a.download = `Schedules_Report_${new Date().toISOString().split('T')[0]}.xml`;
+        a.click();
+        URL.revokeObjectURL(a.href);
+
+        await autoSaveReport('XML');
 }
