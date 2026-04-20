@@ -46,6 +46,13 @@ function setupEventListeners() {
     const proceedBtn  = document.getElementById('proceedImportBtn');
     const anotherBtn  = document.getElementById('importAnotherBtn');
     const deptSelect  = document.getElementById('departmentSelect');
+    const downloadBtn = document.getElementById('downloadTemplateBtn');
+
+    // Generate template on demand so download still works even without a static file.
+    downloadBtn?.addEventListener('click', (e) => {
+        e.preventDefault();
+        downloadStudentTemplate();
+    });
 
     // Department select
     deptSelect.addEventListener('change', () => {
@@ -214,11 +221,12 @@ function parseCSV(text) {
 function validateRow(row, index) {
     const errors   = [];
     const warnings = [];
+    const normalizedId = String(row.studentId || '').trim();
 
-    if (!row.studentId) {
+    if (!normalizedId) {
         errors.push('Student ID is required');
-    } else if (!/^\d{7}$/.test(row.studentId.replace(/-/g, ''))) {
-        errors.push('Student ID should be a 7-digit number');
+    } else if (!/^\d{2}-\d{5}$/.test(normalizedId)) {
+        errors.push('Student ID must be in format NN-NNNNN (e.g. 23-00269)');
     }
 
     if (!row.firstName)  errors.push('First Name is required');
@@ -242,7 +250,7 @@ function validateRow(row, index) {
                  : warnings.length > 0 ? 'warning'
                  : 'ok';
 
-    return { ...row, email, errors, warnings, status, rowIndex: index + 2 };
+    return { ...row, studentId: normalizedId, email, errors, warnings, status, rowIndex: index + 2 };
 }
 
 function renderPreview() {
@@ -460,4 +468,50 @@ function escapeHtml(text) {
     if (text === null || text === undefined) return '';
     const map = { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#039;' };
     return String(text).replace(/[&<>"']/g, m => map[m]);
+}
+
+function downloadStudentTemplate() {
+    const headers = [
+        'Student ID',
+        'First Name',
+        'Middle Name',
+        'Last Name',
+        'Course',
+        'Year Level',
+        'Section',
+        'Email'
+    ];
+
+    const sampleRow = [
+        '23-00221',
+        'Juan',
+        'Santos',
+        'Dela Cruz',
+        'Computer Science',
+        '3',
+        'CS3A',
+        'delacruz_juan@plpasig.edu.ph'
+    ];
+
+    if (window.XLSX) {
+        const wb = XLSX.utils.book_new();
+        const ws = XLSX.utils.aoa_to_sheet([headers, sampleRow]);
+        XLSX.utils.book_append_sheet(wb, ws, 'Students');
+        XLSX.writeFile(wb, 'student-import-template.xlsx');
+        return;
+    }
+
+    // Fallback if SheetJS fails to load.
+    const csv = [headers, sampleRow]
+        .map(row => row.map(v => `"${String(v).replace(/"/g, '""')}"`).join(','))
+        .join('\r\n');
+    const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = 'student-import-template.csv';
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    URL.revokeObjectURL(url);
 }
