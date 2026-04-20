@@ -51,6 +51,11 @@ attendee_queue = queue.Queue()
 recently_seen  = {}
 COOLDOWN_SECS  = 5
 
+# Debounce repeated IN/OUT payloads while a student attendance write is in-flight.
+student_action_inflight = {}
+student_action_lock = threading.Lock()
+STUDENT_ACTION_TTL_SECS = 10
+
 PROFESSOR_START_WINDOW = 45
 STUDENT_GRACE_MINUTES  = 15
 
@@ -79,6 +84,39 @@ def get_now():
     now_store = datetime.datetime.now(datetime.timezone.utc)
     now_local = datetime.datetime.now()
     return now_store, now_local
+
+def _mark_student_action_inflight(student_id, session_id, action, ttl=STUDENT_ACTION_TTL_SECS):
+    if not student_id or not session_id or action not in ("IN", "OUT"):
+        return True
+
+    now_ts = time.time()
+    key = (str(student_id), str(session_id), action)
+
+    with student_action_lock:
+        expired = [k for k, expires_at in student_action_inflight.items() if expires_at <= now_ts]
+        for k in expired:
+            student_action_inflight.pop(k, None)
+
+        expires_at = student_action_inflight.get(key, 0)
+        if expires_at > now_ts:
+            return False
+
+        student_action_inflight[key] = now_ts + ttl
+        return True
+
+def _clear_student_action_inflight(student_id, session_id, action=None):
+    if not student_id or not session_id:
+        return
+
+    sid = str(student_id)
+    sess = str(session_id)
+    with student_action_lock:
+        if action in ("IN", "OUT"):
+            student_action_inflight.pop((sid, sess, action), None)
+            return
+
+        student_action_inflight.pop((sid, sess, "IN"), None)
+        student_action_inflight.pop((sid, sess, "OUT"), None)
 
 # ─────────────────────────────────────────────
 # Face loading from Supabase Storage
@@ -375,6 +413,16 @@ result_lock        = threading.Lock()
 latest_frame       = None
 recognition_result = {"locations": [], "labels": [], "colors": []}
 
+def get_guide_bounds(frame_shape):
+    h, w = frame_shape[:2]
+    guide_w = int(w * 0.45)
+    guide_h = int(h * 0.62)
+    x1 = (w - guide_w) // 2
+    y1 = (h - guide_h) // 2
+    x2 = x1 + guide_w
+    y2 = y1 + guide_h
+    return x1, y1, x2, y2
+
 # ─────────────────────────────────────────────
 # FIX 3: Recognition worker with frame skipping
 # ─────────────────────────────────────────────
@@ -394,8 +442,15 @@ def recognition_worker():
                 continue
             frame = latest_frame.copy()
 
-        # 1. Downscale frame to 1/4 size for lightning-fast processing
-        small = cv2.resize(frame, (0, 0), fx=0.25, fy=0.25)
+        x1, y1, x2, y2 = get_guide_bounds(frame.shape)
+        roi = frame[y1:y2, x1:x2]
+        if roi is None or roi.size == 0:
+            with result_lock:
+                recognition_result.update({"locations": [], "labels": [], "colors": []})
+            continue
+
+        # 1. Downscale ROI to 1/4 size for faster processing.
+        small = cv2.resize(roi, (0, 0), fx=0.25, fy=0.25)
         rgb   = cv2.cvtColor(small, cv2.COLOR_BGR2RGB)
         
         # 2. Find faces in the tiny image
@@ -410,8 +465,11 @@ def recognition_worker():
         new_locs, new_labels, new_colors = [], [], []
 
         for (top, right, bottom, left), enc in zip(locs, encs):
-            # 3. Multiply coordinates by 4 to map the tiny box back to the high-res video
-            top *= 4; right *= 4; bottom *= 4; left *= 4
+            # 3. Map tiny ROI coordinates back to full frame coordinates.
+            top = top * 4 + y1
+            right = right * 4 + x1
+            bottom = bottom * 4 + y1
+            left = left * 4 + x1
 
             if known_encodings_np is None or len(known_encodings_np) == 0:
                 new_locs.append((top, right, bottom, left))
@@ -725,6 +783,10 @@ def _handle_student(meta, today, now):
                            "timestamp":now.strftime("%Y-%m-%d %H:%M:%S")})
         action = "OUT"
 
+    if action in ("IN", "OUT") and not _mark_student_action_inflight(sid, session_id, action):
+        print(f"  → Debounced duplicate student action {action} for student_id={sid} session_id={session_id}")
+        return
+
     _push({"role":"student","student_id":sid,"id_number":id_num,
            "name":name,"action":action,"session_id":session_id,
            "is_late":is_late,"late_minutes":late_minutes,
@@ -746,6 +808,26 @@ def generate_frames():
             break
         with frame_lock:
             latest_frame = frame.copy()
+
+        # Visual guide frame to help students align their face before scan.
+        x1, y1, x2, y2 = get_guide_bounds(frame.shape)
+        guide_color = (80, 220, 160)
+
+        cv2.rectangle(frame, (x1, y1), (x2, y2), guide_color, 2)
+        corner = 28
+        thick = 3
+        cv2.line(frame, (x1, y1), (x1 + corner, y1), guide_color, thick)
+        cv2.line(frame, (x1, y1), (x1, y1 + corner), guide_color, thick)
+        cv2.line(frame, (x2, y1), (x2 - corner, y1), guide_color, thick)
+        cv2.line(frame, (x2, y1), (x2, y1 + corner), guide_color, thick)
+        cv2.line(frame, (x1, y2), (x1 + corner, y2), guide_color, thick)
+        cv2.line(frame, (x1, y2), (x1, y2 - corner), guide_color, thick)
+        cv2.line(frame, (x2, y2), (x2 - corner, y2), guide_color, thick)
+        cv2.line(frame, (x2, y2), (x2, y2 - corner), guide_color, thick)
+
+        cv2.putText(frame, "Align face inside the frame", (x1, max(22, y1 - 10)),
+                    cv2.FONT_HERSHEY_SIMPLEX, 0.55, guide_color, 2)
+
         with result_lock:
             locs   = list(recognition_result["locations"])
             labels = list(recognition_result["labels"])
@@ -780,6 +862,10 @@ def confirm_attendance():
     if not session_id:
         return jsonify({"success": False, "message": "Missing session_id"}), 400
 
+    inflight_action = action if action in ("IN", "OUT") else None
+    if inflight_action:
+        _mark_student_action_inflight(student_id, session_id, inflight_action, ttl=STUDENT_ACTION_TTL_SECS + 2)
+
     try:
         if action == "OUT":
             sess_result = supabase.table("lab_sessions")\
@@ -801,15 +887,25 @@ def confirm_attendance():
             is_late      = data.get("is_late", False)
             late_minutes = int(data.get("late_minutes", 0))
             time_status  = "late" if is_late else "on-time"
-            supabase.table("lab_attendance").insert({
-                "session_id":                     session_id,
-                "student_id":                     student_id,
-                "time_in":                        now_store.isoformat(),
-                "time_in_status":                 time_status,
-                "late_minutes":                   late_minutes,
-                "verified_by_facial_recognition": True,
-                "created_at":                     now_store.isoformat()
-            }).execute()
+            try:
+                supabase.table("lab_attendance").insert({
+                    "session_id":                     session_id,
+                    "student_id":                     student_id,
+                    "time_in":                        now_store.isoformat(),
+                    "time_in_status":                 time_status,
+                    "late_minutes":                   late_minutes,
+                    "verified_by_facial_recognition": True,
+                    "created_at":                     now_store.isoformat()
+                }).execute()
+            except Exception as insert_err:
+                # Handles race conditions where a parallel request inserted first.
+                err_txt = str(insert_err).lower()
+                if "duplicate" in err_txt or "unique" in err_txt:
+                    invalidate_attendance_cache(session_id, student_id)
+                    if student_id:
+                        recently_seen[f"student_{student_id}"] = datetime.datetime.now()
+                    return jsonify({"success": True, "message": "Time IN already recorded ✔"})
+                raise
             # Invalidate cache so next scan gets fresh data
             invalidate_attendance_cache(session_id, student_id)
             # Reset cooldown so popup won't re-trigger immediately after Time IN
@@ -837,6 +933,9 @@ def confirm_attendance():
 
     except Exception as e:
         return jsonify({"success": False, "message": str(e)}), 500
+    finally:
+        if inflight_action:
+            _clear_student_action_inflight(student_id, session_id, inflight_action)
 # ─────────────────────────────────────────────
 # /confirm_session
 # ─────────────────────────────────────────────

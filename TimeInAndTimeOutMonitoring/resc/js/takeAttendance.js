@@ -210,6 +210,7 @@ const toast             = document.getElementById('toast');
 
 let autoDismissTimer  = null;
 let countdownInterval = null;
+const pendingStudentActions = new Set();
 
 function showToast(msg, colorClass, duration = 4000) {
     toast.textContent   = msg;
@@ -286,9 +287,12 @@ if (window.EventSource) {
 function handleStudentEvent(d) {
     const name = d.name || 'Student';
     const time = new Date().toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: true });
+    const actionKey = `${d.student_id || ''}|${d.session_id || ''}|${d.action || ''}`;
 
     switch (d.action) {
         case 'IN':
+            if (pendingStudentActions.has(actionKey)) return;
+            pendingStudentActions.add(actionKey);
             showNotif({ 
                 icon: d.is_late ? '⚠️' : '🟢',
                 title: d.is_late ? 'Saving Time IN — Late...' : 'Saving Time IN...',
@@ -297,14 +301,16 @@ function handleStudentEvent(d) {
                 buttons: [],   
                 autoDismiss: 2 
             });
-            confirmStudent(d); 
+            confirmStudent(d, actionKey); 
             break;
         case 'OUT':
+            if (pendingStudentActions.has(actionKey)) return;
+            pendingStudentActions.add(actionKey);
             showNotif({ 
                 icon: '🔵', title: 'Saving Time OUT...', msg: `${name}\nTime: ${time}`,
                 buttons: [], autoDismiss: 2 
             });
-            confirmStudent(d); 
+            confirmStudent(d, actionKey); 
             break;
         case 'COMPLETED':
             showNotif({ 
@@ -384,7 +390,7 @@ function handleProfessorEvent(d) {
     }
 }
 
-function confirmStudent(d) {
+function confirmStudent(d, actionKey = null) {
     fetch('http://127.0.0.1:5000/confirm_attendance', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -392,7 +398,11 @@ function confirmStudent(d) {
     })
     .then(r => r.json())
     .then(res => showToast(res.message, d.is_late ? 'amber' : 'green'))
-    .catch(() => showToast('❌ Error saving attendance', 'red'));
+    .catch(() => showToast('❌ Error saving attendance', 'red'))
+    .finally(() => {
+        if (!actionKey) return;
+        setTimeout(() => pendingStudentActions.delete(actionKey), 1200);
+    });
 }
 
 function confirmProfessor(d) {

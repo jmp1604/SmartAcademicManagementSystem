@@ -5,6 +5,7 @@
 
 let allSchedules = [];
 let META = { total: 0, active: 0, inactive: 0, date: '' };
+let currentActiveSemester = { term: '', label: '' };
 const SCHEDULE_STATUSES = new Set(['active', 'inactive']);
 const DAY_VALUES = new Set(['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday']);
 
@@ -23,10 +24,81 @@ document.addEventListener('DOMContentLoaded', async () => {
 
     await loadDropdowns();
     bindScheduleXmlImportInput();
+    bindSchedulePreviewEvents();
     await loadSchedulesData();
     initFilters();
     initConflictChecker();
 });
+
+function bindSchedulePreviewEvents() {
+    ['professorId', 'subjectId', 'section', 'labId', 'dayOfWeek', 'startTime', 'endTime', 'schedStatus'].forEach((id) => {
+        const element = document.getElementById(id);
+        if (element) {
+            element.addEventListener('change', updateSchedulePreview);
+            element.addEventListener('input', updateSchedulePreview);
+        }
+    });
+}
+
+function updateScheduleProgress() {
+    const requiredIds = [
+        'professorId', 'subjectId', 'section', 'labId',
+        'dayOfWeek', 'startTime', 'endTime', 'semester', 'schoolYear', 'schedStatus'
+    ];
+
+    const filled = requiredIds.reduce((count, id) => {
+        const element = document.getElementById(id);
+        if (!element) return count;
+        return element.value && String(element.value).trim() !== '' ? count + 1 : count;
+    }, 0);
+
+    const percent = Math.round((filled / requiredIds.length) * 100);
+    const progressText = document.getElementById('scheduleProgressText');
+    const progressHint = document.getElementById('scheduleProgressHint');
+    const progressBar = document.getElementById('scheduleProgressBar');
+
+    if (progressText) progressText.textContent = `Form completion: ${percent}%`;
+    if (progressBar) progressBar.style.width = `${percent}%`;
+    if (progressHint) {
+        progressHint.textContent = percent >= 100
+            ? 'Ready to save.'
+            : `Filled ${filled}/${requiredIds.length} required fields.`;
+    }
+}
+
+function getSelectedText(selectId) {
+    const element = document.getElementById(selectId);
+    if (!element) return '--';
+    const selected = element.options?.[element.selectedIndex];
+    return selected && selected.textContent ? selected.textContent.trim() : '--';
+}
+
+function updateSchedulePreview() {
+    const professor = getSelectedText('professorId');
+    const subject = getSelectedText('subjectId');
+    const section = getSelectedText('section');
+    const day = document.getElementById('dayOfWeek')?.value || '--';
+    const start = document.getElementById('startTime')?.value || '';
+    const end = document.getElementById('endTime')?.value || '';
+    const semester = document.getElementById('semesterDisplay')?.value || currentActiveSemester.term || '--';
+    const schoolYear = document.getElementById('schoolYearDisplay')?.value || currentActiveSemester.schoolYear || '--';
+
+    const previewMap = [
+        ['previewProfessor', professor],
+        ['previewSubject', subject],
+        ['previewSection', section],
+        ['previewTime', day === '--' && !start && !end ? '--' : `${day}${start && end ? `, ${formatTimeStr(start)} - ${formatTimeStr(end)}` : ''}`],
+        ['previewSemester', semester],
+        ['previewSchoolYear', schoolYear]
+    ];
+
+    previewMap.forEach(([id, value]) => {
+        const target = document.getElementById(id);
+        if (target) target.textContent = value || '--';
+    });
+
+    updateScheduleProgress();
+}
 
 function bindScheduleXmlImportInput() {
     const input = document.getElementById('xmlScheduleInput');
@@ -150,11 +222,69 @@ function normalizeSemesterText(value) {
         .trim();
 }
 
+function extractSemesterTerm(value) {
+    const normalized = normalizeSemesterText(value);
+    if (!normalized) return '';
+
+    const match = normalized.match(/^(1st|2nd|3rd|4th)/);
+    if (match) return match[1];
+
+    if (normalized.includes('first')) return '1st';
+    if (normalized.includes('second')) return '2nd';
+    if (normalized.includes('third')) return '3rd';
+    if (normalized.includes('fourth')) return '4th';
+
+    return normalized.split(' ')[0] || '';
+}
+
 function semesterMatchesActive(importSemester, activeSemesterName) {
     const imported = normalizeSemesterText(importSemester);
     const active = normalizeSemesterText(activeSemesterName);
     if (!imported || !active) return false;
     return imported === active || imported.includes(active) || active.includes(imported);
+}
+
+function syncActiveSemesterField(semesterTerm = currentActiveSemester.term, semesterLabel = currentActiveSemester.label) {
+    const semesterDisplay = document.getElementById('semesterDisplay');
+    const semesterValue = document.getElementById('semester');
+    const schoolYearDisplay = document.getElementById('schoolYearDisplay');
+    const schoolYearValue = document.getElementById('schoolYear');
+    const activeSchoolYear = semesterLabel && semesterLabel.match(/\d{4}-\d{4}/)
+        ? semesterLabel.match(/\d{4}-\d{4}/)[0]
+        : currentActiveSemester.schoolYear || '';
+
+    if (semesterDisplay) {
+        semesterDisplay.innerHTML = '';
+        if (semesterTerm) {
+            const option = document.createElement('option');
+            option.value = semesterTerm;
+            option.textContent = `${semesterTerm} Semester`;
+            option.selected = true;
+            semesterDisplay.appendChild(option);
+        } else {
+            const option = document.createElement('option');
+            option.value = '';
+            option.textContent = 'No active semester';
+            option.selected = true;
+            semesterDisplay.appendChild(option);
+        }
+    }
+
+    if (schoolYearDisplay) {
+        schoolYearDisplay.value = activeSchoolYear || '';
+    }
+
+    if (semesterValue) {
+        semesterValue.value = semesterTerm || '';
+        semesterValue.defaultValue = semesterTerm || '';
+    }
+
+    if (schoolYearValue) {
+        schoolYearValue.value = activeSchoolYear || '';
+        schoolYearValue.defaultValue = activeSchoolYear || '';
+    }
+
+    updateSchedulePreview();
 }
 
 function hasTimeOverlap(startA, endA, startB, endB) {
@@ -450,6 +580,11 @@ async function loadDropdowns() {
             .order('start_date', { ascending: false });
 
         const activeSem = semestersData?.find(s => s.is_active === true) || null;
+        currentActiveSemester = activeSem ? {
+            term: extractSemesterTerm(activeSem.name),
+            label: activeSem.name,
+            schoolYear: activeSem.name.match(/\d{4}-\d{4}/)?.[0] || `${new Date(activeSem.start_date).getFullYear()}-${new Date(activeSem.start_date).getFullYear() + 1}`
+        } : { term: '', label: '' };
 
         // Extract School Year from name (e.g., "2025-2026" from "2nd Semester 2025-2026")
         let activeSchoolYear = '';
@@ -459,25 +594,19 @@ async function loadDropdowns() {
         }
 
         // Populate Modal Form Semester Dropdown and Auto-Select Active
-        const semesterSelect = document.getElementById('semester');
-        if (semesterSelect) {
-            semesterSelect.innerHTML = (semestersData || []).map(sem =>
-                `<option value="${escapeHtml(sem.name)}" ${activeSem && activeSem.id === sem.id ? 'selected' : ''}>${escapeHtml(sem.name)}</option>`
-            ).join('');
-        }
+        syncActiveSemesterField();
 
-        // Auto-fill School Year and lock it as the default so form.reset() doesn't clear it
-        const schoolYearInput = document.getElementById('schoolYear');
-        if (schoolYearInput && activeSchoolYear) {
-            schoolYearInput.value = activeSchoolYear;
-            schoolYearInput.defaultValue = activeSchoolYear; 
-        }
+        // Auto-fill School Year and keep it locked to the active semester record
+        syncActiveSemesterField();
 
         // Populate Semester Filter Dropdown at the top of the page
         const semesterFilter = document.getElementById('semesterFilter');
         if (semesterFilter) {
             semesterFilter.innerHTML = '<option value="all">All Semesters</option>' +
-                (semestersData || []).map(sem => `<option value="${escapeHtml(sem.name)}">${escapeHtml(sem.name)}</option>`).join('');
+                (semestersData || []).map(sem => {
+                    const semesterTerm = extractSemesterTerm(sem.name);
+                    return `<option value="${escapeHtml(semesterTerm)}">${escapeHtml(semesterTerm)} Semester</option>`;
+                }).join('');
         }
 
         // Fetch active professors
@@ -654,31 +783,41 @@ function renderTable(data) {
 
     tbody.innerHTML = data.map(s => `
         <tr data-day="${s.day_of_week}" data-status="${s.status}" data-lab="${s.laboratory_rooms?.lab_code || ''}">
-            <td><strong>#${s.schedule_id.split('-')[0]}</strong></td> <td>
+            <td class="col-id"><strong class="sched-id">#${s.schedule_id.split('-')[0]}</strong></td>
+            <td class="col-prof">
                 <div class="professor-chip">
                     <span>${escapeHtml(s.profFullName)}</span>
                     <small>${s.professors?.employee_id || ''}</small>
                 </div>
             </td>
-            <td><strong>${s.subjects?.subject_code || ''}</strong><br><span style="font-size:11px;color:var(--text-muted)">${escapeHtml(s.subjects?.subject_name || '')}</span></td>
-            <td>${escapeHtml(s.display_section)}</td> <td><span class="day-badge">${s.day_of_week}</span></td>
-            <td style="white-space:nowrap;font-size:12px;color:var(--text-dark)">
-                <i class="fa-solid fa-clock" style="color:var(--text-muted);font-size:11px"></i> ${formatTimeStr(s.start_time)}<br>
-                ${formatTimeStr(s.end_time)}
+            <td class="col-subject">
+                <strong class="subject-code">${s.subjects?.subject_code || ''}</strong>
+                <span class="muted-line subject-name">${escapeHtml(s.subjects?.subject_name || '')}</span>
             </td>
-            <td>
-                <div class="lab-chip">
-                    <span>${s.laboratory_rooms?.lab_code || ''}</span>
-                    <small>${escapeHtml(s.laboratory_rooms?.lab_name || '')}</small>
+            <td class="col-students"><span class="students-label">${escapeHtml(s.display_section)}</span></td>
+            <td class="col-day"><span class="day-badge">${s.day_of_week}</span></td>
+            <td class="col-time">
+                <div class="time-stack">
+                    <span><i class="fa-solid fa-clock"></i> ${formatTimeStr(s.start_time)}</span>
+                    <span>${formatTimeStr(s.end_time)}</span>
                 </div>
             </td>
-            <td>${s.semester}<br><span style="font-size:11.5px;color:var(--text-muted)">${s.school_year}</span></td>
-            <td><span class="status-badge ${s.status}">${s.status}</span></td>
-            <td>
-                <strong style="color:var(--text-dark)">${s.enrolled_count}</strong><br>
-                <span style="font-size:11px;color:var(--text-muted)">students</span>
+            <td class="col-lab">
+                <div class="lab-chip">
+                    <span class="lab-code">${s.laboratory_rooms?.lab_code || ''}</span>
+                    <small class="lab-name">${escapeHtml(s.laboratory_rooms?.lab_name || '')}</small>
+                </div>
             </td>
-            <td>
+            <td class="col-semester">
+                <strong class="sem-term">${s.semester}</strong>
+                <span class="muted-line sem-year">${s.school_year}</span>
+            </td>
+            <td class="col-status"><span class="status-badge ${s.status}">${s.status}</span></td>
+            <td class="col-enrolled">
+                <strong class="enrolled-count">${s.enrolled_count}</strong>
+                <span class="muted-line">students</span>
+            </td>
+            <td class="col-actions">
                 <div class="table-actions">
                     <button class="action-btn view" title="View Enrollments" onclick="viewEnrollments('${s.schedule_id}')"><i class="fa-solid fa-users"></i> Students</button>
                     <button class="action-btn edit" title="Edit Schedule" onclick='editSchedule(${JSON.stringify(s).replace(/'/g, "&#39;")})'><i class="fa-solid fa-edit"></i> Edit</button>
@@ -750,8 +889,10 @@ function initFilters() {
         if(subject) subject.value = 'all';
         if(semester) semester.value = 'all';
         if(section) section.value = 'all';
-        renderTable(allSchedules);
+        apply();
     });
+
+    apply();
 }
 
 // ────────────────────────────────────────────
@@ -760,9 +901,12 @@ function initFilters() {
 document.getElementById('addScheduleBtn').addEventListener('click', () => {
     document.getElementById('scheduleForm').reset();
     document.getElementById('scheduleId').value = '';
+    syncActiveSemesterField();
+    updateSchedulePreview();
     document.getElementById('schedModalTitleText').textContent = 'Add Schedule';
     document.getElementById('submitBtnText').textContent = 'Save Schedule';
     document.getElementById('conflictWarning').style.display = 'none';
+    updateScheduleProgress();
     openSchedModal('scheduleModal');
 });
 
@@ -775,9 +919,10 @@ function editSchedule(s) {
     document.getElementById('dayOfWeek').value = s.day_of_week;
     document.getElementById('startTime').value = s.start_time;
     document.getElementById('endTime').value = s.end_time;
-    document.getElementById('semester').value = s.semester;
-    document.getElementById('schoolYear').value = s.school_year;
+    syncActiveSemesterField();
+    updateSchedulePreview();
     document.getElementById('schedStatus').value = s.status;
+    updateScheduleProgress();
     
     document.getElementById('schedModalTitleText').textContent = 'Edit Schedule';
     document.getElementById('submitBtnText').textContent = 'Update Schedule';

@@ -179,6 +179,28 @@
             <form id="scheduleForm">
                 <input type="hidden" id="scheduleId" name="schedule_id">
                 <div class="sched-modal-body">
+                    <div class="schedule-preview-card">
+                        <div class="schedule-preview-title"><i class="fa-solid fa-wand-magic-sparkles"></i> Live Schedule Preview</div>
+                        <div class="schedule-preview-grid">
+                            <div class="preview-item"><span>Professor</span><strong id="previewProfessor">--</strong></div>
+                            <div class="preview-item"><span>Subject</span><strong id="previewSubject">--</strong></div>
+                            <div class="preview-item"><span>Section</span><strong id="previewSection">--</strong></div>
+                            <div class="preview-item"><span>Day / Time</span><strong id="previewTime">--</strong></div>
+                            <div class="preview-item"><span>Semester</span><strong id="previewSemester">--</strong></div>
+                            <div class="preview-item"><span>School Year</span><strong id="previewSchoolYear">--</strong></div>
+                        </div>
+                    </div>
+
+                    <div class="schedule-progress-card" aria-live="polite">
+                        <div class="schedule-progress-top">
+                            <span id="scheduleProgressText">Form completion: 0%</span>
+                            <span id="scheduleProgressHint">Fill required fields to continue.</span>
+                        </div>
+                        <div class="schedule-progress-track">
+                            <div class="schedule-progress-fill" id="scheduleProgressBar" style="width:0%"></div>
+                        </div>
+                    </div>
+
                     <div class="pm-section">
                         <div class="pm-section-title"><i class="fa-solid fa-chalkboard-teacher"></i> Professor &amp; Subject</div>
                         <div class="pm-fields">
@@ -242,6 +264,10 @@
                                     <input type="time" id="endTime" name="end_time" required>
                                 </div>
                             </div>
+                            <p class="pm-help-inline">
+                                <i class="fa-solid fa-circle-info"></i>
+                                Pick the exact time window. The system will block overlaps and invalid ranges.
+                            </p>
                             <div id="conflictWarning" style="display:none;"></div>
                         </div>
                     </div>
@@ -249,16 +275,23 @@
                     <div class="pm-section">
                         <div class="pm-section-title"><i class="fa-solid fa-graduation-cap"></i> Semester &amp; Status</div>
                         <div class="pm-fields">
+                            <div class="pm-badge-row">
+                                <span class="pm-active-badge"><i class="fa-solid fa-database"></i> Values loaded from active semester record</span>
+                            </div>
                             <div class="pm-grid-3">
                              <div class="pm-group">
-                                    <label>Semester <span class="pm-required">*</span></label>
-                                    <select id="semester" name="semester" required>
-                                        <option value="" disabled selected>Loading Semesters...</option>
+                                    <label>Active Semester <span class="pm-required">*</span></label>
+                                    <select id="semesterDisplay" disabled aria-disabled="true">
+                                        <option value="">Loading Semesters...</option>
                                     </select>
+                                    <input type="hidden" id="semester" name="semester">
+                                    <small class="pm-help-text">Fetched from the semester flagged active in the Semesters table.</small>
                                 </div>
                                 <div class="pm-group">
                                     <label>School Year <span class="pm-required">*</span></label>
-                                    <input type="text" id="schoolYear" name="school_year" required placeholder="e.g., 2024-2025">
+                                    <input type="text" id="schoolYearDisplay" disabled aria-disabled="true" placeholder="Loading school year...">
+                                    <input type="hidden" id="schoolYear" name="school_year">
+                                    <small class="pm-help-text">Fetched automatically from the active semester record.</small>
                                 </div>
                                 <div class="pm-group">
                                     <label>Status <span class="pm-required">*</span></label>
